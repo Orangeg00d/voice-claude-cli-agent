@@ -416,6 +416,104 @@
       ],
       "passes": true,
       "evidence": "README line 60: '--stt-backend 选项...在 voice、record、wake 命令中均可用'. Line 62-66: STT backend table (text-input, whisper-cli, apple-speech). Line 68-76: Apple Speech 说明与限制 section explicitly states '转写结果会出现在当前活跃的文本输入框中，而非程序化捕获'. Line 91-102: Fake/Real 模式对比表覆盖 demo-voice, voice, wake. All 5 F031 steps verified."
+    },
+    {
+      "id": "F032",
+      "priority": 32,
+      "category": "app",
+      "description": "rumps dependency added, menu bar app module created (app.py)",
+      "steps": [
+        "Add rumps to pyproject.toml dependencies (conditional on platform == darwin or universal)",
+        "Create src/voice_claude_agent/app.py with rumps.App subclass skeleton",
+        "Verify `python3 -c 'from voice_claude_agent.app import VoiceClaudeApp'` succeeds",
+        "Verify `voice-claude-agent app` CLI command starts the menu bar app"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F033",
+      "priority": 33,
+      "category": "app",
+      "description": "Menu bar shows start/stop wake loop, mic status, and quit",
+      "steps": [
+        "Launch app, verify menu bar icon appears",
+        "Verify menu items: Start Wake / Stop Wake toggle, Mic Status display, Quit",
+        "Verify clicking Start Wake enters a recording loop on a background thread",
+        "Verify clicking Stop Wake stops the loop and releases the mic"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F034",
+      "priority": 34,
+      "category": "app",
+      "description": "Wake loop running from menu bar respects --stt-backend and WHISPER_CPP_MODEL",
+      "steps": [
+        "Set WHISPER_CPP_MODEL and STT backend via CLI args or env",
+        "Start wake loop from menu bar",
+        "Verify the STT backend is the one specified (not hardcoded)",
+        "Verify the whisper model path is resolved from the environment"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F035",
+      "priority": 35,
+      "category": "app",
+      "description": "Menu bar app can be packaged as a standalone .app bundle",
+      "steps": [
+        "Create a setup.py or pyproject.toml for py2app",
+        "Run py2app to produce dist/VoiceClaudeAgent.app",
+        "Verify the .app launches without a terminal (double-click from Finder)",
+        "Verify the menu bar icon appears in the produced .app"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F036",
+      "priority": 36,
+      "category": "app",
+      "description": "Menu bar app handles mic permission denial gracefully",
+      "steps": [
+        "Revoke mic permission for the app",
+        "Click Start Wake",
+        "Verify a clear error message appears (dialog or status item)",
+        "Verify the app does not crash, stays responsive"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F037",
+      "priority": 37,
+      "category": "app",
+      "description": "Menu bar app writes session logs identical to CLI wake mode",
+      "steps": [
+        "Start wake from menu bar, speak a command",
+        "Verify agent_state/sessions.jsonl is written with input_mode='voice'",
+        "Verify last_result.json is updated after each execution",
+        "Verify the log format matches CLI wake mode exactly"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F038",
+      "priority": 38,
+      "category": "app",
+      "description": "Menu bar app has tests covering app startup, menu structure, and mock wake cycle",
+      "steps": [
+        "Write pytest tests for VoiceClaudeApp menu structure (items present)",
+        "Write test for start_toggle / stop_toggle state transitions",
+        "Write test that mocks _run_pipeline and verifies session log is written",
+        "Verify `./init.sh test` passes all app tests"
+      ],
+      "passes": false,
+      "evidence": ""
     }
   ]
 }
