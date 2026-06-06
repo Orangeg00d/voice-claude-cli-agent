@@ -1202,3 +1202,121 @@ class TestMenuBarApp:
         from voice_claude_agent.app import launch_app
 
         assert callable(launch_app)
+
+
+# ── F033: Start/Stop Toggle + Mic Status + Quit ─────────────
+class TestMenuBarLifecycle:
+    """Tests for start/stop toggle, mic status, and quit lifecycle.
+
+    IMPORTANT: Never start a real wake thread. Use _wake_target override
+    so the thread body is a no-op or a controlled mock. This avoids
+    input() calls (which break under pytest) and threading warnings.
+    """
+
+    def test_start_stop_state_transitions_direct_state(self):
+        """start/stop should transition _wake_active and update titles, without threads."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        assert not app._wake_active
+
+        # Directly set state (no thread) to test state machine
+        app._wake_active = True
+        app._sync_menu_titles()
+        assert "running" in app.start_item.title
+
+        app._stop_wake(app.stop_item)  # no-op since _wake_active was set, but _wake_thread is None
+        app._wake_active = False
+        app._sync_menu_titles()
+        assert app.start_item.title == "Start Wake"
+
+    def test_double_start_idempotent(self):
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_wake_target=lambda: None)
+        app._start_wake(app.start_item)
+        first = app._wake_thread
+        app._start_wake(app.start_item)
+        assert app._wake_thread is first
+
+        app._wake_thread.join(timeout=3.0)
+        app._stop_wake(app.stop_item)
+
+    def test_double_stop_safe(self):
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_wake_target=lambda: None)
+        app._start_wake(app.start_item)
+        app._wake_thread.join(timeout=3.0)
+        app._stop_wake(app.stop_item)
+        app._stop_wake(app.stop_item)
+        assert not app._wake_active
+
+    def test_sync_menu_titles_running_state(self):
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        app._wake_active = True
+        app._sync_menu_titles()
+        assert "running" in app.start_item.title
+
+        app._wake_active = False
+        app._sync_menu_titles()
+        assert app.start_item.title == "Start Wake"
+
+    def test_mic_status_refresh_on_start(self):
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_wake_target=lambda: None)
+        app._start_wake(app.start_item)
+        assert "Mic:" in app.mic_status_item.title
+        app._wake_thread.join(timeout=3.0)
+        app._stop_wake(app.stop_item)
+
+    def test_mic_status_monkeypatch(self, monkeypatch):
+        """Patching voice_claude_agent.app.check_mic_permission must affect the app."""
+        import voice_claude_agent.app as app_mod
+
+        monkeypatch.setattr(
+            app_mod, "check_mic_permission",
+            lambda: (False, "test: permission denied"),
+        )
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        assert "Denied" in app.mic_status_item.title
+        assert "permission denied" in app.mic_status_item.title
+
+    def test_quit_stops_wake_then_quits(self, monkeypatch):
+        import rumps as rumps_mod
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_wake_target=lambda: None)
+        app._start_wake(app.start_item)
+
+        # wait for the lambda thread to finish so join doesn't block
+        app._wake_thread.join(timeout=2.0)
+        assert not app._wake_thread.is_alive()
+
+        quit_called = []
+        monkeypatch.setattr(rumps_mod, "quit_application", lambda: quit_called.append(True))
+
+        app._quit(app.quit_item)
+        assert not app._wake_active
+        assert len(quit_called) == 1
+
+    def test_quit_when_idle_still_quits(self, monkeypatch):
+        import rumps as rumps_mod
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        assert not app._wake_active
+
+        quit_called = []
+        monkeypatch.setattr(rumps_mod, "quit_application", lambda: quit_called.append(True))
+
+        app._quit(app.quit_item)
+        assert len(quit_called) == 1

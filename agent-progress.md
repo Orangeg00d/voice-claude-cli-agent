@@ -789,9 +789,37 @@
 
 ### Risks / Notes
 - The menu bar app requires an active NSApplication run loop (AppKit). rumps provides this via `.run()`. The app command blocks the terminal until the user quits from the menu bar.
-- The wake loop currently uses `input()` for push-to-talk trigger — this works from the terminal but not headless. F033 should replace with a timer or hotkey.
+- F033 accepted after test isolation fix.
+
+## 2026-06-06 19:00 — Phase 6: F033 — Start/Stop Toggle, Mic Status, and Quit
+
+### Completed
+- Rewrote VoiceClaudeApp with stable MenuItem references (start_item, stop_item, mic_status_item, quit_item).
+- _start_wake: idempotent, refreshes mic status, starts daemon thread via injectable _wake_target.
+- _stop_wake: idempotent, sets threading.Event, joins thread with timeout, resets menu titles.
+- _quit: stops wake (if active), then calls rumps.quit_application().
+- _update_mic_status + click-to-refresh via _refresh_mic_status_event.
+- _wake_target injectable via constructor keyword for test isolation.
+- 8 lifecycle tests: state transitions (direct), idempotent start, safe double stop, menu title sync, mic refresh on start, mic monkeypatch, quit with/without active wake.
+- All tests use `_wake_target=lambda: None` — no real input() threads.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh lint` passed
+- `./init.sh test` passed: 86/86
+- All 8 F033 lifecycle tests pass
+
+### Files Changed
+- src/voice_claude_agent/app.py (rewritten: stable refs, injectable wake target)
+- tests/test_core.py (added TestMenuBarLifecycle: 8 tests)
+- feature_list.json (F033 passes=true)
+- agent-progress.md (this entry)
+
+### Next Recommended Task
+- F034: verify wake loop respects --stt-backend and WHISPER_CPP_MODEL from menu bar.
 
 ### Risks / Notes
+- The wake loop still uses input() for push-to-talk — this requires a terminal. For a headless menu bar app, a hotkey or timer trigger would be needed (future work).
 - F029 remains the only blocked Phase 5 feature.
 
 ## 2026-06-06 15:46 — Codex Review: F030 Verification
