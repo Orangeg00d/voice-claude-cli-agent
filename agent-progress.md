@@ -937,6 +937,33 @@
 ### Next Recommended Task
 - F038: final test coverage wrap-up.
 
+## 2026-06-06 20:33 — Codex Review: F037 Verification
+
+### Completed
+- Reviewed Claude commit `1b99178`.
+- Confirmed menu bar `_record_and_execute` calls the shared CLI `_run_pipeline` with `input_mode="voice"`.
+- Confirmed menu bar execution writes `sessions.jsonl` and `last_result.json`.
+- Confirmed CLI pipeline and menu bar pipeline produce matching session key sets.
+- Moved `test_alert_patch_defaults_to_rumps_alert` back under F036 ownership.
+- Isolated F037 tests from real microphone permission checks and macOS `say` so parity tests do not touch local audio devices.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh lint` passed
+- `./init.sh test` passed: 110/110
+- Focused F036/F037 tests passed: 7/7
+
+### Files Changed
+- tests/test_core.py
+- feature_list.json
+- agent-progress.md
+
+### Next Recommended Task
+- F038: final test coverage wrap-up.
+
+### Risks / Notes
+- F037 accepted. This verifies log parity through the shared pipeline; live menu bar voice execution still belongs to a later manual smoke test.
+
 ## 2026-06-06 20:23 — Codex Review: F036 Verification
 
 ### Completed

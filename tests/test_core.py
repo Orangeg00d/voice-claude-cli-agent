@@ -1662,9 +1662,35 @@ class TestMicDenialUX:
         app._wake_thread.join(timeout=3.0)
         app._stop_wake(app.stop_item)
 
+    def test_alert_patch_defaults_to_rumps_alert(self):
+        """Without _alert_patch, the app uses rumps.alert."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        assert app._alert is app._rumps_alert
+
 
 # ── F037: Session Log Parity (Menu Bar vs CLI Wake) ────────
 class TestSessionLogParity:
+    @pytest.fixture(autouse=True)
+    def _isolate_voice_side_effects(self, monkeypatch):
+        import voice_claude_agent.app as app_mod
+        import voice_claude_agent.cli as cli_mod
+
+        class SilentSpeaker:
+            def __init__(self):
+                self.spoken = []
+
+            def speak(self, text):
+                self.spoken.append(text)
+
+        monkeypatch.setattr(
+            app_mod,
+            "check_mic_permission",
+            lambda: (True, "mock microphone accessible"),
+        )
+        monkeypatch.setattr(cli_mod, "MacOSSaySpeaker", SilentSpeaker)
+
     def test_menu_bar_record_and_execute_writes_session(self, tmp_path, monkeypatch):
         """_record_and_execute → _run_pipeline → write_session should produce
         a valid JSONL record with input_mode='voice'."""
@@ -1796,10 +1822,3 @@ class TestSessionLogParity:
 
         assert cli_entry["input_mode"] == "voice"
         assert menu_entry["input_mode"] == "voice"
-
-    def test_alert_patch_defaults_to_rumps_alert(self):
-        """Without _alert_patch, the app uses rumps.alert."""
-        from voice_claude_agent.app import VoiceClaudeApp
-
-        app = VoiceClaudeApp()
-        assert app._alert is app._rumps_alert

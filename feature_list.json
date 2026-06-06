@@ -499,7 +499,7 @@
         "Verify the log format matches CLI wake mode exactly"
       ],
       "passes": true,
-      "evidence": "Menu bar _record_and_execute → _run_pipeline → write_session writes JSONL with input_mode='voice', all standard fields. Test: record_and_execute produces session + last_result. Test: CLI _run_pipeline and menu bar _record_and_execute produce identical key sets. Both use same write_session/write_last_result from cli.py — log format is inherently identical. 110/110 tests, lint clean."
+      "evidence": "Menu bar _record_and_execute → _run_pipeline → write_session writes JSONL with input_mode='voice', all standard fields. Test: record_and_execute produces session + last_result. Test: CLI _run_pipeline and menu bar _record_and_execute produce identical key sets. Both use same write_session/write_last_result from cli.py — log format is inherently identical. Codex moved the default alert test back under F036 and isolated F037 tests from real mic checks and macOS say. 110/110 tests, lint clean, check clean."
     },
     {
       "id": "F038",
