@@ -1162,6 +1162,34 @@
 ### Files Changed
 - src/voice_claude_agent/app.py, tests/test_core.py, feature_list.json, agent-progress.md
 
+## 2026-06-06 21:32 — Codex Review: F041 Verification
+
+### Completed
+- Reviewed Claude commit `98f912a`.
+- Confirmed the menu now includes `Mic Diagnostic`.
+- Confirmed diagnostic alert includes bundle ID, default input device info, mic permission check, and TCC troubleshooting tips.
+- Confirmed empty-audio alerts now include recorder start/stop status, frames captured, audio bytes, device info, and likely TCC causes.
+- Added the new `Mic Diagnostic` item to the base menu-structure test so future menu regressions are caught outside the F041-specific tests.
+- Rebuilt `dist/VoiceClaudeAgent.app` so the local app bundle includes the F041 diagnostic menu.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh lint` passed
+- `./init.sh test` passed: 125/125
+- Focused menu/diagnostic tests passed: 10/10
+- `tests/test_py2app.py` passed: 6/6 after rebuilding the app bundle
+
+### Files Changed
+- tests/test_core.py
+- feature_list.json
+- agent-progress.md
+
+### Next Recommended Task
+- Relaunch the rebuilt `.app`, open `Mic Diagnostic`, and use its diagnostic text to determine why macOS is not listing `com.voiceclaude.agent` under Microphone permissions.
+
+### Risks / Notes
+- F041 improves observability; it does not by itself guarantee macOS TCC will list the app. The next decision depends on the live diagnostic output.
+
 ### Next Recommended Task
 - F040: default STT backend to whisper-cli in run_app.py.
 

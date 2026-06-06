@@ -554,7 +554,7 @@
         "Diagnostic test verifies failure message contains frames/bytes/device info"
       ],
       "passes": true,
-      "evidence": "Added Mic Diagnostic menu item showing bundle ID, input device, sample rate, mic permission status, TCC troubleshooting tips (tccutil, NSMicrophoneUsageDescription, code-signing). Empty audio alert now includes full diagnostic: recorder.start/stop status, frames count, audio bytes with duration, and TCC troubleshooting. 5 tests: menu item present, diagnostic includes bundle+device, empty audio alert has frames/bytes/device info, diagnostic includes tccutil hints, setup.py has NSMicrophoneUsageDescription. 125/125 tests, lint clean."
+      "evidence": "Added Mic Diagnostic menu item showing bundle ID, input device, sample rate, mic permission status, TCC troubleshooting tips (tccutil, NSMicrophoneUsageDescription, code-signing). Empty audio alert now includes full diagnostic: recorder.start/stop status, frames count, audio bytes with duration, and TCC troubleshooting. 5 F041 tests plus Codex-updated base menu coverage verify the diagnostic item is present. Codex rebuilt dist/VoiceClaudeAgent.app after the change and verified bundle tests. 125/125 tests, lint clean, check clean."
     }
   ]
 }

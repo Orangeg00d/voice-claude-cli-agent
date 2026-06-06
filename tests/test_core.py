@@ -1177,7 +1177,7 @@ class TestMenuBarApp:
         assert app.title == "🎤"
 
     def test_menu_items_populated(self):
-        """Menu should contain Start Wake, Stop Wake, Mic Status, and Quit."""
+        """Menu should contain wake controls, diagnostics, mic status, and quit."""
         from voice_claude_agent.app import VoiceClaudeApp
 
         app = VoiceClaudeApp()
@@ -1193,6 +1193,7 @@ class TestMenuBarApp:
 
         assert "Start Wake" in titles
         assert "Stop Wake" in titles
+        assert "Mic Diagnostic" in titles
         assert any("Mic" in t for t in titles)
         assert "Quit" in titles
 
