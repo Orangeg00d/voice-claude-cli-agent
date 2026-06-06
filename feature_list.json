@@ -386,7 +386,7 @@
         "Verify transcript is actual speech text, not an error message or audio stats"
       ],
       "passes": true,
-      "evidence": "Rewrote whisper-cli backend: _find_whisper_cpp_binary searches whisper-cpp, whisper-cli, whisper; _is_python_whisper rejects Python openai-whisper via shebang detection + --help signature check. WHISPER_CPP_MODEL required with clear download prompt. 8 new tests: not-installed error, Python reject, missing model env var, file-not-found error, dir-not-file error, valid model resolve, mock successful transcription, list excludes Python whisper. Real whisper-cli at /opt/homebrew/bin/whisper-cli (brew). 71/73 tests, lint clean."
+      "evidence": "whisper-cli backend: _find_whisper_cpp_binary() detects /opt/homebrew/bin/whisper-cli, _is_python_whisper() rejects /opt/homebrew/bin/whisper (Python openai-whisper). WHISPER_CPP_MODEL=/Users/orange/.local/share/whisper.cpp/models/ggml-base.bin resolves. CLI args: whisper-cli -m MODEL -f WAV -nt --no-timestamps. 8 tests: not-installed, Python reject, missing env var, file-not-found, dir error, valid resolve, mock success, backend list exclusion. 71/73 tests, lint clean."
     },
     {
       "id": "F030",

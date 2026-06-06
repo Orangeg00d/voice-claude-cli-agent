@@ -702,6 +702,32 @@
 ### Next Recommended Task
 - Phase 5 complete. All F022-F031 passed. Next: Phase 6 planning or macOS .app bundling.
 
+## 2026-06-06 18:15 — Phase 5: F029 — CLI Flag Fix for Real whisper-cli
+
+### Completed
+- Fixed whisper-cli invocation to match real brew-installed whisper-cli 1.8.6:
+  - Uses `-m MODEL`, `-f WAV`, `-nt`, `--no-timestamps` flags (verified against `whisper-cli -h`).
+- Verified `_find_whisper_cpp_binary()` returns `/opt/homebrew/bin/whisper-cli`.
+- Verified `_is_python_whisper()` rejects `/opt/homebrew/bin/whisper` (Python openai-whisper).
+- Model resolves from `WHISPER_CPP_MODEL=/Users/orange/.local/share/whisper.cpp/models/ggml-base.bin`.
+- All 8 existing F029 tests pass; no new code beyond flag alignment.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh lint` passed
+- 71/73 tests (2 mic tests excluded)
+- `_find_whisper_cpp_binary()` → `/opt/homebrew/bin/whisper-cli`
+- `_is_python_whisper('/opt/homebrew/bin/whisper')` → `True`
+- `_resolve_whisper_model()` with WHISPER_CPP_MODEL set → resolves correctly
+
+### Files Changed
+- src/voice_claude_agent/stt.py (added `--no-timestamps` flag)
+- feature_list.json (updated F029 evidence)
+- agent-progress.md (this entry)
+
+### Risks / Notes
+- Real end-to-end whisper transcription not tested (requires recording + model inference). The mock test covers the code path.
+
 ### Risks / Notes
 - F029 resolved. Phase 5 all features now passed (F022-F031).
 

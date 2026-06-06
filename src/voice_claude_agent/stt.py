@@ -179,13 +179,14 @@ def _transcribe_whisper_cli(audio_data: bytes) -> str:
         tmp_path = f.name
 
     try:
-        # whisper.cpp CLI: whisper-cpp -m <model> -f <wav> -nt
+        # whisper.cpp CLI: <binary> -m <model> -f <wav> -nt --no-timestamps
         proc = subprocess.run(
-            [binary, "-m", model, "-f", tmp_path, "-nt"],
+            [binary, "-m", model, "-f", tmp_path, "-nt", "--no-timestamps"],
             capture_output=True,
             text=True,
             timeout=120,
         )
+        # whisper.cpp writes transcript to stdout; stderr has debug/model info
         result = proc.stdout.strip()
         if not result and proc.stderr.strip():
             result = _extract_text_from_whisper_stderr(proc.stderr)
