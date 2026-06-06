@@ -612,10 +612,20 @@ class TestMicPermission:
 
     def test_check_mic_permission_darwin(self, monkeypatch):
         monkeypatch.setattr("platform.system", lambda: "Darwin")
-        # If sounddevice isn't importable, should return False
+        stream = mock.Mock()
+        sounddevice = mock.Mock(InputStream=mock.Mock(return_value=stream))
+        numpy = mock.Mock(float32="float32")
+        monkeypatch.setitem(sys.modules, "sounddevice", sounddevice)
+        monkeypatch.setitem(sys.modules, "numpy", numpy)
+
         has_perm, detail = check_mic_permission()
-        if not has_perm:
-            assert len(detail) > 0
+
+        assert has_perm is True
+        assert detail == "microphone accessible"
+        sounddevice.InputStream.assert_called_once()
+        stream.start.assert_called_once()
+        stream.stop.assert_called_once()
+        stream.close.assert_called_once()
 
 
 class TestSTTBackends:
@@ -628,10 +638,47 @@ class TestSTTBackends:
         backends = list_available_backends()
         assert "apple-speech" in backends
 
-    def test_recording_transcriber_apple_speech_returns_status(self):
+    def test_recording_transcriber_apple_speech_returns_status(self, monkeypatch):
+        monkeypatch.setattr("platform.system", lambda: "Darwin")
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.subprocess.run",
+            mock.Mock(return_value=mock.Mock(stdout="0\n", stderr="", returncode=0)),
+        )
+
         t = RecordingTranscriber(backend="apple-speech")
         result = t.transcribe(b"\x00" * 32000)
         assert "Apple Speech" in result or "Dictation" in result or "error" in result.lower()
+
+    def test_recording_transcriber_apple_speech_dictation_off_message(self, monkeypatch):
+        monkeypatch.setattr("platform.system", lambda: "Darwin")
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.subprocess.run",
+            mock.Mock(return_value=mock.Mock(stdout="0\n", stderr="", returncode=0)),
+        )
+
+        result = RecordingTranscriber(backend="apple-speech").transcribe(b"\x00" * 32000)
+
+        assert result.startswith("[STT error:")
+        assert "Dictation is not enabled" in result
+        assert "System Settings > Keyboard > Dictation" in result
+        assert "--stt-backend whisper-cli" in result
+
+    def test_recording_transcriber_apple_speech_dictation_on_status(self, monkeypatch):
+        monkeypatch.setattr("platform.system", lambda: "Darwin")
+        run_mock = mock.Mock(
+            side_effect=[
+                mock.Mock(stdout="1\n", stderr="", returncode=0),
+                mock.Mock(stdout="", stderr="", returncode=0),
+            ]
+        )
+        monkeypatch.setattr("voice_claude_agent.stt.subprocess.run", run_mock)
+
+        result = RecordingTranscriber(backend="apple-speech").transcribe(b"\x00" * 32000)
+
+        assert "audio played for dictation" in result
+        assert "active text field" in result
+        assert "--stt-backend whisper-cli" in result
+        assert run_mock.call_count == 2
 
     def test_recording_transcriber_unknown_backend(self):
         t = RecordingTranscriber(backend="nonexistent")

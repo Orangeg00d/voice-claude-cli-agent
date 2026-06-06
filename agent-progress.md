@@ -651,3 +651,30 @@
 
 ### Risks / Notes
 - Dictation ON path cannot be verified on this machine (dictation is disabled). The code path exists and a pre-existing test ensures it does not crash.
+
+## 2026-06-06 15:46 — Codex Review: F030 Verification
+
+### Completed
+- Reviewed Claude commit `681335a`.
+- Confirmed F030 only marked Apple Speech status detection as passing; no functional code changes were made.
+- Verified manually that `list_available_backends()` includes `apple-speech` and the current Dictation OFF path returns a clear `[STT error: ...]` message.
+- Found existing tests depended on real macOS microphone / Apple Speech behavior and could hang or vary by machine.
+- Codex added deterministic tests for Apple Speech Dictation OFF and ON status paths by mocking `subprocess.run`.
+- Codex isolated the Darwin microphone permission test from real hardware by mocking `sounddevice.InputStream`.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh lint` passed
+- `./init.sh test` passed: 65 passed
+
+### Files Changed
+- tests/test_core.py
+- feature_list.json
+- agent-progress.md
+
+### Next Recommended Task
+- F031: README documentation verification.
+- F029 remains blocked until `whisper.cpp` / `whisper-cli` is installed and a real speech sample can be tested.
+
+### Risks / Notes
+- F030 accepted after Codex test hardening. The Apple Speech backend still does not provide programmatic transcript capture; it only reports status / plays audio for system dictation, as documented.
