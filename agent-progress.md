@@ -302,3 +302,23 @@
 ### Risks / Notes
 - Phase 4 is accepted after Codex's small harness fix.
 - The current `apple-speech` backend is a status/fallback path, not true programmatic transcript capture. Real production STT still needs whisper.cpp, OpenAI Whisper API, or a deeper Apple Speech integration.
+
+## 2026-06-06 12:35 — Codex Review: README Usage Docs
+
+### Completed
+- Reviewed Claude README update commit `cc94531`.
+- Confirmed README documents STT backends, Apple Speech limitations, and fake vs real modes.
+- Corrected README mismatches: `./init.sh check` scope, `voice --fake` behavior, and current test count.
+
+### Verification
+- README now matches current CLI behavior.
+
+### Files Changed
+- README.md
+- agent-progress.md
+
+### Next Recommended Task
+- Menu bar app planning can begin next, but Claude should first add explicit Phase 5 acceptance features before implementation.
+
+### Risks / Notes
+- Apple Speech remains documented as limited/non-programmatic capture, which matches the current backend behavior.

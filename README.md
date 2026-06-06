@@ -9,8 +9,8 @@
 ./init.sh install          # 创建 .venv 并安装所有依赖
 
 # 检查环境
-./init.sh check            # Python, Claude CLI, macOS say, 麦克风, STT 后端
-voice-claude-agent check   # 同上 (CLI 命令版)
+./init.sh check            # Python, Claude CLI, macOS say, 包导入, agent_state
+voice-claude-agent check   # 完整检查：含麦克风权限和 STT 后端
 
 # 文本模式 — 无需麦克风
 voice-claude-agent demo-text "请回复 OK"    # 完整演示：Claude → 摘要 → TTS (fake)
@@ -18,7 +18,7 @@ voice-claude-agent run-text "总结当前项目"   # 正式执行 + macOS say �
 
 # 语音测试 — 无需麦克风 (使用 fake 组件)
 voice-claude-agent demo-voice "帮我检查 git 状态"   # fake 录音 → STT → Claude → say
-voice-claude-agent voice --fake                     # 手动输入文本模拟语音
+voice-claude-agent voice --fake                     # fake 录音 → mock STT → Claude → say
 voice-claude-agent wake --fake --once               # 唤醒循环，单次迭代
 
 # 真语音 — 需要麦克风权限
@@ -95,7 +95,7 @@ voice-claude-agent voice --stt-backend whisper-cli
 | 命令 | fake 模式行为 | real 模式行为 |
 |------|-------------|-------------|
 | `demo-voice` | 总是 fake：预设录音 + 预设 transcript | — |
-| `voice --fake` | 用 FakeRecorder 录音 + 手动输入文本 | 真录音 → STT → Claude → say |
+| `voice --fake` | 用 FakeRecorder 录音 + mock STT 文本 | 真录音 → STT → Claude → say |
 | `voice` | — | 检查麦克风权限 → 真录音 → STT → Claude → say |
 | `wake --fake --once` | 自动触发 → 模拟录音 → 预设 transcript | — |
 | `wake --fake` | 自动循环，Ctrl+C 退出 | — |
@@ -145,4 +145,4 @@ voice-claude-agent wake
 
 ## 开发状态
 
-Phase 1-4 已完成。F001-F021 全部通过。54 个测试。详见 `feature_list.json`、`agent-progress.md`。
+Phase 1-4 已完成。F001-F021 全部通过。55 个测试。详见 `feature_list.json`、`agent-progress.md`。
