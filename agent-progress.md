@@ -170,3 +170,30 @@
 
 ### Risks / Notes
 - None outstanding for Phase 2.
+
+## 2026-06-06 10:48 — Codex Review: Phase 2 Fix Accepted
+
+### Completed
+- Reviewed Claude fix commit `4cc50e8`.
+- Confirmed `demo-voice` no longer bypasses the transcriber output.
+- Found one usability issue: `demo-voice "请只回复 OK"` sent mock audio metadata to Claude instead of a useful fake transcript.
+- Codex adjusted `demo-voice` to use `FakeTranscriber(stub_text)`, so the CLI argument becomes the fake STT transcript while the pipeline still executes the transcriber output.
+- Updated CLI-level tests to prove Claude receives the transcriber output, not a direct CLI argument bypass.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh test` passed: 38 passed
+- `./init.sh lint` passed
+- `.venv/bin/voice-claude-agent demo-voice "请只回复 OK"` passed: transcript was `请只回复 OK`, Claude returned `OK`
+
+### Files Changed
+- src/voice_claude_agent/cli.py
+- tests/test_core.py
+- agent-progress.md
+
+### Next Recommended Task
+- Phase 3: Wake trigger integration. Combine `ManualWakeTrigger` with the voice pipeline to create a `voice-claude-agent wake` loop.
+
+### Risks / Notes
+- Phase 2 is accepted.
+- Real microphone behavior still requires manual macOS permission testing before treating recording as production-ready.

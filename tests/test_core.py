@@ -452,6 +452,11 @@ class TestDemoVoiceCLI:
         from click.testing import CliRunner
         from voice_claude_agent.cli import main
 
+        monkeypatch.setattr(
+            "voice_claude_agent.cli.FakeTranscriber",
+            lambda response: FakeTranscriber("TRANSCRIBED FROM STT"),
+        )
+
         fake_proc = mock.MagicMock()
         fake_proc.returncode = 0
         fake_proc.stdout = "OK"
@@ -461,11 +466,16 @@ class TestDemoVoiceCLI:
             runner = CliRunner()
             runner.invoke(main, ["demo-voice", "IGNORE THIS ARG"])
 
-        call_args = mock_run.call_args[0][0] if mock_run.call_args else []
-        claude_prompt = " ".join(call_args) if call_args else ""
+        claude_prompt = ""
+        for call in mock_run.call_args_list:
+            args = call[0][0] if call[0] else []
+            if isinstance(args, list) and "claude" in args[0]:
+                claude_prompt = " ".join(args)
+                break
         assert "IGNORE THIS ARG" not in claude_prompt, (
             f"demo-voice used CLI stub text instead of transcript: {claude_prompt}"
         )
+        assert "TRANSCRIBED FROM STT" in claude_prompt
 
     def test_demo_voice_stt_output_reaches_claude(self, tmp_path, monkeypatch):
         """Verify demo-voice pipeline: STT transcript is what Claude executes."""
@@ -480,6 +490,11 @@ class TestDemoVoiceCLI:
 
         from click.testing import CliRunner
         from voice_claude_agent.cli import main
+
+        monkeypatch.setattr(
+            "voice_claude_agent.cli.FakeTranscriber",
+            lambda response: FakeTranscriber("请回复 OK"),
+        )
 
         fake_proc = mock.MagicMock()
         fake_proc.returncode = 0
@@ -498,6 +513,6 @@ class TestDemoVoiceCLI:
             if isinstance(args, list) and "claude" in args[0]:
                 claude_prompt = " ".join(args)
                 break
-        assert "mock STT" in claude_prompt or "10 bytes" in claude_prompt, (
+        assert "请回复 OK" in claude_prompt, (
             f"Claude did not receive STT output: {claude_prompt}"
         )

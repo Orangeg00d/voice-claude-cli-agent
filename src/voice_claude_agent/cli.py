@@ -13,7 +13,7 @@ from voice_claude_agent.claude_runner import run_claude
 from voice_claude_agent.logging_store import write_session, write_last_result
 from voice_claude_agent.recorder import SoundDeviceRecorder, FakeRecorder
 from voice_claude_agent.risk import classify_risk, requires_confirmation
-from voice_claude_agent.stt import RecordingTranscriber, TextInputTranscriber
+from voice_claude_agent.stt import FakeTranscriber, RecordingTranscriber, TextInputTranscriber
 from voice_claude_agent.summarizer import summarize
 from voice_claude_agent.tts import MacOSSaySpeaker, FakeSpeaker
 
@@ -245,7 +245,7 @@ def voice(duration: int, fake: bool):
 def demo_voice(stub_text: str):
     """Run the voice pipeline with fake audio: recorder -> STT -> Claude CLI -> TTS."""
     recorder = FakeRecorder(b"stub audio")
-    transcriber = TextInputTranscriber()
+    transcriber = FakeTranscriber(stub_text)
 
     transcript = transcriber.transcribe(recorder.get_audio())
     click.echo(f"Transcription: {transcript}")
