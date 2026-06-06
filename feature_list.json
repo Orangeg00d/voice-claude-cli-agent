@@ -513,7 +513,7 @@
         "Verify `./init.sh test` passes all app tests"
       ],
       "passes": true,
-      "evidence": "22 Phase 6 tests across 7 categories: menu structure (4), start/stop toggle (4), trigger recording (4), mic denial (4), session log parity (2), stt backend (2), app startup (2). Plus 6 py2app bundle tests in test_py2app.py. 110/110 total, lint clean."
+      "evidence": "37 Phase 6 tests total: core menu/app tests in test_core.py (31) cover app startup/menu structure (5), start/stop lifecycle and mic status (8), event-driven trigger recording (5), STT backend/env passthrough (6), mic denial UX (5), and session log parity (2). py2app bundle tests in test_py2app.py (6) cover setup/run_app, bundle presence, Info.plist, executable, and standalone Python embedding. All 38 features are passes=true. 110/110 tests, lint clean, check clean."
     }
   ]
 }

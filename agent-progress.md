@@ -941,15 +941,14 @@
 
 ### Completed
 - Audited Phase 6 tests against F038 criteria. All covered by existing tests:
-  - Menu structure: 4 tests (items, separators, trigger item, help listing)
-  - Start/stop toggle: 4 tests (direct state, idempotency, dual transitions)
-  - Trigger recording: 4 tests (idle start, running no-dupe, stop events, loop→execute)
-  - Mic denial: 4 tests (blocked start, blocked trigger, recorder-alert, accessible no-alert)
+  - App startup/menu structure: 5 tests (imports, menu items, separators, help listing, launch_app callable)
+  - Start/stop lifecycle and mic status: 8 tests (state transitions, idempotency, title sync, mic status, quit)
+  - Trigger recording: 5 tests (menu item, idle start, running no-dupe, stop events, loop→execute)
+  - STT backend/env passthrough: 6 tests (storage/default, transcriber backend, env model, CLI forwarding, launch_app construction)
+  - Mic denial UX: 5 tests (blocked start, blocked trigger, recorder-alert, accessible no-alert, default alert binding)
   - Session log parity: 2 tests (menu bar writes session+last_result, key set match with CLI)
-  - STT backend passthrough: 2 tests (stored, transcriber constructed with correct backend)
-  - App startup: 2 tests (imports, launch_app callable)
   - py2app bundle: 6 tests in test_py2app.py
-- Total: 28 Phase 6 tests, 110/110 overall. Zero code changes needed.
+- Total: 37 Phase 6 tests, 110/110 overall. Zero code changes needed.
 
 ### Verification
 - `./init.sh check` / `lint` passed, 110/110 tests
@@ -963,6 +962,33 @@
 
 ### Risks / Notes
 - Phase 6 complete. All phases 1-6 done.
+
+## 2026-06-06 20:39 — Codex Review: F038 Verification
+
+### Completed
+- Reviewed Claude commit `06e763a`.
+- Confirmed all 38 features in `feature_list.json` are `passes=true`.
+- Confirmed F038 is a documentation/audit feature with no required code change.
+- Corrected the Phase 6 test coverage count from 28 to 37 actual tests:
+  - 31 core menu/app tests in `tests/test_core.py`.
+  - 6 py2app bundle tests in `tests/test_py2app.py`.
+- Confirmed no F032-F037 feature status regressed.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh lint` passed
+- `./init.sh test` passed: 110/110
+- `pytest --collect-only` confirmed 110 tests collected
+
+### Files Changed
+- feature_list.json
+- agent-progress.md
+
+### Next Recommended Task
+- Phase 1-6 are complete. Next phase should be real-world macOS smoke testing: launch the built `.app`, verify menu icon, mic permission prompt/denial, manual trigger recording, whisper backend transcription, session logs, and quit behavior.
+
+### Risks / Notes
+- Automated tests validate structure and mocked behavior. Finder double-click launch, visible menu icon, native alert rendering, and live microphone behavior still need manual macOS smoke tests.
 
 ### Next Recommended Task
 - F038: final test coverage wrap-up.
