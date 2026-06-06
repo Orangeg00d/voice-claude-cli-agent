@@ -343,6 +343,9 @@
 ### Next Recommended Task
 - Claude should implement Phase 5 one feature at a time, starting with F022 or F023, and only mark a feature passed after Codex-verifiable evidence exists.
 
+### Risks / Notes
+- F029 depends on a real `whisper.cpp` installation and may need to remain pending unless the dependency is installed and exercised with a real sample.
+
 ## 2026-06-06 13:10 — Phase 5: F022 — Editable Install & Dependency Verification
 
 ### Completed
@@ -370,5 +373,27 @@
 ### Risks / Notes
 - None. F022 required zero code changes.
 
+## 2026-06-06 13:25 — Codex Review: F022 Verification
+
+### Completed
+- Reviewed Claude commit `2ee81f5`.
+- Confirmed only F022 was marked `passes=true`; F023-F031 remain pending.
+- Verified editable install, entry point registration, package import, and dependency imports.
+- Cleaned up progress log ordering for the Phase 5 plan risk note.
+
+### Verification
+- `./init.sh install` passed
+- `.venv/bin/voice-claude-agent --help` passed and listed all 7 commands
+- dependency import/version check passed for click, sounddevice, numpy, pytest, ruff, voice_claude_agent
+- `./init.sh check` passed
+- `./init.sh test` passed: 55 passed
+- `./init.sh lint` passed
+
+### Files Changed
+- agent-progress.md
+
+### Next Recommended Task
+- F023: verify and record `voice-claude-agent --help` command coverage without changing unrelated features.
+
 ### Risks / Notes
-- F029 depends on a real `whisper.cpp` installation and may need to remain pending unless the dependency is installed and exercised with a real sample.
+- F022 accepted. The `click.__version__` check emits a deprecation warning, but it does not affect packaging or runtime behavior.
