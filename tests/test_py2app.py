@@ -4,11 +4,22 @@ These tests verify the bundle structure and configuration, not runtime behavior.
 """
 
 import os
+import plistlib
 from pathlib import Path
+
+import pytest
 
 
 def _project_root() -> Path:
     return Path(__file__).resolve().parent.parent
+
+
+@pytest.fixture
+def app_bundle() -> Path:
+    bundle = _project_root() / "dist" / "VoiceClaudeAgent.app"
+    if not bundle.exists():
+        pytest.skip("Run 'python setup.py py2app' to produce dist/VoiceClaudeAgent.app")
+    return bundle
 
 
 class TestPy2appBundle:
@@ -28,49 +39,37 @@ class TestPy2appBundle:
         content = run_app.read_text()
         assert "launch_app" in content
 
-    def test_bundle_exists(self):
+    def test_bundle_exists(self, app_bundle):
         """dist/VoiceClaudeAgent.app should exist after build."""
-        bundle = _project_root() / "dist" / "VoiceClaudeAgent.app"
-        assert bundle.exists(), (
-            f"Bundle not found at {bundle}. Run 'python setup.py py2app -A' first."
-        )
+        assert app_bundle.exists()
 
-    def test_bundle_has_info_plist(self):
+    def test_bundle_has_info_plist(self, app_bundle):
         """Bundle should contain Info.plist with LSUIElement=True."""
-        info_plist = (
-            _project_root()
-            / "dist"
-            / "VoiceClaudeAgent.app"
-            / "Contents"
-            / "Info.plist"
-        )
+        info_plist = app_bundle / "Contents" / "Info.plist"
         assert info_plist.exists()
-        content = info_plist.read_text()
-        assert "LSUIElement" in content
-        assert "NSMicrophoneUsageDescription" in content
-        assert "com.voiceclaude.agent" in content
+        with info_plist.open("rb") as f:
+            plist = plistlib.load(f)
 
-    def test_bundle_has_executable(self):
+        assert plist["LSUIElement"] is True
+        assert plist["NSMicrophoneUsageDescription"]
+        assert plist["CFBundleIdentifier"] == "com.voiceclaude.agent"
+
+    def test_bundle_has_executable(self, app_bundle):
         """Bundle should contain the main executable."""
-        exe = (
-            _project_root()
-            / "dist"
-            / "VoiceClaudeAgent.app"
-            / "Contents"
-            / "MacOS"
-            / "VoiceClaudeAgent"
-        )
+        exe = app_bundle / "Contents" / "MacOS" / "VoiceClaudeAgent"
         assert exe.exists()
         assert os.access(exe, os.X_OK)
 
-    def test_bundle_has_python_symlink(self):
-        """Alias mode bundle should have a python symlink."""
-        python_link = (
-            _project_root()
-            / "dist"
-            / "VoiceClaudeAgent.app"
-            / "Contents"
-            / "MacOS"
-            / "python"
-        )
-        assert python_link.is_symlink()
+    def test_bundle_is_standalone_not_alias_mode(self, app_bundle):
+        """Standalone bundle should embed Python instead of symlinking to the venv."""
+        info_plist = app_bundle / "Contents" / "Info.plist"
+        with info_plist.open("rb") as f:
+            plist = plistlib.load(f)
+
+        python_exe = app_bundle / "Contents" / "MacOS" / "python"
+        framework = app_bundle / "Contents" / "Frameworks" / "Python.framework"
+
+        assert plist["PyOptions"]["alias"] is False
+        assert python_exe.exists()
+        assert not python_exe.is_symlink()
+        assert framework.exists()

@@ -896,6 +896,35 @@
 ### Risks / Notes
 - Alias mode only works on this machine.
 
+## 2026-06-06 20:20 — Codex Review: F035 Verification
+
+### Completed
+- Reviewed Claude commit `73d1faa`.
+- Found the initial evidence and tests validated py2app alias mode (`py2app -A`), not the standalone bundle required by F035.
+- Rebuilt the app with `python setup.py py2app` and confirmed standalone output.
+- Confirmed `Info.plist` has `LSUIElement=True`, `NSMicrophoneUsageDescription`, and `PyOptions.alias=False`.
+- Confirmed `Contents/MacOS/python` is an embedded executable, not a symlink to `.venv`.
+- Confirmed `Contents/Frameworks/Python.framework` is present.
+- Updated bundle tests to validate standalone structure after a build and skip cleanly when ignored `dist/` is absent in a fresh checkout.
+
+### Verification
+- `python setup.py py2app` passed
+- `./init.sh check` passed
+- `./init.sh lint` passed
+- `./init.sh test` passed: 103/103
+- `pytest tests/test_py2app.py -vv` passed: 6/6 after standalone build
+
+### Files Changed
+- tests/test_py2app.py
+- feature_list.json
+- agent-progress.md
+
+### Next Recommended Task
+- F036: mic permission denial UX.
+
+### Risks / Notes
+- F035 accepted for build/package structure. Double-click launch and menu bar icon visibility still need manual macOS smoke testing from Finder.
+
 ## 2026-06-06 20:05 — Codex Review: F034 Verification
 
 ### Completed
