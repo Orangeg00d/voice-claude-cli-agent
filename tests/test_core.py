@@ -1422,3 +1422,73 @@ class TestTriggerRecording:
         t.join(timeout=3.0)
 
         assert len(calls) == 1
+
+
+# ── F034: STT Backend & Env Passthrough ─────────────────────
+class TestAppSTTBackendPassthrough:
+    def test_stt_backend_stored_on_instance(self):
+        """VoiceClaudeApp(stt_backend='whisper-cli') should store it."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(stt_backend="whisper-cli")
+        assert app.stt_backend == "whisper-cli"
+
+    def test_stt_backend_default_is_text_input(self):
+        """Default stt_backend should be 'text-input'."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        assert app.stt_backend == "text-input"
+
+    def test_record_and_execute_passes_backend_to_transcriber(self, monkeypatch):
+        """_record_and_execute should create RecordingTranscriber with stt_backend."""
+        from unittest import mock as _mock
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(stt_backend="whisper-cli")
+
+        # Mock _run_pipeline (it's in cli.py)
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._run_pipeline",
+            _mock.Mock(),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            _mock.Mock(return_value=_mock.Mock()),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_record_attempt",
+            _mock.Mock(return_value=b"test audio"),
+        )
+
+        # Mock RecordingTranscriber (imported at runtime from stt module)
+        mock_transcriber_cls = _mock.Mock()
+        mock_transcriber_cls.return_value.transcribe.return_value = "hello"
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.RecordingTranscriber",
+            mock_transcriber_cls,
+        )
+
+        app._record_and_execute()
+        mock_transcriber_cls.assert_called_once_with(backend="whisper-cli")
+
+    def test_whisper_model_env_passthrough_to_resolve(self, tmp_path, monkeypatch):
+        """When stt_backend=whisper-cli and WHISPER_CPP_MODEL is set,
+        _resolve_whisper_model should find it."""
+        model_file = tmp_path / "ggml-base.bin"
+        model_file.write_bytes(b"fake")
+        monkeypatch.setenv("WHISPER_CPP_MODEL", str(model_file))
+
+        from voice_claude_agent.stt import _resolve_whisper_model
+
+        path, err = _resolve_whisper_model()
+        assert path == str(model_file), f"expected model path, got: {err}"
+        assert err == ""
+
+    def test_launch_app_passes_stt_backend(self):
+        """VoiceClaudeApp accepts stt_backend kwarg and stores it."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(stt_backend="apple-speech")
+        assert app.stt_backend == "apple-speech"

@@ -850,6 +850,33 @@
 ### Risks / Notes
 - F033 is now fully event-driven — ready for headless operation. No more input() blocking.
 
+## 2026-06-06 19:30 — Phase 6: F034 — STT Backend & Env Passthrough
+
+### Completed
+- Verified `VoiceClaudeApp(stt_backend='whisper-cli')` stores the backend.
+- Verified `_record_and_execute` passes `self.stt_backend` to `RecordingTranscriber(backend=...)` — mock test confirms call with `backend='whisper-cli'`.
+- Verified `WHISPER_CPP_MODEL` env var flows through `_resolve_whisper_model()` — test confirms model file resolves.
+- `launch_app(stt_backend=...)` forwards to VoiceClaudeApp constructor.
+- All code paths use `self.stt_backend` — not hardcoded.
+- 5 tests: storage, default, transcriber passthrough, env model resolve, launch_app.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh lint` passed
+- `./init.sh test` passed: 96/96
+- All 5 F034 tests pass
+
+### Files Changed
+- tests/test_core.py (added TestAppSTTBackendPassthrough: 5 tests)
+- feature_list.json (F034 passes=true)
+- agent-progress.md (this entry)
+
+### Next Recommended Task
+- F035: py2app standalone .app bundle.
+
+### Risks / Notes
+- None.
+
 ## 2026-06-06 19:43 — Codex Review: F033 Verification
 
 ### Completed

@@ -456,8 +456,8 @@
         "Verify the STT backend is the one specified (not hardcoded)",
         "Verify the whisper model path is resolved from the environment"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "VoiceClaudeApp(stt_backend='whisper-cli') stores it. _record_and_execute creates RecordingTranscriber(backend=self.stt_backend) — verified by mock asserting call with backend='whisper-cli'. WHISPER_CPP_MODEL env var flows to _resolve_whisper_model() — test confirms model file resolves correctly. launch_app(stt_backend=...) constructs app with right backend. 5 tests: storage, default, passthrough to transcriber, env model resolve, launch_app forwarding. 96/96 tests, lint clean."
     },
     {
       "id": "F035",
