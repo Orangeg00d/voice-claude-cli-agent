@@ -177,21 +177,27 @@
 - Verified demo-voice fix (commit `4cc50e8`): Claude now receives the STT transcript.
 - Verified 2 new CLI tests: `test_demo_voice_uses_transcript_not_stub`, `test_demo_voice_stt_output_reaches_claude`.
 - Verified Phase 2 features F013–F015 are `passes=true` with correct evidence.
-- Verified `./init.sh check`, `./init.sh test`, `./init.sh lint` all pass.
+- Found one usability issue: `demo-voice "请只回复 OK"` sent mock audio metadata to Claude instead of a useful fake transcript.
+- Codex adjusted `demo-voice` to use `FakeTranscriber(stub_text)`, so the CLI argument becomes the fake STT transcript while the pipeline still executes the transcriber output.
+- Updated CLI-level tests to prove Claude receives the transcriber output, not a direct CLI argument bypass.
 
 ### Verification
 - `./init.sh check` passed
 - `./init.sh test` passed: 38 passed
 - `./init.sh lint` passed
+- `.venv/bin/voice-claude-agent demo-voice "请只回复 OK"` passed: transcript was `请只回复 OK`, Claude returned `OK`
 
 ### Files Changed
+- src/voice_claude_agent/cli.py
+- tests/test_core.py
 - agent-progress.md
 
 ### Next Recommended Task
-- Phase 3: Wake trigger integration as described in agent-progress.md.
+- Phase 3: Wake trigger integration. Combine `ManualWakeTrigger` with the voice pipeline to create a `voice-claude-agent wake` loop.
 
 ### Risks / Notes
-- Phase 3 acceptance features F016–F018 have not yet been added to feature_list.json. Claude should add them before implementing.
+- Phase 2 is accepted.
+- Real microphone behavior still requires manual macOS permission testing before treating recording as production-ready.
 
 ## 2026-06-06 11:00 — Phase 3: Wake Loop Integration
 
@@ -222,27 +228,26 @@
 - Fake wake loop fully verified via CliRunner.
 - The wake command does not yet handle "no speech" gracefully in fake mode (it always gets a transcript). Fine for MVP.
 
+## 2026-06-06 11:08 — Codex Review: Phase 3 Verification
+
 ### Completed
-- Reviewed Claude fix commit `4cc50e8`.
-- Confirmed `demo-voice` no longer bypasses the transcriber output.
-- Found one usability issue: `demo-voice "请只回复 OK"` sent mock audio metadata to Claude instead of a useful fake transcript.
-- Codex adjusted `demo-voice` to use `FakeTranscriber(stub_text)`, so the CLI argument becomes the fake STT transcript while the pipeline still executes the transcriber output.
-- Updated CLI-level tests to prove Claude receives the transcriber output, not a direct CLI argument bypass.
+- Reviewed Claude Phase 3 commit `de4459c`.
+- Verified `wake --fake --once` runs trigger -> record -> STT -> Claude -> TTS and exits after one iteration.
+- Confirmed Phase 3 features F016-F018 are present with explicit acceptance criteria.
+- Repaired progress log ordering so Phase 2 and Phase 3 records are not interleaved.
 
 ### Verification
 - `./init.sh check` passed
-- `./init.sh test` passed: 38 passed
+- `./init.sh test` passed: 41 passed
 - `./init.sh lint` passed
-- `.venv/bin/voice-claude-agent demo-voice "请只回复 OK"` passed: transcript was `请只回复 OK`, Claude returned `OK`
+- `.venv/bin/voice-claude-agent wake --fake --once` passed: transcript was `请回复 OK`, Claude returned `OK`
 
 ### Files Changed
-- src/voice_claude_agent/cli.py
-- tests/test_core.py
 - agent-progress.md
 
 ### Next Recommended Task
-- Phase 3: Wake trigger integration. Combine `ManualWakeTrigger` with the voice pipeline to create a `voice-claude-agent wake` loop.
+- Phase 4: real end-to-end voice loop polish. Add macOS mic permission checks and make real recording/STT failure modes user-friendly before choosing Whisper, whisper.cpp, or Apple Speech.
 
 ### Risks / Notes
-- Phase 2 is accepted.
-- Real microphone behavior still requires manual macOS permission testing before treating recording as production-ready.
+- Phase 3 is accepted for the fake/manual wake MVP.
+- Real wake loop still needs manual microphone permission testing and a real STT backend before it can be considered production-ready voice control.
