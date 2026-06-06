@@ -515,3 +515,26 @@
 
 ### Risks / Notes
 - F025 accepted after Codex's empty-audio wake-loop fix.
+
+## 2026-06-06 14:45 — Phase 5: F026 — STT Error Resilience
+
+### Completed
+- Verified existing coverage: `_stt_is_error()` detects `[STT error:...]` prefix (5 test cases in test__stt_is_error_detects_error_prefix).
+- Verified wake CLI-level test: `test_wake_cli_with_error_stt_skips_pipeline` confirms wake --fake --once with error STT exits 0, skips Claude, writes no session.
+- Verified wake loop code (cli.py:444-453): yellow warning printed, `_stop_if_once` on --once, `continue` to next iteration.
+- Zero code changes — STT error resilience was already implemented in Phase 4.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh lint` passed
+- 60/60 tests pass (pre-existing tests cover F026)
+
+### Files Changed
+- feature_list.json (F026 passes=true with evidence)
+- agent-progress.md (this entry)
+
+### Next Recommended Task
+- F027: verify Claude timeout handling.
+
+### Risks / Notes
+- None. F026 was already fully implemented.

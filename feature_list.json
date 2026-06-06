@@ -345,8 +345,8 @@
         "Verify wake prints yellow warning about STT error",
         "Verify wake skips Claude execution and continues to next iteration"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Existing tests already cover this: test__stt_is_error_detects_error_prefix (5 cases), test_wake_fake_continues_after_stt_error (in-wake detection), test_wake_cli_with_error_stt_skips_pipeline (CLI-level: exit 0, no session written). wake loop line 444-453: prints yellow fg='yellow' warning and continues. 60/60 tests, lint clean."
     },
     {
       "id": "F027",
