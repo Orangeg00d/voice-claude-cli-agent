@@ -1662,6 +1662,141 @@ class TestMicDenialUX:
         app._wake_thread.join(timeout=3.0)
         app._stop_wake(app.stop_item)
 
+
+# ── F037: Session Log Parity (Menu Bar vs CLI Wake) ────────
+class TestSessionLogParity:
+    def test_menu_bar_record_and_execute_writes_session(self, tmp_path, monkeypatch):
+        """_record_and_execute → _run_pipeline → write_session should produce
+        a valid JSONL record with input_mode='voice'."""
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_sessions_log_path",
+            lambda: tmp_path / "sessions.jsonl",
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_last_result_path",
+            lambda: tmp_path / "last_result.json",
+        )
+
+        fake_proc = mock.MagicMock()
+        fake_proc.returncode = 0
+        fake_proc.stdout = "OK from menu bar"
+        fake_proc.stderr = ""
+
+        mock_recorder = mock.MagicMock()
+        mock_recorder.get_audio.return_value = b"test"
+
+        mock_transcriber_cls = mock.MagicMock()
+        mock_transcriber_cls.return_value.transcribe.return_value = "请回复 OK"
+
+        monkeypatch.setattr(
+            "voice_claude_agent.cli.run_claude",
+            mock.MagicMock(return_value=ClaudeRunResult(
+                command=["claude", "-p", "请回复 OK"],
+                exit_code=0, stdout="OK from menu bar", stderr="",
+                duration_seconds=0.1, timed_out=False,
+            )),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            mock.MagicMock(return_value=mock_recorder),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_record_attempt",
+            mock.MagicMock(return_value=b"test audio"),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.RecordingTranscriber",
+            mock_transcriber_cls,
+        )
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(
+            stt_backend="text-input",
+            _alert_patch=lambda **kw: None,
+        )
+        app._record_and_execute()
+
+        # Verify sessions.jsonl
+        assert (tmp_path / "sessions.jsonl").exists()
+        lines = (tmp_path / "sessions.jsonl").read_text().strip().split("\n")
+        assert len(lines) == 1
+        record = json.loads(lines[0])
+        assert record["input_mode"] == "voice"
+        assert record["transcript"] == "请回复 OK"
+        assert record["exit_code"] == 0
+        assert "spoken" in record
+
+        # Verify last_result.json
+        assert (tmp_path / "last_result.json").exists()
+        last = json.loads((tmp_path / "last_result.json").read_text())
+        assert last["prompt"] == "请回复 OK"
+        assert last["exit_code"] == 0
+
+    def test_menu_bar_session_fields_match_cli_format(self, tmp_path, monkeypatch):
+        """The JSONL record from the menu bar must have the same field set
+        as CLI wake mode."""
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_sessions_log_path",
+            lambda: tmp_path / "sessions.jsonl",
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_last_result_path",
+            lambda: tmp_path / "last_result.json",
+        )
+
+        monkeypatch.setattr(
+            "voice_claude_agent.cli.run_claude",
+            mock.MagicMock(return_value=ClaudeRunResult(
+                command=["claude", "-p", "hi"],
+                exit_code=0, stdout="hi", stderr="",
+                duration_seconds=0, timed_out=False,
+            )),
+        )
+
+        from voice_claude_agent.app import VoiceClaudeApp
+        from voice_claude_agent.cli import _run_pipeline
+
+        # Write through _run_pipeline (CLI path)
+        _run_pipeline("test from cli", input_mode="voice", tts_fake=True)
+
+        # Write through app._record_and_execute (menu bar path)
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            mock.MagicMock(return_value=mock.MagicMock()),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_record_attempt",
+            mock.MagicMock(return_value=b"audio"),
+        )
+        mock_transcriber = mock.MagicMock()
+        mock_transcriber.return_value.transcribe.return_value = "test from menu bar"
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.RecordingTranscriber",
+            mock_transcriber,
+        )
+
+        app = VoiceClaudeApp(stt_backend="text-input", _alert_patch=lambda **kw: None)
+        app._record_and_execute()
+
+        lines = (tmp_path / "sessions.jsonl").read_text().strip().split("\n")
+        assert len(lines) == 2
+
+        cli_entry = json.loads(lines[0])
+        menu_entry = json.loads(lines[1])
+
+        # Both should have the same set of top-level keys
+        expected_keys = {
+            "timestamp", "input_mode", "transcript", "classified_intent",
+            "risk_level", "confirmation_required", "confirmation_received",
+            "claude_command", "exit_code", "summary", "spoken",
+        }
+        assert set(cli_entry.keys()) == expected_keys
+        assert set(menu_entry.keys()) == expected_keys
+
+        assert cli_entry["input_mode"] == "voice"
+        assert menu_entry["input_mode"] == "voice"
+
     def test_alert_patch_defaults_to_rumps_alert(self):
         """Without _alert_patch, the app uses rumps.alert."""
         from voice_claude_agent.app import VoiceClaudeApp

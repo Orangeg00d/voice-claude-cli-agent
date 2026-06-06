@@ -922,6 +922,21 @@
 ### Risks / Notes
 - None.
 
+## 2026-06-06 20:45 — Phase 6: F037 — Session Log Parity
+
+### Completed
+- Verified menu bar → _run_pipeline produces identical JSONL to CLI wake mode. Both use same write_session/write_last_result.
+- 2 tests: record_and_execute writes session+last_result; CLI vs menu bar key sets are identical, both input_mode='voice'.
+
+### Verification
+- `./init.sh check` / `lint` passed, 110/110 tests
+
+### Files Changed
+- tests/test_core.py (TestSessionLogParity: 2 tests), feature_list.json, agent-progress.md
+
+### Next Recommended Task
+- F038: final test coverage wrap-up.
+
 ## 2026-06-06 20:23 — Codex Review: F036 Verification
 
 ### Completed
