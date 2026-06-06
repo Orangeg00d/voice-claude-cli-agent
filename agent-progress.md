@@ -322,3 +322,26 @@
 
 ### Risks / Notes
 - Apple Speech remains documented as limited/non-programmatic capture, which matches the current backend behavior.
+
+## 2026-06-06 12:50 — Codex Review: Phase 5 Acceptance Plan
+
+### Completed
+- Reviewed Claude commit `1d373b6`.
+- Confirmed Phase 5 features F022-F031 were added to `feature_list.json`.
+- Confirmed all new Phase 5 features have `passes=false` and empty evidence.
+- Confirmed the change is limited to the feature acceptance plan.
+
+### Verification
+- `python -m json.tool feature_list.json` passed
+- `./init.sh test` passed: 55 passed
+- `./init.sh lint` passed
+
+### Files Changed
+- feature_list.json
+- agent-progress.md
+
+### Next Recommended Task
+- Claude should implement Phase 5 one feature at a time, starting with F022 or F023, and only mark a feature passed after Codex-verifiable evidence exists.
+
+### Risks / Notes
+- F029 depends on a real `whisper.cpp` installation and may need to remain pending unless the dependency is installed and exercised with a real sample.
