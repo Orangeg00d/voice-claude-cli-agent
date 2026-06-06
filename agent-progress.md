@@ -922,6 +922,33 @@
 ### Risks / Notes
 - None.
 
+## 2026-06-06 20:23 — Codex Review: F036 Verification
+
+### Completed
+- Reviewed Claude commit `de85f73`.
+- Confirmed `_start_wake` and `_trigger_recording` are gated by `_check_mic_or_alert()`.
+- Confirmed denied mic status shows a `rumps.alert` message with the macOS System Settings microphone path and does not start the wake loop.
+- Confirmed `_record_and_execute` shows a recording failure alert and sets `Mic: Error` when recorder construction fails.
+- Restored the F034 `launch_app(stt_backend=...)` assertion that was accidentally dropped in the F036 test edit.
+- Added an autouse mic-permission mock for F036 tests so they do not depend on real local microphone permission.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh lint` passed
+- `./init.sh test` passed: 108/108
+- Focused F036/F034 regression tests passed: 6/6
+
+### Files Changed
+- tests/test_core.py
+- feature_list.json
+- agent-progress.md
+
+### Next Recommended Task
+- F037: verify session log parity between menu bar and CLI wake modes.
+
+### Risks / Notes
+- F036 accepted. Manual Finder smoke testing is still needed later for actual macOS alert display behavior.
+
 ## 2026-06-06 20:20 — Codex Review: F035 Verification
 
 ### Completed

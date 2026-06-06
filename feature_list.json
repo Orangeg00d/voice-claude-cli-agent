@@ -485,7 +485,7 @@
         "Verify the app does not crash, stays responsive"
       ],
       "passes": true,
-      "evidence": "_start_wake and _trigger_recording gate on _check_mic_or_alert() — shows rumps.alert dialog when mic denied, then returns without starting. _record_and_execute shows alert when _safe_real_recorder returns None, updates Mic Status to 'Error'. _alert_patch injectable for tests. 5 tests: start blocked on denial, trigger blocked on denial, record failure alert, accessible no alert, default rumps.alert. 108/108 tests, lint clean."
+      "evidence": "_start_wake and _trigger_recording gate on _check_mic_or_alert() — shows rumps.alert dialog when mic denied, then returns without starting. _record_and_execute shows alert when _safe_real_recorder returns None, updates Mic Status to 'Error'. _alert_patch injectable for tests. 5 F036 tests: start blocked on denial, trigger blocked on denial, record failure alert, accessible no alert, default rumps.alert. Codex restored the F034 launch_app assertion and isolated F036 tests from real mic checks. 108/108 tests, lint clean, check clean."
     },
     {
       "id": "F037",

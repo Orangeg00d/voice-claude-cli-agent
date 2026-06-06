@@ -1562,9 +1562,21 @@ class TestAppSTTBackendPassthrough:
 
         app_mod.launch_app(stt_backend="apple-speech")
 
+        assert calls == [("init", "apple-speech"), ("run", None)]
+
 
 # ── F036: Mic Permission Denial UX ──────────────────────────
 class TestMicDenialUX:
+    @pytest.fixture(autouse=True)
+    def _mock_app_mic_check(self, monkeypatch):
+        import voice_claude_agent.app as app_mod
+
+        monkeypatch.setattr(
+            app_mod,
+            "check_mic_permission",
+            lambda: (True, "mock microphone accessible"),
+        )
+
     def test_start_wake_blocked_when_mic_denied(self, monkeypatch):
         """_start_wake should NOT activate the wake loop when mic is denied."""
         import voice_claude_agent.app as app_mod
