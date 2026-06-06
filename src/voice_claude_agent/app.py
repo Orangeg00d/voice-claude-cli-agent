@@ -10,15 +10,20 @@ import rumps
 
 from voice_claude_agent.config import check_mic_permission
 
+# Silence rumps debug output during tests
+import logging
+logging.getLogger("rumps").setLevel(logging.WARNING)
+
 
 class VoiceClaudeApp(rumps.App):
     """macOS menu bar app for Voice Claude Agent.
 
     Menu items:
-      Start Wake  — begins the push-to-talk wake loop
-      Stop Wake   — stops the wake loop
-      Mic Status  — shows current microphone permission state (click to refresh)
-      Quit        — exits the application (stops wake loop first)
+      Start Wake      — begins the continuous wake loop
+      Stop Wake       — stops the wake loop
+      Trigger Record  — fires a single record → STT → Claude → TTS cycle
+      Mic Status      — shows current microphone permission
+      Quit            — exits the application (stops wake loop first)
     """
 
     def __init__(
@@ -41,13 +46,18 @@ class VoiceClaudeApp(rumps.App):
         self.stt_backend = stt_backend
         self._wake_target = _wake_target or self._run_wake_loop
 
+        # State
         self._wake_active = False
-        self._wake_event = threading.Event()
+        self._wake_event = threading.Event()      # set to stop the loop
+        self._trigger_event = threading.Event()   # set to trigger one cycle
         self._wake_thread: threading.Thread | None = None
 
-        # Stable menu item references — NEVER use dynamic title lookups
+        # Stable MenuItem refs
         self.start_item = rumps.MenuItem("Start Wake", callback=self._start_wake)
         self.stop_item = rumps.MenuItem("Stop Wake", callback=self._stop_wake)
+        self.trigger_item = rumps.MenuItem(
+            "Trigger Recording", callback=self._trigger_recording
+        )
         self.mic_status_item = rumps.MenuItem(
             "Mic Status: checking...", callback=self._refresh_mic_status_event
         )
@@ -56,6 +66,7 @@ class VoiceClaudeApp(rumps.App):
         self.menu = [
             self.start_item,
             self.stop_item,
+            self.trigger_item,
             None,
             self.mic_status_item,
             None,
@@ -68,7 +79,6 @@ class VoiceClaudeApp(rumps.App):
     # ── Mic status ───────────────────────────────────────────
 
     def _update_mic_status(self) -> None:
-        """Check microphone permission and update the status menu item."""
         has_mic, detail = check_mic_permission()
         if has_mic:
             self.mic_status_item.title = "Mic: Accessible"
@@ -77,13 +87,11 @@ class VoiceClaudeApp(rumps.App):
             self.mic_status_item.title = f"Mic: Denied ({short})"
 
     def _refresh_mic_status_event(self, sender: rumps.MenuItem) -> None:
-        """Click handler: refresh mic status on demand."""
         self._update_mic_status()
 
     # ── Menu title sync ──────────────────────────────────────
 
     def _sync_menu_titles(self) -> None:
-        """Sync start/stop item titles with current state."""
         if self._wake_active:
             self.start_item.title = "Start Wake (running)"
             self.start_item.set_callback(None)
@@ -94,11 +102,11 @@ class VoiceClaudeApp(rumps.App):
     # ── Start / Stop ─────────────────────────────────────────
 
     def _start_wake(self, sender: rumps.MenuItem) -> None:
-        """Begin the wake loop on a background daemon thread."""
         if self._wake_active:
             return
         self._wake_active = True
         self._wake_event.clear()
+        self._trigger_event.clear()
 
         self._update_mic_status()
         self._sync_menu_titles()
@@ -111,19 +119,43 @@ class VoiceClaudeApp(rumps.App):
         self._wake_thread.start()
 
     def _stop_wake(self, sender: rumps.MenuItem) -> None:
-        """Signal the wake loop to stop and wait for it to finish."""
         if not self._wake_active:
             return
         self._wake_active = False
         self._wake_event.set()
+        self._trigger_event.set()   # unblock any waiting trigger
 
         if self._wake_thread is not None and self._wake_thread.is_alive():
             self._wake_thread.join(timeout=5.0)
 
         self._sync_menu_titles()
 
+    def _trigger_recording(self, sender: rumps.MenuItem) -> None:
+        """Single-cycle trigger: fire one record→STT→pipeline iteration.
+
+        If the wake loop is not running, starts it temporarily for one cycle.
+        If already running, sets the trigger event so the loop picks it up.
+        """
+        if not self._wake_active:
+            # Start the loop in single-shot mode
+            self._wake_active = True
+            self._wake_event.clear()
+            self._trigger_event.set()  # trigger immediately
+
+            self._update_mic_status()
+            self._sync_menu_titles()
+
+            self._wake_thread = threading.Thread(
+                target=self._wake_target,
+                daemon=True,
+                name="wake-loop",
+            )
+            self._wake_thread.start()
+        else:
+            # Loop already running — just fire the trigger
+            self._trigger_event.set()
+
     def _quit(self, sender: rumps.MenuItem) -> None:
-        """Stop the wake loop and exit cleanly."""
         if self._wake_active:
             self._stop_wake(sender)
         rumps.quit_application()
@@ -131,46 +163,52 @@ class VoiceClaudeApp(rumps.App):
     # ── Wake loop (background thread) ────────────────────────
 
     def _run_wake_loop(self) -> None:
-        """The wake loop runs on a daemon thread.
+        """Event-driven wake loop.
 
-        Each iteration:
-          1. Wait for push-to-talk trigger (Enter in terminal for now)
-          2. Record from mic
-          3. STT transcribe
-          4. Run pipeline (risk → Claude → summarize → TTS → log)
+        Waits for _trigger_event (set by "Trigger Recording" menu item or
+        _trigger_recording callback). Each trigger fires one full cycle:
+        record → STT → risk → Claude → summarize → TTS → log.
+
+        Stop is signaled via _wake_event.
         """
         while not self._wake_event.is_set():
-            try:
-                input("[Wake] Press Enter to trigger...")
-            except (EOFError, KeyboardInterrupt):
-                break
-
+            # Wait for a trigger (no input() — pure threading.Event)
+            self._trigger_event.wait(timeout=0.5)
             if self._wake_event.is_set():
                 break
-
-            from voice_claude_agent.cli import (
-                _run_pipeline,
-                _safe_real_recorder,
-                _safe_record_attempt,
-            )
-            from voice_claude_agent.stt import RecordingTranscriber
-
-            recorder = _safe_real_recorder()
-            if recorder is None:
-                self.mic_status_item.title = "Mic: Error"
+            if not self._trigger_event.is_set():
                 continue
 
-            audio = _safe_record_attempt(recorder, max_duration=10)
-            if not audio:
-                continue
+            self._trigger_event.clear()
 
-            transcriber = RecordingTranscriber(backend=self.stt_backend)
-            transcript = transcriber.transcribe(audio)
+            # Run one full cycle
+            self._record_and_execute()
 
-            if not transcript.strip() or transcript.startswith("[STT error:"):
-                continue
+    def _record_and_execute(self) -> None:
+        """One recording cycle: mic → STT → pipeline."""
+        from voice_claude_agent.cli import (
+            _run_pipeline,
+            _safe_real_recorder,
+            _safe_record_attempt,
+        )
+        from voice_claude_agent.stt import RecordingTranscriber
 
-            _run_pipeline(transcript, input_mode="voice", tts_fake=False)
+        recorder = _safe_real_recorder()
+        if recorder is None:
+            self.mic_status_item.title = "Mic: Error"
+            return
+
+        audio = _safe_record_attempt(recorder, max_duration=10)
+        if not audio:
+            return
+
+        transcriber = RecordingTranscriber(backend=self.stt_backend)
+        transcript = transcriber.transcribe(audio)
+
+        if not transcript.strip() or transcript.startswith("[STT error:"):
+            return
+
+        _run_pipeline(transcript, input_mode="voice", tts_fake=False)
 
 
 def launch_app(stt_backend: str = "text-input") -> None:

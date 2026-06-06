@@ -443,7 +443,7 @@
         "Verify clicking Stop Wake stops the loop and releases the mic"
       ],
       "passes": true,
-      "evidence": "VoiceClaudeApp uses stable MenuItem refs (start_item, stop_item, mic_status_item, quit_item). _start_wake: sets _wake_active, clears event, refreshes mic, launches daemon thread. _stop_wake: sets event, joins thread (5s timeout), syncs titles. Double start/stop are idempotent. Mic status monkeypatch verified. Quit stops wake then calls quit_application. _wake_target injectable for tests. 8 lifecycle tests: state transitions, idempotent start, safe double stop, menu titles sync, mic refresh, monkeypatch, quit with and without active wake. 86/86 tests, lint clean."
+      "evidence": "Removed input() from _run_wake_loop — replaced with event-driven model: _trigger_event.wait(). 'Trigger Recording' menu item fires one record→STT→Claude→TTS cycle per click. _stop_wake sets both _wake_event and _trigger_event to unblock any waiting loop. 13 lifecycle+trigger tests: state transitions, idempotent start/stop, menu title sync, mic refresh+monkeypatch, quit, trigger menu presence, trigger idle starts thread, trigger running no new thread, stop sets both events, wake loop calls record_and_execute. 91/91 tests, lint clean."
     },
     {
       "id": "F034",

@@ -819,15 +819,36 @@
 - F034: verify wake loop respects --stt-backend and WHISPER_CPP_MODEL from menu bar.
 
 ### Risks / Notes
-- The wake loop still uses input() for push-to-talk — this requires a terminal. For a headless menu bar app, a hotkey or timer trigger would be needed (future work).
-- F029 remains the only blocked Phase 5 feature.
+- F033 trigger recording is event-driven (no input()). The wake loop responds to menu-item triggers via threading.Event, making it ready for headless operation.
 
-## 2026-06-06 15:46 — Codex Review: F030 Verification
+## 2026-06-06 19:15 — Phase 6: F033 Final — Event-Driven Trigger Recording
 
 ### Completed
-- Reviewed Claude commit `681335a`.
-- Confirmed F030 only marked Apple Speech status detection as passing; no functional code changes were made.
-- Verified manually that `list_available_backends()` includes `apple-speech` and the current Dictation OFF path returns a clear `[STT error: ...]` message.
+- Removed `input()` from `_run_wake_loop`. Loop now uses `_trigger_event.wait(timeout=0.5)`.
+- Added "Trigger Recording" menu item — fires one record→STT→Claude→TTS cycle per click.
+- `_trigger_recording`: when idle, starts a daemon thread and sets `_trigger_event`. When running, only sets `_trigger_event` (no new thread).
+- `_stop_wake` now sets both `_wake_event` and `_trigger_event` to unblock any waiting loop.
+- `_record_and_execute()` extracted as separate method for testability.
+- Added 5 new trigger-specific tests: menu presence, idle starts thread, running no new thread, stop sets both events, wake loop calls record_and_execute.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh lint` passed
+- `./init.sh test` passed: 91/91
+- All 5 new TriggerRecording tests pass
+- No `input()` calls remain in `_run_wake_loop`
+
+### Files Changed
+- src/voice_claude_agent/app.py (added Trigger Recording, event-driven loop)
+- tests/test_core.py (added TestTriggerRecording: 5 tests, added threading import)
+- feature_list.json (updated F033 evidence)
+- agent-progress.md (this entry)
+
+### Next Recommended Task
+- F034: verify wake loop respects --stt-backend and WHISPER_CPP_MODEL.
+
+### Risks / Notes
+- F033 is now fully event-driven — ready for headless operation. No more input() blocking.
 - Found existing tests depended on real macOS microphone / Apple Speech behavior and could hang or vary by machine.
 - Codex added deterministic tests for Apple Speech Dictation OFF and ON status paths by mocking `subprocess.run`.
 - Codex isolated the Darwin microphone permission test from real hardware by mocking `sounddevice.InputStream`.

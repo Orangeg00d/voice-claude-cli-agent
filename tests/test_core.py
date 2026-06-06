@@ -3,6 +3,7 @@
 import json
 import os
 import sys
+import threading
 from pathlib import Path
 from unittest import mock
 
@@ -1320,3 +1321,104 @@ class TestMenuBarLifecycle:
 
         app._quit(app.quit_item)
         assert len(quit_called) == 1
+
+
+# ── F033b: Trigger Recording (event-driven, no input()) ─────
+class TestTriggerRecording:
+    def test_trigger_item_in_menu(self):
+        """Menu should include 'Trigger Recording' item."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        titles = set()
+        for m in app.menu:
+            if m is not None:
+                t = m.title
+                if callable(t):
+                    titles.add(t())
+                else:
+                    titles.add(str(t))
+        assert "Trigger Recording" in titles
+
+    def test_trigger_when_idle_starts_thread(self):
+        """When wake is NOT active, _trigger_recording starts a daemon thread."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_wake_target=lambda: None)
+        assert not app._wake_active
+        assert app._wake_thread is None
+
+        app._trigger_recording(app.trigger_item)
+        assert app._wake_active
+        assert app._trigger_event.is_set()
+        assert app._wake_thread is not None
+        assert app._wake_thread.daemon
+        assert app._wake_thread.name == "wake-loop"
+
+        # Let the lambda finish then clean up
+        app._wake_thread.join(timeout=2.0)
+        # Reset state manually since the lambda didn't touch _wake_active
+        app._wake_active = False
+        app._wake_event.clear()
+        app._trigger_event.clear()
+
+    def test_trigger_when_running_does_not_create_new_thread(self):
+        """When wake IS already active, _trigger_recording only sets the event.
+
+        We test this using direct state manipulation since real threads cause hangs."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        app._wake_active = True
+        app._trigger_event.clear()
+
+        # Simulate: already have a thread reference
+        dummy_thread = threading.Thread(target=lambda: None, daemon=True)
+        dummy_thread.start()
+        app._wake_thread = dummy_thread
+
+        app._trigger_recording(app.trigger_item)
+        assert app._trigger_event.is_set()
+        assert app._wake_thread is dummy_thread  # no new thread
+
+        dummy_thread.join(timeout=2.0)
+        app._wake_active = False
+
+    def test_stop_wake_sets_both_events(self):
+        """_stop_wake must set _wake_event AND _trigger_event to unblock the loop."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        app._wake_active = True
+        app._wake_event.clear()
+        app._trigger_event.clear()
+
+        app._stop_wake(app.stop_item)
+        assert app._wake_event.is_set()
+        assert app._trigger_event.is_set()
+        assert not app._wake_active
+
+    def test_run_wake_loop_calls_record_and_execute(self):
+        """_run_wake_loop should call _record_and_execute when triggered."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        calls = []
+
+        def fake_execute():
+            calls.append(1)
+            # After first call, signal stop so the loop exits
+            app._wake_event.set()
+
+        app._record_and_execute = fake_execute
+
+        # Start the real loop in a thread but with a short timeout
+        app._wake_event.clear()
+        app._trigger_event.clear()
+        app._trigger_event.set()  # pre-trigger
+
+        t = threading.Thread(target=app._run_wake_loop, daemon=True)
+        t.start()
+        t.join(timeout=3.0)
+
+        assert len(calls) == 1
