@@ -414,8 +414,8 @@
         "Verify Apple Speech section explains the 'text appears in active field' limitation",
         "Verify fake/real mode table is present"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "README line 60: '--stt-backend 选项...在 voice、record、wake 命令中均可用'. Line 62-66: STT backend table (text-input, whisper-cli, apple-speech). Line 68-76: Apple Speech 说明与限制 section explicitly states '转写结果会出现在当前活跃的文本输入框中，而非程序化捕获'. Line 91-102: Fake/Real 模式对比表覆盖 demo-voice, voice, wake. All 5 F031 steps verified."
     }
   ]
 }

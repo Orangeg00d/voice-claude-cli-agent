@@ -652,6 +652,30 @@
 ### Risks / Notes
 - Dictation ON path cannot be verified on this machine (dictation is disabled). The code path exists and a pre-existing test ensures it does not crash.
 
+## 2026-06-06 15:50 — Phase 5: F031 — README Documentation Verification
+
+### Completed
+- Verified F031 step 1: `--stt-backend` option documented for `voice, record, wake` (README line 60).
+- Verified F031 step 2: STT backend table explains text-input, whisper-cli, apple-speech (lines 62-66).
+- Verified F031 step 3: Apple Speech section explains "text appears in active field" limitation (lines 76).
+- Verified F031 step 4: Fake/Real mode table present (lines 91-102).
+- Zero code changes — README was already complete.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh lint` passed
+- All 5 F031 steps confirmed against README
+
+### Files Changed
+- feature_list.json (F031 passes=true with evidence)
+- agent-progress.md (this entry)
+
+### Next Recommended Task
+- F029: blocked on whisper.cpp. All other Phase 5 features (F022-F031 except F029) are now passed. Consider Phase 6 planning or resolving the F029 dependency.
+
+### Risks / Notes
+- F029 remains the only blocked Phase 5 feature.
+
 ## 2026-06-06 15:46 — Codex Review: F030 Verification
 
 ### Completed
