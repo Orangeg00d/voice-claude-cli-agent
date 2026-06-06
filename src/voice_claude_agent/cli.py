@@ -98,6 +98,37 @@ def _safe_real_recorder() -> SoundDeviceRecorder | None:
         return None
 
 
+def _safe_record_attempt(recorder, max_duration: int) -> bytes:
+    """Run a start→wait→stop cycle. Returns audio bytes or empty on error."""
+    try:
+        recorder.start()
+    except Exception as e:
+        click.echo(click.style(f"Recording start failed: {e}", fg="red"))
+        return b""
+
+    click.echo(f"Recording... (max {max_duration}s, press Enter to stop)")
+    try:
+        input()
+    except (EOFError, KeyboardInterrupt):
+        pass
+
+    try:
+        recorder.stop()
+    except Exception as e:
+        click.echo(click.style(f"Recording stop failed: {e}", fg="red"))
+        return b""
+
+    audio = recorder.get_audio()
+    if not audio:
+        click.echo(click.style("No audio captured. Check microphone connection.", fg="red"))
+    return audio
+
+
+def _stt_is_error(transcript: str) -> bool:
+    """Return True if the transcript looks like an STT backend error message."""
+    return transcript.startswith("[STT error:")
+
+
 @click.group()
 def main():
     """Voice Claude Agent — macOS voice-activated Claude CLI assistant."""
@@ -192,6 +223,22 @@ def _run_pipeline(prompt: str, input_mode: str, tts_fake: bool) -> None:
         f"Running: claude -p \"{prompt[:80]}{'...' if len(prompt) > 80 else ''}\""
     )
     result = run_claude(prompt)
+
+    if result.timed_out:
+        click.echo(click.style("Claude CLI timed out.", fg="red"))
+        speaker.speak("Claude CLI 执行超时，请检查任务或重试。")
+        write_session({
+            "input_mode": input_mode,
+            "transcript": prompt,
+            "risk_level": risk_level.value,
+            "confirmation_required": confirmation_required,
+            "confirmation_received": confirmation_received,
+            "claude_command": result.command,
+            "exit_code": result.exit_code,
+            "summary": "Timed out",
+            "spoken": True,
+        })
+        return
 
     # 4. Summarize
     combined = result.stdout
@@ -316,6 +363,10 @@ def voice(duration: int, fake: bool, stt_backend: str):
     text = transcriber.transcribe(audio)
     click.echo(f"Transcription: {text}")
 
+    if _stt_is_error(text):
+        click.echo(click.style("STT error — cannot execute. Try a different --stt-backend.", fg="yellow"))
+        return
+
     if not text.strip():
         click.echo("No speech detected. Aborting.")
         return
@@ -382,32 +433,40 @@ def wake(fake: bool, once: bool, stt_backend: str):
             click.echo(f"[{iteration}] Woke! Recording...")
 
             # 2. Record
-            recorder.start()
-            if fake:
+            if not fake:
+                audio = _safe_record_attempt(recorder, max_duration=10)
+            else:
+                recorder.start()
                 import time as _time
 
                 _time.sleep(0.5)
-            else:
-                click.echo("Press Enter to stop recording...")
-                try:
-                    input()
-                except (EOFError, KeyboardInterrupt):
-                    pass
-            recorder.stop()
-            audio = recorder.get_audio()
+                recorder.stop()
+                audio = recorder.get_audio()
 
-            if not audio and not fake:
-                click.echo(
-                    click.style(
-                        f"[{iteration}] No audio captured. Check microphone.",
-                        fg="red",
+            if not audio:
+                if fake:
+                    pass  # fake mode always has audio
+                else:
+                    click.echo(
+                        click.style(
+                            f"[{iteration}] No audio captured. Check microphone.",
+                            fg="red",
+                        )
                     )
-                )
-                continue
+                    continue
 
             # 3. STT
             transcript = transcriber.transcribe(audio)
             click.echo(f"[{iteration}] Transcript: {transcript}")
+
+            if _stt_is_error(transcript):
+                click.echo(
+                    click.style(
+                        f"[{iteration}] STT error — retry or use a different --stt-backend.",
+                        fg="yellow",
+                    )
+                )
+                continue
 
             if not transcript.strip():
                 click.echo(

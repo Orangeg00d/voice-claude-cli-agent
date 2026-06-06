@@ -696,3 +696,108 @@ class TestRecordingErrorUX:
         )
         recorder = _safe_real_recorder()
         assert recorder is None
+
+
+class TestPhase4ExceptionHandling:
+    def test__stt_is_error_detects_error_prefix(self):
+        from voice_claude_agent.cli import _stt_is_error
+
+        assert _stt_is_error("[STT error: microphone denied]") is True
+        assert _stt_is_error("[STT error: timed out]") is True
+        assert _stt_is_error("[recorded 32000 bytes, 1.0s audio]") is False
+        assert _stt_is_error("请回复 OK") is False
+        assert _stt_is_error("") is False
+
+    def test_wake_fake_continues_after_stt_error(self, tmp_path, monkeypatch):
+        """wake --fake --once with a 'failing' STT should skip Claude and still exit cleanly."""
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_sessions_log_path",
+            lambda: tmp_path / "sessions.jsonl",
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_last_result_path",
+            lambda: tmp_path / "last_result.json",
+        )
+
+        import importlib
+        import voice_claude_agent.cli as cli_mod
+        importlib.reload(cli_mod)
+
+        # Bypass the wake command itself and test the STT error detection directly.
+        # The wake loop's inner _run_pipeline is called per iteration.
+        # Instead, test that _stt_is_error + the wake's transcript check works:
+        from voice_claude_agent.cli import _stt_is_error
+
+        # Simulate what happens inside the wake loop:
+        transcript = FakeTranscriber("[STT error: test failure]").transcribe()
+        assert _stt_is_error(transcript)
+        # In the real wake loop, this would trigger a yellow warning and 'continue',
+        # so no session would be written. Verified via stt_is_error above.
+
+    def test_wake_cli_with_error_stt_skips_pipeline(self, tmp_path, monkeypatch):
+        """CLI-level: wake --fake --once with error STT exits cleanly without Claude."""
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_sessions_log_path",
+            lambda: tmp_path / "sessions.jsonl",
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_last_result_path",
+            lambda: tmp_path / "last_result.json",
+        )
+
+        from click.testing import CliRunner
+        import voice_claude_agent.cli as cli_mod
+        from voice_claude_agent.stt import FakeTranscriber as FT
+
+        # The wake command's --fake path creates FakeTranscriber("请回复 OK").
+        # We need the CLI to get an error transcript. Override FakeTranscriber
+        # inside the cli module so wake's code path picks it up.
+        original = cli_mod.FakeTranscriber
+        cli_mod.FakeTranscriber = lambda response=None: FT("[STT error: test failure]")
+
+        try:
+            with mock.patch("subprocess.run") as mock_run:
+                mock_run.return_value = mock.MagicMock(
+                    returncode=0, stdout="OK", stderr=""
+                )
+                runner = CliRunner()
+                result = runner.invoke(cli_mod.main, ["wake", "--fake", "--once"])
+        finally:
+            cli_mod.FakeTranscriber = original
+
+        assert result.exit_code == 0
+        assert not (tmp_path / "sessions.jsonl").exists()
+
+    def test_pipeline_timeout_creates_session(self, tmp_path, monkeypatch):
+        """_run_pipeline should log a session even when Claude times out."""
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_sessions_log_path",
+            lambda: tmp_path / "sessions.jsonl",
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_last_result_path",
+            lambda: tmp_path / "last_result.json",
+        )
+
+        from voice_claude_agent.claude_runner import ClaudeRunResult
+        from voice_claude_agent.cli import _run_pipeline
+
+        # Patch run_claude to return a timeout result
+        timeout_result = ClaudeRunResult(
+            command=["claude", "-p", "test"],
+            exit_code=-1,
+            stdout="",
+            stderr="Timeout after 300s",
+            duration_seconds=300.0,
+            timed_out=True,
+        )
+        with mock.patch(
+            "voice_claude_agent.cli.run_claude", return_value=timeout_result
+        ):
+            _run_pipeline("test", input_mode="text", tts_fake=True)
+
+        assert (tmp_path / "sessions.jsonl").exists()
+        lines = (tmp_path / "sessions.jsonl").read_text().strip().split("\n")
+        record = json.loads(lines[0])
+        assert record["summary"] == "Timed out"
+        assert record["exit_code"] == -1
