@@ -1,6 +1,7 @@
 """Tests for Voice Claude Agent core modules."""
 
 import json
+import os
 import sys
 from pathlib import Path
 from unittest import mock
@@ -22,6 +23,7 @@ from voice_claude_agent.config import check_mic_permission
 from voice_claude_agent.stt import (
     FakeTranscriber,
     RecordingTranscriber,
+    _resolve_whisper_model,
     list_available_backends,
 )
 from voice_claude_agent.summarizer import summarize
@@ -1037,3 +1039,111 @@ class TestEmptyAudioResilience:
         assert "No audio captured" in result.output
         assert "Wake loop stopped after 1 iteration" in result.output
         assert not (tmp_path / "sessions.jsonl").exists()
+
+
+# ── F029: whisper-cli Backend Validation ────────────────────
+class TestWhisperCliBackend:
+    def test_whisper_cli_not_installed_error(self, monkeypatch):
+        """When no whisper.cpp binary exists, transcribe returns clear error."""
+        import shutil as _shutil
+
+        monkeypatch.setattr(_shutil, "which", lambda name: None)
+        monkeypatch.setattr(
+            "voice_claude_agent.stt._find_whisper_cpp_binary", lambda: None
+        )
+
+        result = RecordingTranscriber(backend="whisper-cli").transcribe(b"\x00" * 32000)
+        assert "[STT error:" in result
+        assert "not found" in result.lower()
+        assert "brew install whisper-cpp" in result
+
+    def test_python_whisper_rejected(self, tmp_path, monkeypatch):
+        """Python openai-whisper should be detected and rejected."""
+        fake_bin = tmp_path / "whisper"
+        fake_bin.write_text("#!/usr/bin/env python3\n# openai whisper CLI wrapper\n")
+        fake_bin.chmod(0o755)
+
+        monkeypatch.setattr(
+            "voice_claude_agent.stt._find_whisper_cpp_binary",
+            lambda: str(fake_bin),
+        )
+
+        result = RecordingTranscriber(backend="whisper-cli").transcribe(b"\x00" * 32000)
+        assert "[STT error:" in result
+        assert "Python" in result or "openai-whisper" in result
+        assert "brew install whisper-cpp" in result
+
+    def test_no_model_env_var_returns_error(self, monkeypatch):
+        """Without WHISPER_CPP_MODEL set, returns clear model download prompt."""
+        monkeypatch.setitem(
+            os.environ, "WHISPER_CPP_MODEL", ""
+        ) if "WHISPER_CPP_MODEL" in os.environ else None
+
+        result = _resolve_whisper_model()
+        assert result[0] is None
+        assert "WHISPER_CPP_MODEL" in result[1]
+        assert "huggingface.co" in result[1]
+
+    def test_model_file_not_found_error(self, monkeypatch):
+        """When WHISPER_CPP_MODEL points to a missing file, returns clear error."""
+        monkeypatch.setitem(os.environ, "WHISPER_CPP_MODEL", "/nonexistent/model.bin")
+
+        result = _resolve_whisper_model()
+        assert result[0] is None
+        assert "not found" in result[1]
+        assert "/nonexistent/model.bin" in result[1]
+
+    def test_model_is_directory_error(self, tmp_path, monkeypatch):
+        """When WHISPER_CPP_MODEL points to a directory, returns clear error."""
+        monkeypatch.setitem(os.environ, "WHISPER_CPP_MODEL", str(tmp_path))
+
+        result = _resolve_whisper_model()
+        assert result[0] is None
+        assert "not a file" in result[1]
+
+    def test_valid_model_resolves(self, tmp_path, monkeypatch):
+        """When WHISPER_CPP_MODEL points to a real file, resolves successfully."""
+        model_file = tmp_path / "ggml-base.en.bin"
+        model_file.write_bytes(b"fake model data")
+        monkeypatch.setitem(os.environ, "WHISPER_CPP_MODEL", str(model_file))
+
+        path, err = _resolve_whisper_model()
+        assert path == str(model_file)
+        assert err == ""
+
+    def test_mock_whisper_cpp_successful_transcription(self, tmp_path, monkeypatch):
+        """With a mocked whisper.cpp binary, transcription returns the output."""
+        model = tmp_path / "model.bin"
+        model.write_bytes(b"model")
+        monkeypatch.setitem(os.environ, "WHISPER_CPP_MODEL", str(model))
+
+        # Provide a mock binary that prints transcribed text to stdout
+        fake_binary = tmp_path / "whisper-cpp"
+        fake_binary.write_text("#!/bin/sh\necho 'hello world'\n")
+        fake_binary.chmod(0o755)
+
+        monkeypatch.setattr(
+            "voice_claude_agent.stt._find_whisper_cpp_binary",
+            lambda: str(fake_binary),
+        )
+
+        result = RecordingTranscriber(backend="whisper-cli").transcribe(b"\x00" * 32000)
+        assert "hello world" in result
+        assert "STT error" not in result
+
+    def test_list_backends_excludes_python_whisper(self, monkeypatch):
+        """list_available_backends should NOT include whisper-cli when only Python whisper exists."""
+        import shutil as _shutil
+
+        # Only 'whisper' exists and it's the Python version
+        monkeypatch.setattr(
+            _shutil, "which",
+            lambda name: "/usr/local/bin/whisper" if name == "whisper" else None,
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.stt._is_python_whisper", lambda p: True
+        )
+
+        backends = list_available_backends()
+        assert "whisper-cli" not in backends
+        assert "text-input" in backends

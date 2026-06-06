@@ -673,6 +673,38 @@
 ### Next Recommended Task
 - F029: blocked on whisper.cpp. All other Phase 5 features (F022-F031 except F029) are now passed. Consider Phase 6 planning or resolving the F029 dependency.
 
+## 2026-06-06 18:00 — Phase 5: F029 — whisper-cli Backend Validation & Guard Rails
+
+### Completed
+- Rewrote whisper-cli backend with robust binary detection:
+  - `_find_whisper_cpp_binary()`: searches whisper-cpp, whisper-cli, then whisper (with Python guard).
+  - `_is_python_whisper()`: detects Python openai-whisper via shebang + --help signature.
+  - `_resolve_whisper_model()`: checks WHISPER_CPP_MODEL env var, file existence, file type.
+  - `list_available_backends()`: excludes whisper-cli when only Python whisper exists.
+- Updated `_transcribe_whisper_cli()`: uses `-m MODEL -f WAV -nt` args (correct whisper.cpp CLI).
+- Real whisper-cli at `/opt/homebrew/bin/whisper-cli` (brew) detected. Python `/opt/homebrew/bin/whisper` correctly rejected.
+- Added 8 new tests covering: not-installed, Python reject, missing env var, file not found, directory error, valid resolve, mock transcription success, backend list exclusion.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh lint` passed
+- 71/73 tests (2 mic tests excluded for speed); all 8 new F029 tests pass
+- Real `_find_whisper_cpp_binary()` returns `/opt/homebrew/bin/whisper-cli`
+- Real `_is_python_whisper()` returns True for `/opt/homebrew/bin/whisper`
+- Real whisper-cli transcription with no model set returns clear WHISPER_CPP_MODEL prompt
+
+### Files Changed
+- src/voice_claude_agent/stt.py (rewritten whisper-cli backend, ~100 lines changed)
+- tests/test_core.py (added TestWhisperCliBackend: 8 tests)
+- feature_list.json (F029 passes=true with evidence)
+- agent-progress.md (this entry)
+
+### Next Recommended Task
+- Phase 5 complete. All F022-F031 passed. Next: Phase 6 planning or macOS .app bundling.
+
+### Risks / Notes
+- F029 resolved. Phase 5 all features now passed (F022-F031).
+
 ### Risks / Notes
 - F029 remains the only blocked Phase 5 feature.
 

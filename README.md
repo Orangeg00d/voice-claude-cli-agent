@@ -62,7 +62,29 @@ macOS 常驻进程 (CLI 原型)
 | 后端 | 说明 | 需要 |
 |------|------|------|
 | `text-input` (默认) | 打印录音统计，不真正转写。适合开发和调试。 | 无 |
-| `whisper-cli` | 调用本地 whisper.cpp 二进制做离域转写。 | 安装 [whisper.cpp](https://github.com/ggerganov/whisper.cpp) |
+| `whisper-cli` | 调用本地 whisper.cpp 二进制做离线转写。 | 安装 whisper.cpp + 下载 GGML 模型 |
+
+### whisper-cli 前置条件
+
+使用 `--stt-backend whisper-cli` 之前需要：
+
+1. **安装 whisper.cpp**：`brew install whisper-cpp`
+2. **下载 GGML 模型**：从 [huggingface.co/ggerganov/whisper.cpp](https://huggingface.co/ggerganov/whisper.cpp) 下载一个 `.bin` 文件（如 `ggml-base.en.bin`）
+3. **设置环境变量**：`export WHISPER_CPP_MODEL=/path/to/ggml-base.en.bin`
+
+注意：系统上的 `whisper` 命令可能是 Python `openai-whisper` 包，whisper-cli 后端会自动检测并拒绝使用。请确保安装的是 whisper.cpp 而不是 pip install openai-whisper。
+
+```bash
+# 完整安装流程
+brew install whisper-cpp
+mkdir -p ~/whisper-models
+cd ~/whisper-models
+curl -LO https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
+export WHISPER_CPP_MODEL=~/whisper-models/ggml-base.en.bin
+
+# 现在可以使用 whisper-cli 后端
+voice-claude-agent voice --stt-backend whisper-cli
+```
 | `apple-speech` | 使用 macOS 内建听写引擎 (NSSpeechRecognizer via osascript)。 | 系统设置 > 键盘 > 听写 开关打开 |
 
 ### Apple Speech 说明与限制

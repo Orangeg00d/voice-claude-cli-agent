@@ -4,6 +4,7 @@ Phase 4 — real STT backends: text-input (dev), whisper-cli (local),
 and apple-speech (macOS NSSpeechRecognizer via osascript).
 """
 
+import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -42,7 +43,7 @@ class RecordingTranscriber:
 
     Backends:
     - text-input: prints audio stats (dev mode, no real STT)
-    - whisper-cli: local whisper.cpp binary
+    - whisper-cli: local whisper.cpp binary (requires WHISPER_CPP_MODEL)
     - apple-speech: macOS on-device dictation via osascript
     """
 
@@ -64,13 +65,113 @@ class RecordingTranscriber:
         return f"[unknown backend: {self.backend}]"
 
 
-def _transcribe_whisper_cli(audio_data: bytes) -> str:
-    """Transcribe via a local whisper.cpp CLI binary."""
+# ── whisper-cli backend ─────────────────────────────────────
+
+_WHISPER_CPP_CANDIDATES = ["whisper-cpp", "whisper-cli"]
+
+
+def _find_whisper_cpp_binary() -> str | None:
+    """Locate a real whisper.cpp binary.
+
+    Detection order: whisper-cpp, whisper-cli, then whisper (if it's NOT the Python one).
+    Returns path string or None.
+    """
     import shutil
 
-    whisper_bin = shutil.which("whisper-cpp") or shutil.which("whisper")
-    if not whisper_bin:
-        return "[STT error: whisper CLI not found. Install whisper.cpp or use --stt-backend text-input]"
+    for name in _WHISPER_CPP_CANDIDATES:
+        path = shutil.which(name)
+        if path:
+            return path
+
+    # If only 'whisper' is found, verify it's NOT the Python whisper package
+    whisper = shutil.which("whisper")
+    if whisper and _is_python_whisper(whisper):
+        return None
+    return whisper
+
+
+def _is_python_whisper(path: str) -> bool:
+    """Return True if `path` points to the Python whisper CLI, not whisper.cpp."""
+    try:
+        with open(path, "rb") as f:
+            head = f.read(80)
+        # Python scripts start with #! or are text files referencing python
+        text_head = head.decode("utf-8", errors="replace")
+        if text_head.startswith("#!") and "python" in text_head.lower():
+            return True
+        if "python" in text_head.lower() and "script" in text_head.lower():
+            return True
+    except OSError:
+        return False
+
+    # Fallback: run --help and check for Python whisper signature args
+    try:
+        proc = subprocess.run(
+            [path, "--help"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        help_text = proc.stdout + proc.stderr
+        python_markers = ["--model_dir", "--output_format", "openai"]
+        if any(m in help_text for m in python_markers):
+            return True
+    except Exception:
+        return True  # can't verify, reject to be safe
+    return False
+
+
+def _resolve_whisper_model() -> tuple[str | None, str]:
+    """Resolve the whisper.cpp GGML model path and return (path, error_message).
+
+    Priority: WHISPER_CPP_MODEL env var. Returns (None, error) if not set.
+    """
+    model = os.environ.get("WHISPER_CPP_MODEL", "").strip()
+    if not model:
+        return None, (
+            "[STT error: WHISPER_CPP_MODEL environment variable is not set. "
+            "Download a GGML model (e.g. ggml-base.en.bin) from "
+            "https://huggingface.co/ggerganov/whisper.cpp and set: "
+            "export WHISPER_CPP_MODEL=/path/to/ggml-base.en.bin]"
+        )
+    model_path = Path(model)
+    if not model_path.exists():
+        return None, (
+            f"[STT error: whisper model not found at '{model}'. "
+            "Download a GGML model from "
+            "https://huggingface.co/ggerganov/whisper.cpp]"
+        )
+    if not model_path.is_file():
+        return None, (
+            f"[STT error: WHISPER_CPP_MODEL points to '{model}' which is not a file.]"
+        )
+    return model, ""
+
+
+def _transcribe_whisper_cli(audio_data: bytes) -> str:
+    """Transcribe via a local whisper.cpp CLI binary.
+
+    Requires: 1) whisper.cpp installed (brew install whisper-cpp),
+              2) WHISPER_CPP_MODEL env var set to a GGML model file.
+    """
+    binary = _find_whisper_cpp_binary()
+    if not binary:
+        return (
+            "[STT error: whisper.cpp not found. "
+            "Install it: brew install whisper-cpp, "
+            "or use --stt-backend text-input]"
+        )
+
+    # Double-check we're not using Python whisper
+    if _is_python_whisper(binary):
+        return (
+            "[STT error: found 'whisper' is the Python openai-whisper package, "
+            "not whisper.cpp. Install whisper.cpp: brew install whisper-cpp]"
+        )
+
+    model, model_err = _resolve_whisper_model()
+    if model is None:
+        return model_err
 
     wav_data = _pcm_to_wav(audio_data)
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
@@ -78,8 +179,9 @@ def _transcribe_whisper_cli(audio_data: bytes) -> str:
         tmp_path = f.name
 
     try:
+        # whisper.cpp CLI: whisper-cpp -m <model> -f <wav> -nt
         proc = subprocess.run(
-            [whisper_bin, "-f", tmp_path, "--no-timestamps"],
+            [binary, "-m", model, "-f", tmp_path, "-nt"],
             capture_output=True,
             text=True,
             timeout=120,
@@ -95,6 +197,8 @@ def _transcribe_whisper_cli(audio_data: bytes) -> str:
     finally:
         Path(tmp_path).unlink(missing_ok=True)
 
+
+# ── apple-speech backend ────────────────────────────────────
 
 def _transcribe_apple_speech(audio_data: bytes) -> str:
     """Transcribe using macOS on-device dictation.
@@ -114,15 +218,12 @@ def _transcribe_apple_speech(audio_data: bytes) -> str:
         wav_path = f.name
 
     try:
-        # Use afplay to play the audio while NSSpeechRecognizer listens.
-        # This approach uses the system dictation — the user must have
-        # "Enable Dictation" turned on in System Settings.
-        script = '''
+        script = """
         tell application "System Events"
             set prevDictation to do shell script "defaults read com.apple.speech.recognition.AppleSpeechRecognition.prefs DictationIMEnabled 2>/dev/null || echo 0"
         end tell
         return prevDictation
-        '''
+        """
         proc = subprocess.run(
             ["osascript", "-e", script],
             capture_output=True,
@@ -138,15 +239,12 @@ def _transcribe_apple_speech(audio_data: bytes) -> str:
                 "or use --stt-backend whisper-cli]"
             )
 
-        # Dictation is enabled — use it via a short recording replay
         subprocess.run(
             [
                 "osascript", "-e",
-                f'''
-                set audioFile to POSIX file "{wav_path}"
-                tell application "Finder" to open audioFile
-                delay 3
-                ''',
+                f'set audioFile to POSIX file "{wav_path}"\n'
+                "tell application \"Finder\" to open audioFile\n"
+                "delay 3\n",
             ],
             capture_output=True,
             text=True,
@@ -165,6 +263,8 @@ def _transcribe_apple_speech(audio_data: bytes) -> str:
         Path(wav_path).unlink(missing_ok=True)
 
 
+# ── helpers ─────────────────────────────────────────────────
+
 def _pcm_to_wav(pcm_data: bytes, sample_rate: int = 16000, channels: int = 1) -> bytes:
     """Convert raw PCM int16 to a minimal WAV file in memory."""
     import struct
@@ -180,8 +280,8 @@ def _pcm_to_wav(pcm_data: bytes, sample_rate: int = 16000, channels: int = 1) ->
         36 + data_len,
         b"WAVE",
         b"fmt ",
-        16,  # PCM
-        1,  # format = PCM
+        16,
+        1,
         channels,
         sample_rate,
         byte_rate,
@@ -196,20 +296,26 @@ def _pcm_to_wav(pcm_data: bytes, sample_rate: int = 16000, channels: int = 1) ->
 def _extract_text_from_whisper_stderr(stderr: str) -> str:
     """Try to extract transcribed text from whisper.cpp stderr output."""
     for line in stderr.splitlines():
-        line = line.strip()
-        if line and not line.startswith("[") and "whisper" not in line.lower():
-            return line
+        stripped = line.strip()
+        if stripped and not stripped.startswith("[") and "whisper" not in stripped.lower():
+            return stripped
     return ""
 
 
 def list_available_backends() -> list[str]:
-    """Return the list of STT backends that are usable right now."""
-    import shutil
+    """Return the list of STT backends that are usable right now.
+
+    whisper-cli is only included if a real whisper.cpp binary is found
+    (NOT the Python openai-whisper package).
+    """
     import platform
 
     backends = ["text-input"]
-    if shutil.which("whisper-cpp") or shutil.which("whisper"):
+
+    cpp_bin = _find_whisper_cpp_binary()
+    if cpp_bin and not _is_python_whisper(cpp_bin):
         backends.append("whisper-cli")
+
     if platform.system() == "Darwin":
         backends.append("apple-speech")
     return backends
