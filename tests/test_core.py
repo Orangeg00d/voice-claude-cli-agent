@@ -718,7 +718,7 @@ class TestRecordingStartStopErrors:
         captured = capsys.readouterr()
         assert "Recording start failed" in captured.out
 
-    def test__safe_record_attempt_stop_failure(self):
+    def test__safe_record_attempt_stop_failure(self, capsys):
         """_safe_record_attempt should catch recorder.stop() exceptions and return empty bytes."""
         from voice_claude_agent.cli import _safe_record_attempt
 
@@ -736,6 +736,8 @@ class TestRecordingStartStopErrors:
         with mock.patch("builtins.input", return_value=""):
             audio = _safe_record_attempt(BrokenStopRecorder(), max_duration=1)
         assert audio == b""
+        captured = capsys.readouterr()
+        assert "Recording stop failed" in captured.out
 
     def test_wake_real_recording_start_error_continues(self, tmp_path, monkeypatch):
         """wake --once with _safe_record_attempt returning empty should continue, not crash."""
@@ -759,12 +761,17 @@ class TestRecordingStartStopErrors:
         with mock.patch("subprocess.run") as mock_run:
             mock_run.return_value = mock.MagicMock(returncode=0, stdout="OK", stderr="")
             runner = CliRunner()
-            result = runner.invoke(cli_mod.main, ["wake", "--once"])
+            result = runner.invoke(cli_mod.main, ["wake", "--once"], input="\n")
 
         assert result.exit_code == 0
         # The wake loop should print "No audio captured" and continue to next iteration,
         # then with --once + no audio, _stop_if_once triggers. No sessions written.
+        assert "No audio captured" in result.output
+        assert "Wake loop stopped after 1 iteration(s)." in result.output
+        mock_run.assert_not_called()
         assert not (tmp_path / "sessions.jsonl").exists()
+
+
 class TestPhase4ExceptionHandling:
     def test__stt_is_error_detects_error_prefix(self):
         from voice_claude_agent.cli import _stt_is_error
