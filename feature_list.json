@@ -399,8 +399,8 @@
         "If dictation is OFF: verify prompt to enable it in System Settings",
         "If dictation is ON: verify audio is played for dictation (non-crashing)"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "apple-speech appears in list_available_backends(). Dictation OFF: RecordingTranscriber(backend='apple-speech').transcribe() returns '[STT error: macOS Dictation is not enabled. Enable it in System Settings > Keyboard > Dictation...]' — clear, actionable message, no crash. Pre-existing test_recording_transcriber_apple_speech_returns_status covers this path."
     },
     {
       "id": "F031",

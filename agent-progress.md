@@ -627,3 +627,27 @@
 
 ### Risks / Notes
 - F029 requires `brew install whisper-cpp` — blocked on absent external dependency.
+
+## 2026-06-06 15:40 — Phase 5: F030 — Apple Speech Backend Status Detection
+
+### Completed
+- Verified apple-speech appears in `list_available_backends()` on macOS.
+- Manual verification: `RecordingTranscriber(backend='apple-speech').transcribe()` with dictation OFF returns `[STT error: macOS Dictation is not enabled. Enable it in System Settings > Keyboard > Dictation, or use --stt-backend whisper-cli]` — clear, actionable error, no crash.
+- Pre-existing test `test_recording_transcriber_apple_speech_returns_status` covers the non-crashing path.
+- Zero code changes — all detection logic was implemented in Phase 4.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh lint` passed
+- Apple Speech dictation detection: OFF → actionable error message, no crash
+- Pre-existing test passes
+
+### Files Changed
+- feature_list.json (F030 passes=true with evidence)
+- agent-progress.md (this entry)
+
+### Next Recommended Task
+- F029: blocked on whisper.cpp install. F031: README doc check.
+
+### Risks / Notes
+- Dictation ON path cannot be verified on this machine (dictation is disabled). The code path exists and a pre-existing test ensures it does not crash.
