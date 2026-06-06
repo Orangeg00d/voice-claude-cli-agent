@@ -1,0 +1,166 @@
+{
+  "features": [
+    {
+      "id": "F001",
+      "priority": 1,
+      "category": "core",
+      "description": "Agent can check local Claude CLI availability",
+      "steps": [
+        "Run init check",
+        "Verify command -v claude succeeds or reports actionable error",
+        "Verify claude --version is captured when available"
+      ],
+      "passes": true,
+      "evidence": "Claude CLI 2.1.162 detected and available via subprocess"
+    },
+    {
+      "id": "F002",
+      "priority": 2,
+      "category": "core",
+      "description": "Text input mode can invoke Claude CLI",
+      "steps": [
+        "Run voice-claude-agent demo-text '请回复 OK'",
+        "Verify claude -p is invoked via subprocess",
+        "Verify exit code is captured"
+      ],
+      "passes": true,
+      "evidence": "demo-text '请回复 OK' -> Claude CLI returned 'OK', exit_code=0, summary and TTS output captured"
+    },
+    {
+      "id": "F003",
+      "priority": 3,
+      "category": "core",
+      "description": "Claude CLI stdout/stderr/exit code is fully recorded",
+      "steps": [
+        "Execute a Claude CLI command that produces output",
+        "Verify stdout is captured in ClaudeRunResult",
+        "Verify stderr is captured in ClaudeRunResult",
+        "Verify exit code is captured in ClaudeRunResult",
+        "Verify timed_out flag is set correctly"
+      ],
+      "passes": true,
+      "evidence": "4 test_claude_runner tests pass: success, file_not_found, timeout, dataclass_fields all verified"
+    },
+    {
+      "id": "F004",
+      "priority": 4,
+      "category": "core",
+      "description": "A structured summary is generated after each execution",
+      "steps": [
+        "Run claude_runner with a known prompt",
+        "Pass result to summarizer",
+        "Verify summary is non-empty string",
+        "Verify summary mentions exit code or status"
+      ],
+      "passes": true,
+      "evidence": "5 summarizer tests pass: success, failure, timeout, claude_not_found, empty output — all return descriptive summaries"
+    },
+    {
+      "id": "F005",
+      "priority": 5,
+      "category": "core",
+      "description": "TTS can speak the summary; MVP uses macOS say",
+      "steps": [
+        "Create MacOSSaySpeaker",
+        "Call speak('test message')",
+        "Verify no exception raised",
+        "Create FakeSpeaker for tests",
+        "Verify FakeSpeaker records spoken text"
+      ],
+      "passes": true,
+      "evidence": "3 TTS tests pass: MacOSSaySpeaker no-raise, FakeSpeaker records text, FakeSpeaker starts empty"
+    },
+    {
+      "id": "F006",
+      "priority": 6,
+      "category": "safety",
+      "description": "High-risk actions trigger confirmation flow",
+      "steps": [
+        "Classify a prompt containing 'push' as external_or_destructive",
+        "Classify a prompt containing 'read file' as read_only",
+        "Verify requires_confirmation returns True for destructive",
+        "Verify requires_confirmation returns False for read_only"
+      ],
+      "passes": true,
+      "evidence": "8 risk classifier tests pass: read_only, recoverable, destructive keywords all classified correctly"
+    },
+    {
+      "id": "F007",
+      "priority": 7,
+      "category": "safety",
+      "description": "Unconfirmed push/delete/deploy actions are rejected",
+      "steps": [
+        "Call confirm_or_reject with destructive risk and rejection",
+        "Verify returns (False, reason)",
+        "Call confirm_or_reject with read_only risk",
+        "Verify returns (True, reason) — no confirmation needed"
+      ],
+      "passes": true,
+      "evidence": "3 confirmation tests pass: read_only auto-approves, destructive rejected, destructive confirmed"
+    },
+    {
+      "id": "F008",
+      "priority": 8,
+      "category": "logging",
+      "description": "Task logs are written to agent_state/sessions.jsonl",
+      "steps": [
+        "Write a session entry",
+        "Verify sessions.jsonl exists and contains one valid JSON line",
+        "Verify required fields are present"
+      ],
+      "passes": true,
+      "evidence": "3 logging tests pass: single session write, last_result write, multiple session append — all JSONL valid"
+    },
+    {
+      "id": "F009",
+      "priority": 9,
+      "category": "ux",
+      "description": "Failed executions are reported with cause and suggestions",
+      "steps": [
+        "Summarize a result with exit_code != 0",
+        "Verify summary mentions failure or exit code",
+        "Summarize a timed-out result",
+        "Verify summary mentions timeout"
+      ],
+      "passes": true,
+      "evidence": "Summarizer tests cover exit_code=1, exit_code=-1 (timeout), exit_code=-2 (not found) — all generate descriptive Chinese summaries"
+    },
+    {
+      "id": "F010",
+      "priority": 10,
+      "category": "voice",
+      "description": "Voice input interface exists; mock if real STT unavailable",
+      "steps": [
+        "Verify STT interface protocol is defined (stt.py)",
+        "Verify mock transcriber is available for testing"
+      ],
+      "passes": true,
+      "evidence": "stt.py created with Transcriber protocol, TextInputTranscriber (stdin) and FakeTranscriber (test) implementations"
+    },
+    {
+      "id": "F011",
+      "priority": 11,
+      "category": "wake",
+      "description": "Wake trigger interface exists; shortcut/CLI if real wake word unavailable",
+      "steps": [
+        "Verify wake trigger interface is defined (wake.py)",
+        "Verify manual/CLI trigger is available as alternative"
+      ],
+      "passes": true,
+      "evidence": "wake.py created with WakeTrigger protocol and ManualWakeTrigger (Enter key / programmatic trigger)"
+    },
+    {
+      "id": "F012",
+      "priority": 12,
+      "category": "integration",
+      "description": "Full demo-text pipeline is testable end-to-end",
+      "steps": [
+        "Run ./init.sh test",
+        "Verify integration test covers demo-text flow",
+        "Verify tests pass without real Claude CLI dependency"
+      ],
+      "passes": true,
+      "evidence": "28/28 tests pass (1.44s). Integration tests: test_pipeline_with_mocked_claude + test_destructive_pipeline_is_blocked both pass"
+    }
+  ]
+}

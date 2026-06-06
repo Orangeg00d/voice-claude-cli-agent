@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voice Claude CLI Agent — 项目全景图</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --surface2: #334155;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --green: #4ade80;
+    --yellow: #fbbf24;
+    --red: #f87171;
+    --purple: #c084fc;
+    --orange: #fb923c;
+    --pink: #f472b6;
+    --border: #475569;
+    --radius: 12px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 24px;
+  }
+  .container { max-width: 1400px; margin: 0 auto; }
+
+  h1 {
+    font-size: 2.4rem;
+    font-weight: 800;
+    text-align: center;
+    margin-bottom: 4px;
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .subtitle { text-align: center; color: var(--muted); margin-bottom: 32px; font-size: 1.05rem; }
+
+  /* Grid */
+  .grid { display: grid; gap: 20px; }
+  .grid-2 { grid-template-columns: 1fr 1fr; }
+  .grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .grid-4 { grid-template-columns: repeat(4, 1fr); }
+  .span-2 { grid-column: span 2; }
+  .span-3 { grid-column: span 3; }
+  .span-4 { grid-column: span 4; }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .card-icon {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem;
+  }
+  .card-title { font-weight: 700; font-size: 1.05rem; }
+
+  /* Tags */
+  .tag {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 99px;
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+  .tag-blue { background: rgba(56,189,248,.15); color: var(--accent); }
+  .tag-green { background: rgba(74,222,128,.15); color: var(--green); }
+  .tag-yellow { background: rgba(251,191,36,.15); color: var(--yellow); }
+  .tag-red { background: rgba(248,113,113,.15); color: var(--red); }
+  .tag-purple { background: rgba(192,132,252,.15); color: var(--purple); }
+  .tag-orange { background: rgba(251,146,60,.15); color: var(--orange); }
+
+  /* Flow */
+  .flow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 16px 0;
+  }
+  .flow-node {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .flow-arrow {
+    color: var(--accent);
+    font-size: 1.2rem;
+    font-weight: 700;
+  }
+
+  /* Phase */
+  .phase-indicator {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .phase-dot {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+  }
+  .phase-dot.active { background: var(--green); border-color: var(--green); }
+  .phase-dot.pending { background: transparent; border-color: var(--border); }
+
+  /* Feature list */
+  .feature-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(71,85,105,.4);
+    font-size: 0.9rem;
+  }
+  .feature-row:last-child { border-bottom: none; }
+  .feature-id {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.78rem;
+    color: var(--accent);
+    min-width: 36px;
+  }
+  .feature-check { font-size: 1rem; min-width: 20px; text-align: center; }
+
+  /* Code block */
+  pre {
+    background: rgba(0,0,0,.3);
+    border-radius: 8px;
+    padding: 12px 16px;
+    overflow-x: auto;
+    font-size: 0.82rem;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    color: var(--muted);
+  }
+
+  /* Architecture diagram */
+  .arch-layer {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .arch-row {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .arch-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 0.82rem;
+    text-align: center;
+    min-width: 100px;
+  }
+  .arch-box.entry { border-color: var(--accent); }
+  .arch-box.process { border-color: var(--purple); }
+  .arch-box.output { border-color: var(--green); }
+  .arch-box.storage { border-color: var(--orange); }
+
+  /* Risk table */
+  .risk-bar {
+    display: flex;
+    gap: 4px;
+    margin-top: 10px;
+  }
+  .risk-segment {
+    flex:1; height:6px; border-radius:3px;
+  }
+  .risk-ro { background: var(--green); flex:5; }
+  .risk-re { background: var(--yellow); flex:3; }
+  .risk-ed { background: var(--red); flex:2; }
+
+  .legend { display:flex; gap:16px; justify-content:center; font-size:0.8rem; color:var(--muted); margin-top:4px; }
+
+  /* File tree */
+  .file-tree {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.82rem;
+    line-height: 1.8;
+  }
+  .file-dir { color: var(--accent); }
+  .file-exists { color: var(--green); }
+  .file-pending { color: var(--muted); }
+  .file-comment { color: #64748b; font-style: italic; }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+    .span-2, .span-3, .span-4 { grid-column: span 1; }
+    .flow { flex-direction: column; }
+    .flow-arrow { transform: rotate(90deg); }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Voice Claude CLI Agent</h1>
+<p class="subtitle">macOS 语音唤醒 Claude 开发助手 — 项目全景图</p>
+
+<!-- ====== CURRENT STATUS ====== -->
+<div class="grid grid-3" style="margin-bottom:20px">
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(251,191,36,.15)">&#9888;</div>
+      <div>
+        <div class="card-title">当前状态</div>
+        <div style="font-size:0.8rem;color:var(--muted)">2026-06-06</div>
+      </div>
+    </div>
+    <span class="tag tag-yellow">计划阶段</span>
+    <span class="tag tag-yellow" style="margin-left:4px">Initializer 未执行</span>
+    <p style="margin-top:10px;font-size:0.88rem;color:var(--muted)">
+      仓库目前只有 5 个文档文件。Initializer agent 尚未运行 — 还没有代码、测试、或 harness 文件。
+    </p>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(56,189,248,.15)">&#9881;</div>
+      <div class="card-title">技术栈</div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">
+      <span class="tag tag-blue">Python 3.11+</span>
+      <span class="tag tag-blue">macOS say (TTS)</span>
+      <span class="tag tag-blue">Claude CLI</span>
+      <span class="tag tag-blue">subprocess</span>
+      <span class="tag tag-blue">pytest</span>
+      <span class="tag tag-blue">uv / pip</span>
+      <span class="tag tag-purple">JSONL 日志</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(192,132,252,.15)">&#128101;</div>
+      <div class="card-title">协同模式</div>
+    </div>
+    <div style="font-size:0.88rem">
+      <p><strong style="color:var(--accent)">Claude</strong> — 主开发者，每轮一个 feature</p>
+      <p style="margin-top:4px"><strong style="color:var(--purple)">Codex</strong> — 审核、验收、GitHub 发布</p>
+    </div>
+  </div>
+</div>
+
+<!-- ====== USER GOAL & ARCHITECTURE FLOW ====== -->
+<div class="card span-3" style="margin-bottom:20px">
+  <div class="card-header">
+    <div class="card-icon" style="background:rgba(56,189,248,.15)">&#127919;</div>
+    <div class="card-title">最终目标：完整语音闭环</div>
+  </div>
+
+  <div class="flow">
+    <div class="flow-node">&#127908; 用户说出唤醒词</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node">&#127897; Agent 开始录音</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node">&#9997; 语音转文字 (STT)</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node">&#9888; 判断风险等级</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node" style="border-color:var(--yellow)">&#10067; 高风险? → 确认</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node" style="border-color:var(--accent);background:rgba(56,189,248,.1)">&#9881; Claude CLI 执行</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node">&#128196; 记录 stdout/stderr/exit</div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-node">&#128264; 语音播报摘要 (TTS)</div>
+  </div>
+</div>
+
+<!-- ====== 4 PHASES ====== -->
+<div class="grid grid-4" style="margin-bottom:20px">
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(74,222,128,.15)">&#10132;</div>
+      <div>
+        <div class="card-title">Phase 1</div>
+        <div style="font-size:0.78rem;color:var(--muted)">当前目标</div>
+      </div>
+    </div>
+    <span class="tag tag-green">文本触发 MVP</span>
+    <ul style="margin-top:10px;font-size:0.84rem;padding-left:18px;color:var(--muted)">
+      <li>文本指令 → Claude CLI</li>
+      <li>结果记录 + 摘要</li>
+      <li>macOS say 播报</li>
+      <li>风险分类 + 确认</li>
+      <li>F001-F009 验收</li>
+      <li>不接真实麦克风/唤醒词</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(56,189,248,.15)">&#127897;</div>
+      <div>
+        <div class="card-title">Phase 2</div>
+        <div style="font-size:0.78rem;color:var(--muted)">下一阶段</div>
+      </div>
+    </div>
+    <span class="tag tag-blue">语音输入抽象</span>
+    <ul style="margin-top:10px;font-size:0.84rem;padding-left:18px;color:var(--muted)">
+      <li>STT 接口设计</li>
+      <li>真实录音或 mock</li>
+      <li>手动开始/结束录音</li>
+      <li>F010 验收</li>
+      <li>后续可选: Whisper / whisper.cpp / Apple Speech</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(192,132,252,.15)">&#9889;</div>
+      <div>
+        <div class="card-title">Phase 3</div>
+        <div style="font-size:0.78rem;color:var(--muted)">后续</div>
+      </div>
+    </div>
+    <span class="tag tag-purple">唤醒入口</span>
+    <ul style="margin-top:10px;font-size:0.84rem;padding-left:18px;color:var(--muted)">
+      <li>Wake trigger 接口</li>
+      <li>按键/命令行模拟唤醒</li>
+      <li>F011 验收</li>
+      <li>后续可选: Porcupine / openWakeWord</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(251,191,36,.15)">&#127760;</div>
+      <div>
+        <div class="card-title">Phase 4</div>
+        <div style="font-size:0.78rem;color:var(--muted)">最终</div>
+      </div>
+    </div>
+    <span class="tag tag-yellow">端到端语音闭环</span>
+    <ul style="margin-top:10px;font-size:0.84rem;padding-left:18px;color:var(--muted)">
+      <li>唤醒 → 录音 → STT → Claude CLI → 摘要 → TTS</li>
+      <li>F012 验收</li>
+      <li>最终形态: macOS 常驻 App</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ====== ARCHITECTURE & FILE PLAN ====== -->
+<div class="grid grid-2" style="margin-bottom:20px">
+
+  <!-- Module architecture -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(56,189,248,.15)">&#128451;</div>
+      <div class="card-title">推荐模块架构 (待创建)</div>
+    </div>
+    <div class="file-tree">
+      <div class="file-dir">src/voice_claude_agent/</div>
+      <div style="padding-left:18px">
+        <div class="file-pending">├── __init__.py</div>
+        <div class="file-pending">├── cli.py <span class="file-comment">← CLI 入口 (click/argparse)</span></div>
+        <div class="file-pending">├── config.py <span class="file-comment">← 配置管理</span></div>
+        <div class="file-pending">├── claude_runner.py <span class="file-comment">← Claude CLI subprocess 执行器</span></div>
+        <div class="file-pending">├── command_router.py <span class="file-comment">← 指令路由</span></div>
+        <div class="file-pending">├── risk.py <span class="file-comment">← 风险分类 (只读/可恢复/破坏性)</span></div>
+        <div class="file-pending">├── confirmation.py <span class="file-comment">← 高风险动作二次确认</span></div>
+        <div class="file-pending">├── recorder.py <span class="file-comment">← 录音模块 (Phase 2)</span></div>
+        <div class="file-pending">├── stt.py <span class="file-comment">← 语音转文字接口 (Phase 2)</span></div>
+        <div class="file-pending">├── wake.py <span class="file-comment">← 唤醒入口接口 (Phase 3)</span></div>
+        <div class="file-pending">├── tts.py <span class="file-comment">← 文字转语音接口 + macOS say</span></div>
+        <div class="file-pending">├── summarizer.py <span class="file-comment">← Claude CLI 输出摘要</span></div>
+        <div class="file-pending">└── logging_store.py <span class="file-comment">← JSONL 日志写入</span></div>
+      </div>
+      <div class="file-pending" style="margin-top:4px">tests/ <span class="file-comment">← pytest 测试</span></div>
+      <div class="file-pending">pyproject.toml <span class="file-comment">← Python 项目配置</span></div>
+    </div>
+  </div>
+
+  <!-- File status -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(74,222,128,.15)">&#128193;</div>
+      <div class="card-title">当前文件状态</div>
+    </div>
+    <div class="file-tree">
+      <div class="file-exists">&#10003; README.md</div>
+      <div class="file-exists">&#10003; CLAUDE.md</div>
+      <div class="file-exists">&#10003; CODEX_REVIEW_GUIDE.md</div>
+      <div class="file-exists">&#10003; CLAUDE_CLI_TASK_ORCHESTRATION.md</div>
+      <div class="file-exists">&#10003; VOICE_CLAUDE_CLI_AGENT_PLAN.md</div>
+      <div class="file-exists">&#10003; .gitignore</div>
+      <div style="margin-top:6px; padding-top:6px; border-top:1px solid var(--border)"></div>
+      <div class="file-pending">&#10007; init.sh</div>
+      <div class="file-pending">&#10007; feature_list.json</div>
+      <div class="file-pending">&#10007; agent-progress.md</div>
+      <div class="file-pending">&#10007; pyproject.toml</div>
+      <div class="file-pending">&#10007; src/voice_claude_agent/*</div>
+      <div class="file-pending">&#10007; tests/*</div>
+      <div class="file-pending">&#10007; agent_state/</div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== 12 FEATURES ====== -->
+<div class="card span-3" style="margin-bottom:20px">
+  <div class="card-header">
+    <div class="card-icon" style="background:rgba(74,222,128,.15)">&#10003;</div>
+    <div class="card-title">功能验收清单 (feature_list.json — 全部待实现)</div>
+  </div>
+  <div class="grid grid-2" style="gap:0">
+    <div>
+      <div class="feature-row"><span class="feature-check" style="color:var(--red)">&#10007;</span><span class="feature-id">F001</span>检查 Claude CLI 可用性 <span class="tag tag-blue" style="margin-left:auto">core</span></div>
+      <div class="feature-row"><span class="feature-check" style="color:var(--red)">&#10007;</span><span class="feature-id">F002</span>文本指令模式可调用 Claude CLI <span class="tag tag-blue" style="margin-left:auto">core</span></div>
+      <div class="feature-row"><span class="feature-check" style="color:var(--red)">&#10007;</span><span class="feature-id">F003</span>stdout/stderr/exit code 完整记录 <span class="tag tag-blue" style="margin-left:auto">core</span></div>
+      <div class="feature-row"><span class="feature-check" style="color:var(--red)">&#10007;</span><span class="feature-id">F004</span>执行结束生成结构化摘要 <span class="tag tag-blue" style="margin-left:auto">core</span></div>
+      <div class="feature-row"><span class="feature-check" style="color:var(--red)">&#10007;</span><span class="feature-id">F005</span>TTS 播报摘要 (macOS say) <span class="tag tag-blue" style="margin-left:auto">core</span></div>
+      <div class="feature-row"><span class="feature-check" style="color:var(--red)">&#10007;</span><span class="feature-id">F006</span>高风险动作进入确认流程 <span class="tag tag-red" style="margin-left:auto">safety</span></div>
+    </div>
+    <div>
+      <div class="feature-row"><span class="feature-check" style="color:var(--red)">&#10007;</span><span class="feature-id">F007</span>拒绝未确认的 push/delete/deploy <span class="tag tag-red" style="margin-left:auto">safety</span></div>
+      <div class="feature-row"><span class="feature-check" style="color:var(--red)">&#10007;</span><span class="feature-id">F008</span>任务日志写入 JSONL <span class="tag tag-purple" style="margin-left:auto">logging</span></div>
+      <div class="feature-row"><span class="feature-check" style="color:var(--red)">&#10007;</span><span class="feature-id">F009</span>失败时播报原因和建议 <span class="tag tag-orange" style="margin-left:auto">ux</span></div>
+      <div class="feature-row"><span class="feature-check" style="color:var(--red)">&#10007;</span><span class="feature-id">F010</span>语音输入接口 (mock or real) <span class="tag tag-purple" style="margin-left:auto">Phase 2</span></div>
+      <div class="feature-row"><span class="feature-check" style="color:var(--red)">&#10007;</span><span class="feature-id">F011</span>唤醒入口接口 (按键/mock) <span class="tag tag-purple" style="margin-left:auto">Phase 3</span></div>
+      <div class="feature-row"><span class="feature-check" style="color:var(--red)">&#10007;</span><span class="feature-id">F012</span>完整 demo-text 自动化测试 <span class="tag tag-green" style="margin-left:auto">Phase 4</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== RISK MODEL ====== -->
+<div class="grid grid-2" style="margin-bottom:20px">
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(248,113,113,.15)">&#128737;</div>
+      <div class="card-title">风险三级模型</div>
+    </div>
+    <div class="risk-bar"><div class="risk-ro"></div><div class="risk-re"></div><div class="risk-ed"></div></div>
+    <div class="legend">
+      <span>&#128994; 只读 (read_only)</span>
+      <span>&#128993; 可恢复 (recoverable)</span>
+      <span>&#128308; 破坏性 (external_or_destructive)</span>
+    </div>
+    <table style="width:100%;margin-top:12px;font-size:0.84rem;border-collapse:collapse">
+      <tr style="color:var(--green)"><td style="padding:4px 8px">&#128994;</td><td>git status, 查看文件, 读取 GitHub, 让 Claude 总结代码</td><td style="color:var(--muted)">直接执行</td></tr>
+      <tr style="color:var(--yellow)"><td style="padding:4px 8px">&#128993;</td><td>修改本地代码, 创建分支, 运行测试, 安装依赖</td><td style="color:var(--muted)">记录日志</td></tr>
+      <tr style="color:var(--red)"><td style="padding:4px 8px">&#128308;</td><td>git push, 创建 PR, 删除文件, 部署, 改写 git 历史</td><td style="color:var(--muted)">必须确认</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon" style="background:rgba(192,132,252,.15)">&#128274;</div>
+      <div class="card-title">开发约束</div>
+    </div>
+    <ul style="font-size:0.86rem;padding-left:18px;color:var(--muted);line-height:2">
+      <li>不默认使用 <code style="color:var(--red)">--dangerously-skip-permissions</code></li>
+      <li>不默认执行 push / deploy / delete</li>
+      <li>不在无日志情况下静默执行</li>
+      <li>不一次性做所有高级功能</li>
+      <li>不删除或弱化 feature_list.json</li>
+      <li>每轮只做一个 feature，提交一个 commit</li>
+      <li>依赖文件 + git history 接续，不依赖对话上下文</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ====== INITIALIZER TASKS ====== -->
+<div class="card span-3" style="margin-bottom:20px;border-color:var(--accent)">
+  <div class="card-header">
+    <div class="card-icon" style="background:rgba(56,189,248,.15)">&#128640;</div>
+    <div>
+      <div class="card-title">下一步: Initializer Agent 任务清单</div>
+      <div style="font-size:0.78rem;color:var(--muted)">这是项目启动后必须执行的第一步</div>
+    </div>
+  </div>
+  <div class="grid grid-2" style="font-size:0.86rem">
+    <ol style="padding-left:22px;line-height:2.2;color:var(--muted)">
+      <li>创建 <code>pyproject.toml</code></li>
+      <li>创建包目录 <code>src/voice_claude_agent/</code></li>
+      <li>创建 <code>init.sh</code> (check / test / demo-text)</li>
+      <li>创建 <code>feature_list.json</code> (F001-F012)</li>
+      <li>创建 <code>agent-progress.md</code></li>
+      <li>创建 <code>agent_state/</code> 目录</li>
+      <li>确认 README / CLAUDE / CODEX_REVIEW 已存在</li>
+    </ol>
+    <ol start="8" style="padding-left:22px;line-height:2.2;color:var(--muted)">
+      <li>实现文本 → Claude CLI 最小链路</li>
+      <li>实现 macOS say 播报</li>
+      <li>实现风险分类 + 确认占位</li>
+      <li>编写 pytest 测试</li>
+      <li>运行 <code>./init.sh check</code> 和 <code>./init.sh test</code></li>
+      <li>写入进度记录</li>
+      <li>创建 git commit</li>
+    </ol>
+  </div>
+</div>
+
+<!-- ====== DEMO-TEXT FLOW ====== -->
+<div class="card span-3">
+  <div class="card-header">
+    <div class="card-icon" style="background:rgba(74,222,128,.15)">&#9889;</div>
+    <div class="card-title">MVP 命令行体验 (Phase 1 目标)</div>
+  </div>
+  <pre>voice-claude-agent check              # 检查依赖和 Claude CLI
+voice-claude-agent demo-text "让 Claude 回复 OK"   # 完整演示链路
+voice-claude-agent run-text "请总结当前项目结构"    # 正式文本触发
+
+# demo-text 预期行为:
+# 1. 接收文本指令
+# 2. 调用 claude -p "..." (subprocess)
+# 3. 捕获 stdout / stderr / exit code
+# 4. 生成短摘要
+# 5. 写入 agent_state/sessions.jsonl
+# 6. 用 macOS say 播报摘要</pre>
+</div>
+
+</div>
+</body>
+</html>
