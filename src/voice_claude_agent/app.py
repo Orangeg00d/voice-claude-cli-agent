@@ -52,6 +52,7 @@ class VoiceClaudeApp(rumps.App):
         self._wake_event = threading.Event()
         self._trigger_event = threading.Event()
         self._wake_thread: threading.Thread | None = None
+        self._single_trigger_mode = False
 
         self.start_item = rumps.MenuItem("Start Wake", callback=self._start_wake)
         self.stop_item = rumps.MenuItem("Stop Wake", callback=self._stop_wake)
@@ -254,6 +255,7 @@ class VoiceClaudeApp(rumps.App):
             return
         if not self._wake_active:
             self._wake_active = True
+            self._single_trigger_mode = True
             self._wake_event.clear()
             self._trigger_event.set()
             self._sync_menu_titles()
@@ -279,7 +281,14 @@ class VoiceClaudeApp(rumps.App):
             if not self._trigger_event.is_set():
                 continue
             self._trigger_event.clear()
-            self._record_and_execute()
+            try:
+                self._record_and_execute()
+            finally:
+                if self._single_trigger_mode:
+                    self._single_trigger_mode = False
+                    self._wake_active = False
+                    self._wake_event.set()
+                    self._sync_menu_titles()
 
     # ── Non-interactive recording (NO input()) ───────────────
 
@@ -287,48 +296,75 @@ class VoiceClaudeApp(rumps.App):
         from voice_claude_agent.cli import _run_pipeline
         from voice_claude_agent.stt import RecordingTranscriber
 
-        recorder = self._open_mic_or_alert()
-        if recorder is None:
-            return
+        self._append_runtime_event("record_cycle_start")
+        try:
+            recorder = self._open_mic_or_alert()
+            if recorder is None:
+                self._append_runtime_event("record_open_failed")
+                return
 
-        self.trigger_item.title = "Recording..."
-        audio, diag = self._record_fixed_duration_with_diag(recorder)
-        if not audio:
-            self.mic_status_item.title = "Mic: No audio captured"
-            self.trigger_item.title = "Trigger Recording"
-            self._alert(
-                title="No Audio",
-                message=(
-                    "No audio was captured. Check your microphone connection.\n\n"
-                    f"{diag}"
-                ),
-            )
-            return
+            self.trigger_item.title = "Recording..."
+            self._append_runtime_event("record_start")
+            audio, diag = self._record_fixed_duration_with_diag(recorder)
+            self._append_runtime_event(f"record_done bytes={len(audio)}")
+            if not audio:
+                self.mic_status_item.title = "Mic: No audio captured"
+                self._alert(
+                    title="No Audio",
+                    message=(
+                        "No audio was captured. Check your microphone connection.\n\n"
+                        f"{diag}"
+                    ),
+                )
+                return
 
-        self.trigger_item.title = "Transcribing..."
-        transcriber = RecordingTranscriber(backend=self.stt_backend)
-        transcript = transcriber.transcribe(audio)
+            self.trigger_item.title = "Transcribing..."
+            transcriber = RecordingTranscriber(backend=self.stt_backend)
+            transcript = transcriber.transcribe(audio)
+            self._append_runtime_event(f"stt_done transcript={transcript[:120]!r}")
 
-        if not transcript.strip():
-            self.mic_status_item.title = "Mic: Empty transcript"
-            self.trigger_item.title = "Trigger Recording"
-            self._alert(
-                title="No Speech Detected",
-                message="No speech was detected in the recording.",
-            )
-            return
+            if not transcript.strip():
+                self.mic_status_item.title = "Mic: Empty transcript"
+                self._alert(
+                    title="No Speech Detected",
+                    message="No speech was detected in the recording.",
+                )
+                return
 
-        if transcript.startswith("[STT error:"):
-            self.mic_status_item.title = "Mic: STT Error"
-            self.trigger_item.title = "Trigger Recording"
-            self._alert(title="STT Error", message=transcript)
-            return
+            if transcript.startswith("[STT error:"):
+                self.mic_status_item.title = "Mic: STT Error"
+                self._alert(title="STT Error", message=transcript)
+                return
 
-        self.trigger_item.title = "Running Claude..."
-        _run_pipeline(transcript, input_mode="voice", tts_fake=False)
+            self.trigger_item.title = "Running Claude..."
+            self._append_runtime_event("claude_start")
+            _run_pipeline(transcript, input_mode="voice", tts_fake=False)
+            self._append_runtime_event("claude_done")
 
-        self.trigger_item.title = "Done ✓"
-        threading.Timer(1.5, lambda: setattr(self.trigger_item, "title", "Trigger Recording")).start()
+            self.trigger_item.title = "Done ✓"
+            threading.Timer(1.5, lambda: setattr(self.trigger_item, "title", "Trigger Recording")).start()
+        except Exception as e:
+            self.mic_status_item.title = "Mic: Runtime error"
+            self._append_runtime_event(f"record_cycle_error {type(e).__name__}: {e}")
+            self._alert(title="Recording Runtime Error", message=str(e))
+        finally:
+            if self.trigger_item.title not in {"Done ✓", "Trigger Recording"}:
+                self.trigger_item.title = "Trigger Recording"
+
+    def _append_runtime_event(self, message: str) -> None:
+        from datetime import datetime
+
+        from voice_claude_agent.config import get_agent_state_dir
+
+        try:
+            state_dir = get_agent_state_dir()
+            state_dir.mkdir(parents=True, exist_ok=True)
+            path = state_dir / "app-events.log"
+            timestamp = datetime.now().isoformat(timespec="seconds")
+            with path.open("a", encoding="utf-8") as f:
+                f.write(f"{timestamp} {message}\n")
+        except Exception:
+            pass
 
     def _open_mic_or_alert(self):
         from voice_claude_agent.cli import _safe_real_recorder
@@ -371,9 +407,15 @@ class VoiceClaudeApp(rumps.App):
 
         diag_parts.append("recorder.start: OK")
 
-        time.sleep(self.DEFAULT_RECORD_SECONDS)
+        deadline = time.monotonic() + self.DEFAULT_RECORD_SECONDS
+        while time.monotonic() < deadline:
+            if self._wake_event.is_set():
+                diag_parts.append("recording interrupted by stop event")
+                break
+            time.sleep(0.1)
 
         try:
+            self._append_runtime_event("record_stop")
             recorder.stop()
         except Exception as e:
             diag_parts.append(f"recorder.stop: FAILED ({e})")

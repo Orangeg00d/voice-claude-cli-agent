@@ -1328,6 +1328,29 @@
 - tests/test_core.py
 - agent-progress.md
 
+## 2026-06-06 22:58 — Codex Review: Trigger Recording Stuck In Recording State
+
+### Finding
+- User reported the menu bar app stayed in `Recording...` after Trigger Recording and menu buttons became hard to use.
+- The app process was force-closed to release the microphone.
+- Code review found that one-shot Trigger Recording reused the continuous wake-loop state and left `_wake_active` true; it also lacked a single-cycle `finally` path that always restores the Trigger menu title.
+
+### Completed
+- Added `_single_trigger_mode` so one-shot Trigger Recording returns the app to idle after one cycle.
+- Made fixed-duration recording check `_wake_event` every 0.1s so Stop Wake can interrupt the recording wait.
+- Added `try/except/finally` around the menu recording cycle to restore menu title on empty audio, STT errors, Claude errors, or unexpected exceptions.
+- Added lightweight runtime breadcrumbs to `agent_state/app-events.log`: record cycle start, record start/stop, audio byte count, STT transcript preview, Claude start/done, and runtime errors.
+- Rebuilt `dist/VoiceClaudeAgent.app`.
+
+### Verification
+- `./init.sh check` passed.
+- `./init.sh lint` passed.
+- `./init.sh test` passed: 135/135.
+
+### Files Changed
+- src/voice_claude_agent/app.py
+- agent-progress.md
+
 ## 2026-06-06 22:37 — Codex Review: F042 Runtime Bootstrap Correction
 
 ### Finding

@@ -13,6 +13,7 @@ build/
 # Local state
 agent_state/*.jsonl
 agent_state/*.json
+agent_state/*.log
 
 # macOS
 .DS_Store
