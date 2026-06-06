@@ -728,6 +728,32 @@
 ### Risks / Notes
 - Real end-to-end whisper transcription not tested (requires recording + model inference). The mock test covers the code path.
 
+## 2026-06-06 18:20 — Codex Review: F029 Verification
+
+### Completed
+- Reviewed Claude commits `cada111` and `619ed8f`.
+- Confirmed the backend now detects real Homebrew whisper.cpp as `/opt/homebrew/bin/whisper-cli`.
+- Confirmed Python/OpenAI Whisper at `/opt/homebrew/bin/whisper` is rejected.
+- Confirmed `WHISPER_CPP_MODEL=/Users/orange/.local/share/whisper.cpp/models/ggml-base.bin` resolves to a real GGML model file.
+- Verified project code performs real transcription through `RecordingTranscriber(backend="whisper-cli")` using the Homebrew whisper.cpp `jfk.wav` sample.
+- Real transcription output: "And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country."
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh lint` passed
+- `./init.sh test` passed: 73 passed
+- Real project-level whisper-cli transcription passed with Homebrew whisper.cpp 1.8.6 and local `ggml-base.bin`
+
+### Files Changed
+- feature_list.json
+- agent-progress.md
+
+### Next Recommended Task
+- Phase 5 is complete. Start Phase 6 planning: likely macOS app packaging / menu bar shell / background microphone lifecycle decisions.
+
+### Risks / Notes
+- Real live microphone transcription still depends on macOS microphone input quality and ambient noise, but the installed whisper.cpp backend and model are now verified with an actual audio sample.
+
 ### Risks / Notes
 - F029 resolved. Phase 5 all features now passed (F022-F031).
 

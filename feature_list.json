@@ -386,7 +386,7 @@
         "Verify transcript is actual speech text, not an error message or audio stats"
       ],
       "passes": true,
-      "evidence": "whisper-cli backend: _find_whisper_cpp_binary() detects /opt/homebrew/bin/whisper-cli, _is_python_whisper() rejects /opt/homebrew/bin/whisper (Python openai-whisper). WHISPER_CPP_MODEL=/Users/orange/.local/share/whisper.cpp/models/ggml-base.bin resolves. CLI args: whisper-cli -m MODEL -f WAV -nt --no-timestamps. 8 tests: not-installed, Python reject, missing env var, file-not-found, dir error, valid resolve, mock success, backend list exclusion. 71/73 tests, lint clean."
+      "evidence": "whisper-cli backend: _find_whisper_cpp_binary() detects /opt/homebrew/bin/whisper-cli, _is_python_whisper() rejects /opt/homebrew/bin/whisper (Python openai-whisper). WHISPER_CPP_MODEL=/Users/orange/.local/share/whisper.cpp/models/ggml-base.bin resolves. CLI args: whisper-cli -m MODEL -f WAV -nt --no-timestamps. Real project-level transcription verified with RecordingTranscriber(backend='whisper-cli') on Homebrew whisper.cpp jfk.wav sample: returned 'And so my fellow Americans...'. 8 tests: not-installed, Python reject, missing env var, file-not-found, dir error, valid resolve, mock success, backend list exclusion. 73/73 tests, lint clean."
     },
     {
       "id": "F030",
