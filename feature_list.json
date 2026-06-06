@@ -514,6 +514,33 @@
       ],
       "passes": true,
       "evidence": "37 Phase 6 tests total: core menu/app tests in test_core.py (31) cover app startup/menu structure (5), start/stop lifecycle and mic status (8), event-driven trigger recording (5), STT backend/env passthrough (6), mic denial UX (5), and session log parity (2). py2app bundle tests in test_py2app.py (6) cover setup/run_app, bundle presence, Info.plist, executable, and standalone Python embedding. All 38 features are passes=true. 110/110 tests, lint clean, check clean."
+    },
+    {
+      "id": "F039",
+      "priority": 39,
+      "category": "app",
+      "description": "Menu bar Trigger Recording uses non-interactive recording (no input())",
+      "steps": [
+        "Click Trigger Recording — must NOT call input()",
+        "Menu status updates: Recording... → Transcribing... → Done/Error",
+        "Empty audio must show status feedback, not silent return",
+        "Test proves menu bar recording path never uses input()"
+      ],
+      "passes": true,
+      "evidence": "Replaced input()-based recording with time-based: _record_fixed_duration records 5s via time.sleep. Menu status updates: Recording... → Transcribing... → Running Claude... → Done ✓ (resets after 1.5s). Empty audio shows 'No Audio' alert. Empty transcript shows 'No Speech Detected' alert. STT error shows native alert. 5 tests: no input() in code, stage title updates, empty audio alert, STT error alert, empty transcript alert. 115/115 tests, lint clean."
+    },
+    {
+      "id": "F040",
+      "priority": 40,
+      "category": "app",
+      "description": "Menu bar app default STT backend is whisper-cli",
+      "steps": [
+        "run_app.py default VOICE_STT_BACKEND=whisper-cli",
+        "If whisper-cli or WHISPER_CPP_MODEL unavailable, show status/alert",
+        "Env var override tested"
+      ],
+      "passes": false,
+      "evidence": ""
     }
   ]
 }

@@ -5,6 +5,7 @@ Reuses cli.py's pipeline functions for recording, STT, Claude execution, and TTS
 """
 
 import threading
+import time
 
 import rumps
 
@@ -25,6 +26,8 @@ class VoiceClaudeApp(rumps.App):
       Mic Status      — shows current microphone permission
       Quit            — exits the application (stops wake loop first)
     """
+
+    DEFAULT_RECORD_SECONDS = 5
 
     def __init__(
         self,
@@ -89,11 +92,9 @@ class VoiceClaudeApp(rumps.App):
 
     @staticmethod
     def _rumps_alert(title: str, message: str) -> None:
-        """Show a native macOS alert dialog. Overridable for tests."""
         rumps.alert(title=title, message=message)
 
     def _check_mic_or_alert(self) -> bool:
-        """Check mic permission. If denied, show alert + update status. Returns True if OK."""
         has_mic, detail = check_mic_permission()
         if not has_mic:
             self.mic_status_item.title = "Mic: Denied"
@@ -124,22 +125,15 @@ class VoiceClaudeApp(rumps.App):
     def _start_wake(self, sender: rumps.MenuItem) -> None:
         if self._wake_active:
             return
-
         self._update_mic_status()
-
-        # Gate on mic permission
         if not self._check_mic_or_alert():
             return
-
         self._wake_active = True
         self._wake_event.clear()
         self._trigger_event.clear()
         self._sync_menu_titles()
-
         self._wake_thread = threading.Thread(
-            target=self._wake_target,
-            daemon=True,
-            name="wake-loop",
+            target=self._wake_target, daemon=True, name="wake-loop"
         )
         self._wake_thread.start()
 
@@ -149,16 +143,13 @@ class VoiceClaudeApp(rumps.App):
         self._wake_active = False
         self._wake_event.set()
         self._trigger_event.set()
-
         if self._wake_thread is not None and self._wake_thread.is_alive():
             self._wake_thread.join(timeout=5.0)
-
         self._sync_menu_titles()
 
     def _trigger_recording(self, sender: rumps.MenuItem) -> None:
         """Single-cycle trigger, gated on mic permission."""
         self._update_mic_status()
-
         if not self._check_mic_or_alert():
             return
 
@@ -167,11 +158,8 @@ class VoiceClaudeApp(rumps.App):
             self._wake_event.clear()
             self._trigger_event.set()
             self._sync_menu_titles()
-
             self._wake_thread = threading.Thread(
-                target=self._wake_target,
-                daemon=True,
-                name="wake-loop",
+                target=self._wake_target, daemon=True, name="wake-loop"
             )
             self._wake_thread.start()
         else:
@@ -194,17 +182,74 @@ class VoiceClaudeApp(rumps.App):
             self._trigger_event.clear()
             self._record_and_execute()
 
+    # ── Non-interactive recording (NO input()) ───────────────
+
     def _record_and_execute(self) -> None:
-        from voice_claude_agent.cli import (
-            _run_pipeline,
-            _safe_real_recorder,
-            _safe_record_attempt,
-        )
+        """One full cycle: record N seconds → STT → Claude → TTS → log.
+
+        Uses time-based recording (DEFAULT_RECORD_SECONDS) instead of input().
+        Menu status updates at each stage so the user sees progress.
+        """
+        from voice_claude_agent.cli import _run_pipeline
         from voice_claude_agent.stt import RecordingTranscriber
+
+        # 1. Open mic
+        recorder = self._open_mic_or_alert()
+        if recorder is None:
+            return
+
+        # 2. Record
+        self.trigger_item.title = "Recording..."
+        audio = self._record_fixed_duration(recorder)
+        if not audio:
+            self.mic_status_item.title = "Mic: No audio captured"
+            self.trigger_item.title = "Trigger Recording"
+            self._alert(
+                title="No Audio",
+                message="No audio was captured. Check your microphone connection.",
+            )
+            return
+
+        # 3. STT
+        self.trigger_item.title = "Transcribing..."
+        transcriber = RecordingTranscriber(backend=self.stt_backend)
+        transcript = transcriber.transcribe(audio)
+
+        if not transcript.strip():
+            self.mic_status_item.title = "Mic: Empty transcript"
+            self.trigger_item.title = "Trigger Recording"
+            self._alert(
+                title="No Speech Detected",
+                message="No speech was detected in the recording.",
+            )
+            return
+
+        if transcript.startswith("[STT error:"):
+            self.mic_status_item.title = "Mic: STT Error"
+            self.trigger_item.title = "Trigger Recording"
+            self._alert(
+                title="STT Error",
+                message=transcript,
+            )
+            return
+
+        # 4. Claude pipeline
+        self.trigger_item.title = "Running Claude..."
+        _run_pipeline(transcript, input_mode="voice", tts_fake=False)
+
+        # 5. Done
+        self.trigger_item.title = "Done ✓"
+        # Reset after a short visible delay
+        threading.Timer(1.5, lambda: setattr(self.trigger_item, "title", "Trigger Recording")).start()
+
+    def _open_mic_or_alert(self):
+        """Open the sounddevice recorder. Returns recorder or None (with alert)."""
+        from voice_claude_agent.cli import _safe_real_recorder
 
         recorder = _safe_real_recorder()
         if recorder is None:
             self.mic_status_item.title = "Mic: Error"
+            self.trigger_item.title = "Trigger Recording"
             self._alert(
                 title="Recording Failed",
                 message=(
@@ -212,19 +257,27 @@ class VoiceClaudeApp(rumps.App):
                     "Check: System Settings > Privacy & Security > Microphone"
                 ),
             )
-            return
+            return None
+        return recorder
 
-        audio = _safe_record_attempt(recorder, max_duration=10)
-        if not audio:
-            return
+    def _record_fixed_duration(self, recorder) -> bytes:
+        """Record for DEFAULT_RECORD_SECONDS. Returns audio bytes or empty."""
+        try:
+            recorder.start()
+        except Exception as e:
+            self.mic_status_item.title = f"Mic: start error ({e})"
+            return b""
 
-        transcriber = RecordingTranscriber(backend=self.stt_backend)
-        transcript = transcriber.transcribe(audio)
+        time.sleep(self.DEFAULT_RECORD_SECONDS)
 
-        if not transcript.strip() or transcript.startswith("[STT error:"):
-            return
+        try:
+            recorder.stop()
+        except Exception as e:
+            self.mic_status_item.title = f"Mic: stop error ({e})"
+            return b""
 
-        _run_pipeline(transcript, input_mode="voice", tts_fake=False)
+        audio = recorder.get_audio()
+        return audio or b""
 
 
 def launch_app(stt_backend: str = "text-input") -> None:

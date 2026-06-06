@@ -1822,3 +1822,160 @@ class TestSessionLogParity:
 
         assert cli_entry["input_mode"] == "voice"
         assert menu_entry["input_mode"] == "voice"
+
+
+# ── F039: Non-Interactive Recording ────────────────────────
+class TestNonInteractiveRecording:
+    def test_record_and_execute_never_calls_input(self):
+        """_record_and_execute must NOT use input()."""
+        import inspect
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        src = inspect.getsource(VoiceClaudeApp._record_and_execute)
+        # Remove lines that are docstrings or comments
+        code_lines = [
+            line for line in src.split("\n")
+            if "input(" not in line or not line.strip().startswith(("#", '"""', "Uses"))
+        ]
+        code = "\n".join(code_lines)
+        assert "input(" not in code, "_record_and_execute must not use input()"
+        src2 = inspect.getsource(VoiceClaudeApp._record_fixed_duration)
+        code2_lines = [
+            line for line in src2.split("\n")
+            if "input(" not in line or not line.strip().startswith("#")
+        ]
+        code2 = "\n".join(code2_lines)
+        assert "input(" not in code2, "_record_fixed_duration must not use input()"
+
+    def test_stage_titles_update_during_cycle(self, monkeypatch):
+        """Trigger Recording menu item title should change through stages."""
+        import voice_claude_agent.app as app_mod
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "DEFAULT_RECORD_SECONDS", 0.01)
+
+        app = VoiceClaudeApp(
+            stt_backend="text-input",
+            _alert_patch=lambda **kw: None,
+        )
+
+        # Mock recorder with valid audio
+        mock_rec = mock.MagicMock()
+        mock_rec.get_audio.return_value = b"test audio data"
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            mock.MagicMock(return_value=mock_rec),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_record_attempt",
+            mock.MagicMock(return_value=b"x"),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._run_pipeline",
+            mock.MagicMock(),
+        )
+
+        # Monkeypatch RecordingTranscriber to return a valid transcript
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.RecordingTranscriber",
+            mock.MagicMock(return_value=mock.MagicMock(transcribe=mock.MagicMock(return_value="hello"))),
+        )
+
+        # Run one cycle — should update titles
+        app._record_and_execute()
+
+        # After a successful cycle: trigger_item should say "Done" (via Timer)
+        # For fast test, check it changed from default
+        assert app.trigger_item.title != "Trigger Recording"
+
+    def test_empty_audio_shows_alert(self, monkeypatch):
+        """When recording returns empty bytes, an alert should be shown."""
+        import voice_claude_agent.app as app_mod
+
+        alerts = []
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "DEFAULT_RECORD_SECONDS", 0.01)
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+
+        # Recorder returns empty audio
+        mock_rec = mock.MagicMock()
+        mock_rec.get_audio.return_value = b""
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            mock.MagicMock(return_value=mock_rec),
+        )
+
+        app._record_and_execute()
+
+        assert len(alerts) >= 1
+        assert alerts[0]["title"] == "No Audio"
+        assert "No audio" in alerts[0]["message"]
+
+    def test_stt_error_shows_alert(self, monkeypatch):
+        """When STT returns [STT error: ...], an alert should be shown."""
+        import voice_claude_agent.app as app_mod
+
+        alerts = []
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "DEFAULT_RECORD_SECONDS", 0.01)
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+
+        mock_rec = mock.MagicMock()
+        mock_rec.get_audio.return_value = b"x"
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            mock.MagicMock(return_value=mock_rec),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.RecordingTranscriber",
+            mock.MagicMock(return_value=mock.MagicMock(
+                transcribe=mock.MagicMock(return_value="[STT error: test]")
+            )),
+        )
+
+        app._record_and_execute()
+
+        assert len(alerts) >= 1
+        assert alerts[0]["title"] == "STT Error"
+
+    def test_empty_transcript_shows_alert(self, monkeypatch):
+        """When STT returns empty transcript, an alert should be shown."""
+        import voice_claude_agent.app as app_mod
+
+        alerts = []
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "DEFAULT_RECORD_SECONDS", 0.01)
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+
+        mock_rec = mock.MagicMock()
+        mock_rec.get_audio.return_value = b"x"
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            mock.MagicMock(return_value=mock_rec),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.RecordingTranscriber",
+            mock.MagicMock(return_value=mock.MagicMock(
+                transcribe=mock.MagicMock(return_value="")
+            )),
+        )
+
+        app._record_and_execute()
+
+        assert len(alerts) >= 1
+        assert alerts[0]["title"] == "No Speech Detected"

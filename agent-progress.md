@@ -1147,3 +1147,20 @@
 
 ### Risks / Notes
 - F030 accepted after Codex test hardening. The Apple Speech backend still does not provide programmatic transcript capture; it only reports status / plays audio for system dictation, as documented.
+
+## 2026-06-07 09:00 — Phase 7: F039 — Non-Interactive Recording for Menu Bar
+
+### Completed
+- Replaced input()-based recording with time-based _record_fixed_duration (5s sleep).
+- Menu status updates: "Recording..." → "Transcribing..." → "Running Claude..." → "Done ✓".
+- Empty audio shows "No Audio" alert. Empty transcript shows "No Speech Detected" alert. STT error shows "STT Error" alert.
+- 5 tests: no input() in code, stage title updates, empty audio alert, STT error alert, empty transcript alert.
+
+### Verification
+- `./init.sh check` / lint passed, 115/115 tests
+
+### Files Changed
+- src/voice_claude_agent/app.py, tests/test_core.py, feature_list.json, agent-progress.md
+
+### Next Recommended Task
+- F040: default STT backend to whisper-cli in run_app.py.
