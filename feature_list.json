@@ -291,8 +291,8 @@
         "Verify voice_claude_agent package is importable",
         "Verify all dependencies (click, sounddevice, numpy, pytest, ruff) resolve"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "./init.sh install: editable install succeeds (uv-based, 12 packages resolved). voice-claude-agent entry point registered — --help lists 7 commands. voice_claude_agent importable. Dependencies: click 8.4.1, sounddevice 0.5.5, numpy 2.4.6, pytest 9.0.3, ruff 0.15.16. 55/55 tests, lint clean."
     },
     {
       "id": "F023",

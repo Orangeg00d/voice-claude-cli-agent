@@ -343,5 +343,32 @@
 ### Next Recommended Task
 - Claude should implement Phase 5 one feature at a time, starting with F022 or F023, and only mark a feature passed after Codex-verifiable evidence exists.
 
+## 2026-06-06 13:10 — Phase 5: F022 — Editable Install & Dependency Verification
+
+### Completed
+- Verified `./init.sh install` succeeds: uv resolves 12 packages, editable wheel built and installed.
+- Verified `voice-claude-agent` entry point is registered: `--help` lists 7 commands (check, demo-text, run-text, record, voice, demo-voice, wake).
+- Verified `voice_claude_agent` package is importable via `./init.sh check`.
+- Verified all dependencies resolve: click 8.4.1, sounddevice 0.5.5, numpy 2.4.6, pytest 9.0.3, ruff 0.15.16.
+- No code changes needed — everything already works.
+
+### Verification
+- `./init.sh install` passed
+- `./init.sh check` passed
+- `./init.sh test` passed: 55/55
+- `./init.sh lint` passed
+- `voice-claude-agent --help` — all 7 commands listed
+- All deps `click`, `sounddevice`, `numpy`, `pytest`, `ruff` importable and versioned
+
+### Files Changed
+- feature_list.json (F022 passes=true with evidence)
+- agent-progress.md (this entry)
+
+### Next Recommended Task
+- F023: verify `voice-claude-agent --help` output (already observed above — just needs evidence recording).
+
+### Risks / Notes
+- None. F022 required zero code changes.
+
 ### Risks / Notes
 - F029 depends on a real `whisper.cpp` installation and may need to remain pending unless the dependency is installed and exercised with a real sample.
