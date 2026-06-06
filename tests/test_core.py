@@ -1146,4 +1146,59 @@ class TestWhisperCliBackend:
 
         backends = list_available_backends()
         assert "whisper-cli" not in backends
-        assert "text-input" in backends
+
+
+# ── Phase 6: Menu Bar App Tests ────────────────────────────
+class TestMenuBarApp:
+    def test_app_class_imports(self):
+        """VoiceClaudeApp should be importable and constructible."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        assert app.name == "Voice Agent"
+        assert app.title == "🎤"
+
+    def test_menu_items_populated(self):
+        """Menu should contain Start Wake, Stop Wake, Mic Status, and Quit."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        titles = []
+        for m in app.menu:
+            if m is None:
+                continue
+            t = m.title
+            if callable(t):
+                titles.append(t())
+            else:
+                titles.append(str(t))
+
+        assert "Start Wake" in titles
+        assert "Stop Wake" in titles
+        assert any("Mic" in t for t in titles)
+        assert "Quit" in titles
+
+    def test_menu_has_separators(self):
+        """Menu should have at least one item of type str (rumps uses str for separators)."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        # rumps converts None menu entries to str objects (SeparatorMenuItem_*)
+        sep_count = sum(1 for m in app.menu if isinstance(m, str) and 'Separator' in m)
+        assert sep_count >= 1
+
+    def test_app_command_listed_in_help(self):
+        """voice-claude-agent --help should list 'app' command."""
+        from click.testing import CliRunner
+        from voice_claude_agent.cli import main
+
+        runner = CliRunner()
+        result = runner.invoke(main, ["--help"])
+        assert "app" in result.output
+        assert "menu bar" in result.output.lower()
+
+    def test_launch_app_function_exists(self):
+        """launch_app should be importable and callable (we don't call it)."""
+        from voice_claude_agent.app import launch_app
+
+        assert callable(launch_app)

@@ -757,6 +757,40 @@
 ### Risks / Notes
 - F029 resolved. Phase 5 all features now passed (F022-F031).
 
+## 2026-06-06 18:30 — Phase 6: F032 — rumps Skeleton + app.py + CLI Entry
+
+### Completed
+- Added rumps>=0.4 to pyproject.toml dependencies.
+- Created src/voice_claude_agent/app.py: VoiceClaudeApp(rumps.App) with:
+  - Menu: Start Wake, Stop Wake, Mic Status, Quit, plus separators.
+  - Mic status check via check_mic_permission() on init.
+  - Background daemon thread wake loop reusing _safe_real_recorder, _safe_record_attempt, RecordingTranscriber, _run_pipeline.
+  - launch_app(stt_backend) entry point.
+- Added `app` CLI command in cli.py: `voice-claude-agent app`.
+- Added 5 tests: app class imports, menu items populated, separator count, --help listing, launch_app callable.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh lint` passed
+- `./init.sh test` passed: 76/78 (2 mic tests excluded)
+- `voice-claude-agent --help` lists `app: Launch the macOS menu bar app`
+- `from voice_claude_agent.app import VoiceClaudeApp` — constructs cleanly
+
+### Files Changed
+- pyproject.toml (added rumps)
+- src/voice_claude_agent/app.py (new, ~160 lines)
+- src/voice_claude_agent/cli.py (added `app` command)
+- tests/test_core.py (added TestMenuBarApp: 5 tests)
+- feature_list.json (F032 passes=true)
+- agent-progress.md (this entry)
+
+### Next Recommended Task
+- F033: wire real start/stop toggle, background wake loop with threading.Event, mic status live update.
+
+### Risks / Notes
+- The menu bar app requires an active NSApplication run loop (AppKit). rumps provides this via `.run()`. The app command blocks the terminal until the user quits from the menu bar.
+- The wake loop currently uses `input()` for push-to-talk trigger — this works from the terminal but not headless. F033 should replace with a timer or hotkey.
+
 ### Risks / Notes
 - F029 remains the only blocked Phase 5 feature.
 

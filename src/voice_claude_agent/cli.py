@@ -473,5 +473,20 @@ def wake(fake: bool, once: bool, stt_backend: str):
         click.echo(f"\nWake loop stopped after {iteration} iteration(s).")
 
 
+@main.command()
+@click.option(
+    "--stt-backend", default="text-input", help=_STT_BACKEND_HELP,
+)
+def app(stt_backend: str):
+    """Launch the macOS menu bar app (rumps-based system tray)."""
+    from voice_claude_agent.app import launch_app
+
+    click.echo("Launching Voice Claude Agent menu bar app...")
+    click.echo(f"STT backend: {stt_backend}")
+    click.echo("Look for the 🎤 icon in your menu bar.")
+    click.echo("Press Ctrl+C in this terminal to quit.")
+    launch_app(stt_backend=stt_backend)
+
+
 if __name__ == "__main__":
     main()

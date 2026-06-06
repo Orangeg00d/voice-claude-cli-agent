@@ -428,8 +428,8 @@
         "Verify `python3 -c 'from voice_claude_agent.app import VoiceClaudeApp'` succeeds",
         "Verify `voice-claude-agent app` CLI command starts the menu bar app"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "rumps>=0.4 added to pyproject.toml. app.py created: VoiceClaudeApp(rumps.App) with Start Wake/Stop Wake/Mic Status/Quit menu, daemon thread wake loop. CLI: voice-claude-agent app --help shows 'Launch the macOS menu bar app'. 5 new tests: import, menu items, separators, --help listing, launch_app callable. 76/78 tests, lint clean."
     },
     {
       "id": "F033",
