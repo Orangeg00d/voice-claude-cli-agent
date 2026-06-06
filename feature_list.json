@@ -371,8 +371,8 @@
         "Verify Recording start failed error is printed in red",
         "Verify wake loop continues to next iteration instead of crashing"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "3 new tests: _safe_record_attempt catches start exceptions (returns b'', red message), stop exceptions (returns b'', red message), and wake --once continues without crash when recording returns empty. Pre-existing test__safe_real_recorder_returns_none_on_error covers constructor errors. 63/63 tests, lint clean."
     },
     {
       "id": "F029",

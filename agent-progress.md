@@ -602,3 +602,28 @@
 
 ### Risks / Notes
 - F026 accepted. The test checks warning text, not terminal color escape codes.
+
+## 2026-06-06 15:30 — Phase 5: F028 — Recording Start/Stop Error Handling
+
+### Completed
+- Added 3 new tests for recording error paths:
+  - `_safe_record_attempt` catches `recorder.start()` exceptions, returns `b""`, prints red "Recording start failed".
+  - `_safe_record_attempt` catches `recorder.stop()` exceptions, returns `b""`, prints red "Recording stop failed".
+  - `wake --once` with empty audio (simulated start failure) continues loop without crashing, exits cleanly.
+- `_safe_real_recorder` constructor errors were already covered by pre-existing test.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh lint` passed
+- 63/63 total, 3 new F028 tests all pass
+
+### Files Changed
+- tests/test_core.py (added TestRecordingStartStopErrors: 3 tests)
+- feature_list.json (F028 passes=true with evidence)
+- agent-progress.md (this entry)
+
+### Next Recommended Task
+- F029: whisper-cli blocked on external install. F030: apple-speech already covered. F031: README already documented.
+
+### Risks / Notes
+- F029 requires `brew install whisper-cpp` — blocked on absent external dependency.

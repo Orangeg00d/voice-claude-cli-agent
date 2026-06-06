@@ -698,6 +698,73 @@ class TestRecordingErrorUX:
         assert recorder is None
 
 
+class TestRecordingStartStopErrors:
+    def test__safe_record_attempt_start_failure(self, capsys):
+        """_safe_record_attempt should catch recorder.start() exceptions and return empty bytes."""
+        from voice_claude_agent.cli import _safe_record_attempt
+
+        class BrokenRecorder:
+            def start(self):
+                raise RuntimeError("No default input device")
+
+            def stop(self):
+                pass
+
+            def get_audio(self):
+                return b"x"
+
+        audio = _safe_record_attempt(BrokenRecorder(), max_duration=1)
+        assert audio == b""
+        captured = capsys.readouterr()
+        assert "Recording start failed" in captured.out
+
+    def test__safe_record_attempt_stop_failure(self):
+        """_safe_record_attempt should catch recorder.stop() exceptions and return empty bytes."""
+        from voice_claude_agent.cli import _safe_record_attempt
+
+        class BrokenStopRecorder:
+            def start(self):
+                pass
+
+            def stop(self):
+                raise RuntimeError("Stream already closed")
+
+            def get_audio(self):
+                return b"x"
+
+        # Patch input() to avoid pytest stdin capture error
+        with mock.patch("builtins.input", return_value=""):
+            audio = _safe_record_attempt(BrokenStopRecorder(), max_duration=1)
+        assert audio == b""
+
+    def test_wake_real_recording_start_error_continues(self, tmp_path, monkeypatch):
+        """wake --once with _safe_record_attempt returning empty should continue, not crash."""
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_sessions_log_path",
+            lambda: tmp_path / "sessions.jsonl",
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_last_result_path",
+            lambda: tmp_path / "last_result.json",
+        )
+        # Force _safe_record_attempt to return empty bytes (simulating start failure)
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_record_attempt",
+            lambda r, max_duration: b"",
+        )
+
+        from click.testing import CliRunner
+        from voice_claude_agent import cli as cli_mod
+
+        with mock.patch("subprocess.run") as mock_run:
+            mock_run.return_value = mock.MagicMock(returncode=0, stdout="OK", stderr="")
+            runner = CliRunner()
+            result = runner.invoke(cli_mod.main, ["wake", "--once"])
+
+        assert result.exit_code == 0
+        # The wake loop should print "No audio captured" and continue to next iteration,
+        # then with --once + no audio, _stop_if_once triggers. No sessions written.
+        assert not (tmp_path / "sessions.jsonl").exists()
 class TestPhase4ExceptionHandling:
     def test__stt_is_error_detects_error_prefix(self):
         from voice_claude_agent.cli import _stt_is_error
