@@ -332,8 +332,8 @@
         "Simulate STT returning empty transcript",
         "Verify wake prints No speech detected and continues to next iteration"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "5 new tests: empty FakeRecorder + RecordingTranscriber verify no crash; CLI-level wake --fake --once handles empty transcript and empty audio without writing a session. 60/60 tests, lint clean."
     },
     {
       "id": "F026",

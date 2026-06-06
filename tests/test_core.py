@@ -801,3 +801,112 @@ class TestPhase4ExceptionHandling:
         record = json.loads(lines[0])
         assert record["summary"] == "Timed out"
         assert record["exit_code"] == -1
+
+
+# ── F025: Empty Audio / Empty Transcript Resilience ──────
+class TestEmptyAudioResilience:
+    def test_fake_recorder_empty_audio_is_safe(self):
+        """FakeRecorder with empty bytes should not crash get_audio()."""
+        recorder = FakeRecorder(b"")
+        assert recorder.get_audio() == b""
+
+    def test_recording_transcriber_empty_audio_empty_string(self):
+        """RecordingTranscriber with empty audio returns empty string (no crash)."""
+        t = RecordingTranscriber()
+        assert t.transcribe(b"") == ""
+
+    def test_wake_fake_continues_after_empty_transcript(self, tmp_path, monkeypatch):
+        """wake --fake --once with an empty transcript should skip Claude and exit cleanly."""
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_sessions_log_path",
+            lambda: tmp_path / "sessions.jsonl",
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_last_result_path",
+            lambda: tmp_path / "last_result.json",
+        )
+
+        from click.testing import CliRunner
+        from voice_claude_agent import cli as cli_mod
+        from voice_claude_agent.stt import FakeTranscriber as FT
+
+        original = cli_mod.FakeTranscriber
+        cli_mod.FakeTranscriber = lambda response=None: FT("")
+
+        try:
+            with mock.patch("subprocess.run") as mock_run:
+                mock_run.return_value = mock.MagicMock(
+                    returncode=0, stdout="OK", stderr=""
+                )
+                runner = CliRunner()
+                result = runner.invoke(cli_mod.main, ["wake", "--fake", "--once"])
+        finally:
+            cli_mod.FakeTranscriber = original
+
+        assert result.exit_code == 0
+        assert "No speech detected" in result.output
+        assert not (tmp_path / "sessions.jsonl").exists()
+
+    def test_wake_fake_exits_after_empty_transcript_with_once(self, tmp_path, monkeypatch):
+        """wake --fake --once with empty transcript exits with stop message."""
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_sessions_log_path",
+            lambda: tmp_path / "sessions.jsonl",
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_last_result_path",
+            lambda: tmp_path / "last_result.json",
+        )
+
+        from click.testing import CliRunner
+        from voice_claude_agent import cli as cli_mod
+        from voice_claude_agent.stt import FakeTranscriber as FT
+
+        original = cli_mod.FakeTranscriber
+        cli_mod.FakeTranscriber = lambda response=None: FT("")
+
+        try:
+            with mock.patch("subprocess.run") as mock_run:
+                mock_run.return_value = mock.MagicMock(
+                    returncode=0, stdout="OK", stderr=""
+                )
+                runner = CliRunner()
+                result = runner.invoke(cli_mod.main, ["wake", "--fake", "--once"])
+        finally:
+            cli_mod.FakeTranscriber = original
+
+        assert result.exit_code == 0
+        assert "Wake loop stopped after 1 iteration" in result.output
+
+    def test_wake_fake_empty_audio_skips_pipeline(self, tmp_path, monkeypatch):
+        """wake --fake --once with empty audio should skip STT/Claude and exit cleanly."""
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_sessions_log_path",
+            lambda: tmp_path / "sessions.jsonl",
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_last_result_path",
+            lambda: tmp_path / "last_result.json",
+        )
+
+        from click.testing import CliRunner
+        from voice_claude_agent import cli as cli_mod
+        from voice_claude_agent.recorder import FakeRecorder as FR
+
+        original = cli_mod.FakeRecorder
+        cli_mod.FakeRecorder = lambda audio=None: FR(b"")
+
+        try:
+            with mock.patch("subprocess.run") as mock_run:
+                mock_run.return_value = mock.MagicMock(
+                    returncode=0, stdout="OK", stderr=""
+                )
+                runner = CliRunner()
+                result = runner.invoke(cli_mod.main, ["wake", "--fake", "--once"])
+        finally:
+            cli_mod.FakeRecorder = original
+
+        assert result.exit_code == 0
+        assert "No audio captured" in result.output
+        assert "Wake loop stopped after 1 iteration" in result.output
+        assert not (tmp_path / "sessions.jsonl").exists()

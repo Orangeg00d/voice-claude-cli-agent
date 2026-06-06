@@ -490,3 +490,28 @@
 
 ### Risks / Notes
 - F024 accepted. The observed summary duration is runtime-dependent, so future evidence should avoid relying on an exact number of seconds.
+
+## 2026-06-06 14:30 — Phase 5: F025 — Empty Audio / Empty Transcript Resilience
+
+### Completed
+- Added tests for empty FakeRecorder audio and RecordingTranscriber empty audio.
+- Added CLI-level tests for `wake --fake --once` with empty transcript.
+- Codex found the empty-audio CLI path was not actually protected: fake wake would continue to STT/Claude even when audio was empty.
+- Codex fixed wake loop empty-audio handling so it prints `No audio captured`, skips Claude, and respects `--once`.
+- Added CLI-level test for empty audio to prove no session is written.
+
+### Verification
+- `./init.sh test` passed: 60 passed
+- `./init.sh lint` passed
+
+### Files Changed
+- src/voice_claude_agent/cli.py
+- tests/test_core.py
+- feature_list.json
+- agent-progress.md
+
+### Next Recommended Task
+- F026: verify `[STT error: ...]` handling without changing timeout or recording-start behavior.
+
+### Risks / Notes
+- F025 accepted after Codex's empty-audio wake-loop fix.

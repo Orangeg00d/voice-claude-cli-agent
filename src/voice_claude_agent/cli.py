@@ -427,16 +427,15 @@ def wake(fake: bool, once: bool, stt_backend: str):
                 audio = recorder.get_audio()
 
             if not audio:
-                if fake:
-                    pass  # fake mode always has audio
-                else:
-                    click.echo(
-                        click.style(
-                            f"[{iteration}] No audio captured. Check microphone.",
-                            fg="red",
-                        )
+                click.echo(
+                    click.style(
+                        f"[{iteration}] No audio captured. Check microphone.",
+                        fg="red",
                     )
-                    continue
+                )
+                if _stop_if_once(once, iteration):
+                    break
+                continue
 
             # 3. STT
             transcript = transcriber.transcribe(audio)
