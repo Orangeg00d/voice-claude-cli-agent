@@ -766,6 +766,8 @@ class TestPhase4ExceptionHandling:
             cli_mod.FakeTranscriber = original
 
         assert result.exit_code == 0
+        assert "STT error" in result.output
+        assert "different --stt-backend" in result.output
         assert not (tmp_path / "sessions.jsonl").exists()
 
     def test_pipeline_timeout_creates_session(self, tmp_path, monkeypatch):

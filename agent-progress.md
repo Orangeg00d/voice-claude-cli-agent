@@ -538,3 +538,25 @@
 
 ### Risks / Notes
 - None. F026 was already fully implemented.
+
+## 2026-06-06 14:55 — Codex Review: F026 Verification
+
+### Completed
+- Reviewed Claude commit `c5520be`.
+- Confirmed only F026 was marked `passes=true`; F027-F031 remain pending.
+- Verified STT error path skips Claude and does not write a session.
+- Codex strengthened the CLI-level test to assert the user-facing `STT error` warning text is printed.
+
+### Verification
+- `./init.sh test` passed: 60 passed
+- `./init.sh lint` passed
+
+### Files Changed
+- tests/test_core.py
+- agent-progress.md
+
+### Next Recommended Task
+- F027: verify Claude timeout handling and ensure the session summary and spoken message match the acceptance criteria.
+
+### Risks / Notes
+- F026 accepted. The test checks warning text, not terminal color escape codes.
