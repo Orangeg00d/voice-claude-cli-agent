@@ -371,7 +371,30 @@
 - F023: verify `voice-claude-agent --help` output (already observed above — just needs evidence recording).
 
 ### Risks / Notes
-- None. F022 required zero code changes.
+- None.
+
+## 2026-06-06 13:35 — Phase 5: F023 — CLI Help Command Verification
+
+### Completed
+- Verified `voice-claude-agent --help` lists all 7 commands: check, demo-text, run-text, record, voice, demo-voice, wake.
+- Matches the `[project.scripts]` entry point `voice-claude-agent = "voice_claude_agent.cli:main"` in pyproject.toml.
+- Zero code changes — `--help` output was already correct.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh test` passed: 55/55
+- `./init.sh lint` passed
+- `voice-claude-agent --help` — all 7 commands present
+
+### Files Changed
+- feature_list.json (F023 passes=true with evidence)
+- agent-progress.md (this entry)
+
+### Next Recommended Task
+- F024: verify wake loop prints per-iteration status (waiting, woke, recording, transcript, summary).
+
+### Risks / Notes
+- None. F023 required zero code changes.
 
 ## 2026-06-06 13:25 — Codex Review: F022 Verification
 

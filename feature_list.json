@@ -303,8 +303,8 @@
         "Run voice-claude-agent --help",
         "Verify check, demo-text, run-text, record, voice, demo-voice, wake are listed"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "voice-claude-agent --help lists all 7 commands: check, demo-text, run-text, record, voice, demo-voice, wake. Matches pyproject.toml [project.scripts] entry point."
     },
     {
       "id": "F024",
