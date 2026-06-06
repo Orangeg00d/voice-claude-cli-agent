@@ -484,8 +484,8 @@
         "Verify a clear error message appears (dialog or status item)",
         "Verify the app does not crash, stays responsive"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "_start_wake and _trigger_recording gate on _check_mic_or_alert() — shows rumps.alert dialog when mic denied, then returns without starting. _record_and_execute shows alert when _safe_real_recorder returns None, updates Mic Status to 'Error'. _alert_patch injectable for tests. 5 tests: start blocked on denial, trigger blocked on denial, record failure alert, accessible no alert, default rumps.alert. 108/108 tests, lint clean."
     },
     {
       "id": "F037",

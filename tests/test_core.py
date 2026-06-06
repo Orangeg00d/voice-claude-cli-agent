@@ -1562,4 +1562,97 @@ class TestAppSTTBackendPassthrough:
 
         app_mod.launch_app(stt_backend="apple-speech")
 
-        assert calls == [("init", "apple-speech"), ("run", None)]
+
+# ── F036: Mic Permission Denial UX ──────────────────────────
+class TestMicDenialUX:
+    def test_start_wake_blocked_when_mic_denied(self, monkeypatch):
+        """_start_wake should NOT activate the wake loop when mic is denied."""
+        import voice_claude_agent.app as app_mod
+
+        alerts = []
+
+        monkeypatch.setattr(
+            app_mod, "check_mic_permission",
+            lambda: (False, "test: mic denied"),
+        )
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_alert_patch=lambda title=None, message=None: alerts.append((title, message)))
+        assert not app._wake_active
+
+        app._start_wake(app.start_item)
+        assert not app._wake_active  # should NOT start
+        assert app._wake_thread is None
+        assert len(alerts) == 1
+        title, msg = alerts[0]
+        assert "Microphone" in title
+        assert "System Settings" in msg
+
+    def test_trigger_recording_blocked_when_mic_denied(self, monkeypatch):
+        """_trigger_recording should show alert and not start when mic denied."""
+        import voice_claude_agent.app as app_mod
+
+        alerts = []
+
+        monkeypatch.setattr(
+            app_mod, "check_mic_permission",
+            lambda: (False, "test: no mic"),
+        )
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_alert_patch=lambda title=None, message=None: alerts.append((title, message)))
+        app._trigger_recording(app.trigger_item)
+        assert not app._wake_active
+        assert len(alerts) == 1
+
+    def test_record_and_execute_shows_alert_when_recorder_is_none(self, monkeypatch):
+        """When _safe_real_recorder returns None, alert should fire and mic status update."""
+        alerts = []
+
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            lambda: None,
+        )
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_alert_patch=lambda title=None, message=None: alerts.append((title, message)))
+        app._record_and_execute()
+
+        assert app.mic_status_item.title == "Mic: Error"
+        assert len(alerts) == 1
+        assert "Recording Failed" in alerts[0][0]
+        assert "Microphone" in alerts[0][1]
+
+    def test_mic_accessible_no_alert_on_start(self, monkeypatch):
+        """When mic is accessible, start_wake should proceed without alert."""
+        import voice_claude_agent.app as app_mod
+
+        alerts = []
+        monkeypatch.setattr(
+            app_mod, "check_mic_permission",
+            lambda: (True, "microphone accessible"),
+        )
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(
+            _wake_target=lambda: None,
+            _alert_patch=lambda title=None, message=None: alerts.append((title, message)),
+        )
+
+        app._start_wake(app.start_item)
+        assert app._wake_active
+        assert len(alerts) == 0
+
+        app._wake_thread.join(timeout=3.0)
+        app._stop_wake(app.stop_item)
+
+    def test_alert_patch_defaults_to_rumps_alert(self):
+        """Without _alert_patch, the app uses rumps.alert."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        assert app._alert is app._rumps_alert

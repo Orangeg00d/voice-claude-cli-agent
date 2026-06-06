@@ -31,25 +31,23 @@ class VoiceClaudeApp(rumps.App):
         stt_backend: str = "text-input",
         *,
         _wake_target: callable | None = None,
+        _alert_patch: callable | None = None,
     ):
-        """Args:
-            stt_backend: STT backend name.
-            _wake_target: Override for _run_wake_loop (testing only).
-        """
         super().__init__(
             name="Voice Agent",
-            title="\U0001f3a4",  # 🎤
+            title="\U0001f3a4",
             icon=None,
             quit_button=None,
         )
 
         self.stt_backend = stt_backend
         self._wake_target = _wake_target or self._run_wake_loop
+        self._alert = _alert_patch or self._rumps_alert
 
         # State
         self._wake_active = False
-        self._wake_event = threading.Event()      # set to stop the loop
-        self._trigger_event = threading.Event()   # set to trigger one cycle
+        self._wake_event = threading.Event()
+        self._trigger_event = threading.Event()
         self._wake_thread: threading.Thread | None = None
 
         # Stable MenuItem refs
@@ -76,7 +74,7 @@ class VoiceClaudeApp(rumps.App):
         self._update_mic_status()
         self._sync_menu_titles()
 
-    # ── Mic status ───────────────────────────────────────────
+    # ── Mic permission helpers ────────────────────────────────
 
     def _update_mic_status(self) -> None:
         has_mic, detail = check_mic_permission()
@@ -88,6 +86,28 @@ class VoiceClaudeApp(rumps.App):
 
     def _refresh_mic_status_event(self, sender: rumps.MenuItem) -> None:
         self._update_mic_status()
+
+    @staticmethod
+    def _rumps_alert(title: str, message: str) -> None:
+        """Show a native macOS alert dialog. Overridable for tests."""
+        rumps.alert(title=title, message=message)
+
+    def _check_mic_or_alert(self) -> bool:
+        """Check mic permission. If denied, show alert + update status. Returns True if OK."""
+        has_mic, detail = check_mic_permission()
+        if not has_mic:
+            self.mic_status_item.title = "Mic: Denied"
+            self._alert(
+                title="Microphone Not Available",
+                message=(
+                    f"Cannot start recording: {detail}\n\n"
+                    "Grant microphone access in:\n"
+                    "System Settings > Privacy & Security > Microphone,\n"
+                    "then restart this app."
+                ),
+            )
+            return False
+        return True
 
     # ── Menu title sync ──────────────────────────────────────
 
@@ -104,11 +124,16 @@ class VoiceClaudeApp(rumps.App):
     def _start_wake(self, sender: rumps.MenuItem) -> None:
         if self._wake_active:
             return
+
+        self._update_mic_status()
+
+        # Gate on mic permission
+        if not self._check_mic_or_alert():
+            return
+
         self._wake_active = True
         self._wake_event.clear()
         self._trigger_event.clear()
-
-        self._update_mic_status()
         self._sync_menu_titles()
 
         self._wake_thread = threading.Thread(
@@ -123,7 +148,7 @@ class VoiceClaudeApp(rumps.App):
             return
         self._wake_active = False
         self._wake_event.set()
-        self._trigger_event.set()   # unblock any waiting trigger
+        self._trigger_event.set()
 
         if self._wake_thread is not None and self._wake_thread.is_alive():
             self._wake_thread.join(timeout=5.0)
@@ -131,18 +156,16 @@ class VoiceClaudeApp(rumps.App):
         self._sync_menu_titles()
 
     def _trigger_recording(self, sender: rumps.MenuItem) -> None:
-        """Single-cycle trigger: fire one record→STT→pipeline iteration.
+        """Single-cycle trigger, gated on mic permission."""
+        self._update_mic_status()
 
-        If the wake loop is not running, starts it temporarily for one cycle.
-        If already running, sets the trigger event so the loop picks it up.
-        """
+        if not self._check_mic_or_alert():
+            return
+
         if not self._wake_active:
-            # Start the loop in single-shot mode
             self._wake_active = True
             self._wake_event.clear()
-            self._trigger_event.set()  # trigger immediately
-
-            self._update_mic_status()
+            self._trigger_event.set()
             self._sync_menu_titles()
 
             self._wake_thread = threading.Thread(
@@ -152,7 +175,6 @@ class VoiceClaudeApp(rumps.App):
             )
             self._wake_thread.start()
         else:
-            # Loop already running — just fire the trigger
             self._trigger_event.set()
 
     def _quit(self, sender: rumps.MenuItem) -> None:
@@ -163,29 +185,16 @@ class VoiceClaudeApp(rumps.App):
     # ── Wake loop (background thread) ────────────────────────
 
     def _run_wake_loop(self) -> None:
-        """Event-driven wake loop.
-
-        Waits for _trigger_event (set by "Trigger Recording" menu item or
-        _trigger_recording callback). Each trigger fires one full cycle:
-        record → STT → risk → Claude → summarize → TTS → log.
-
-        Stop is signaled via _wake_event.
-        """
         while not self._wake_event.is_set():
-            # Wait for a trigger (no input() — pure threading.Event)
             self._trigger_event.wait(timeout=0.5)
             if self._wake_event.is_set():
                 break
             if not self._trigger_event.is_set():
                 continue
-
             self._trigger_event.clear()
-
-            # Run one full cycle
             self._record_and_execute()
 
     def _record_and_execute(self) -> None:
-        """One recording cycle: mic → STT → pipeline."""
         from voice_claude_agent.cli import (
             _run_pipeline,
             _safe_real_recorder,
@@ -196,6 +205,13 @@ class VoiceClaudeApp(rumps.App):
         recorder = _safe_real_recorder()
         if recorder is None:
             self.mic_status_item.title = "Mic: Error"
+            self._alert(
+                title="Recording Failed",
+                message=(
+                    "Could not access the microphone.\n\n"
+                    "Check: System Settings > Privacy & Security > Microphone"
+                ),
+            )
             return
 
         audio = _safe_record_attempt(recorder, max_duration=10)
@@ -212,5 +228,4 @@ class VoiceClaudeApp(rumps.App):
 
 
 def launch_app(stt_backend: str = "text-input") -> None:
-    """Launch the Voice Claude Agent menu bar app. Blocks until quit."""
     VoiceClaudeApp(stt_backend=stt_backend).run()

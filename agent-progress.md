@@ -896,6 +896,32 @@
 ### Risks / Notes
 - Alias mode only works on this machine.
 
+## 2026-06-06 20:30 — Phase 6: F036 — Mic Permission Denial UX
+
+### Completed
+- Added `_check_mic_or_alert()` — gates `_start_wake` and `_trigger_recording` on mic permission.
+- When mic denied: shows `rumps.alert("Microphone Not Available", ...)` with System Settings path, then returns without starting.
+- `_record_and_execute`: when `_safe_real_recorder` returns None, shows alert + updates Mic Status to "Error".
+- `_alert_patch` injectable via constructor for tests (defaults to `rumps.alert`).
+- 5 tests: start blocked, trigger blocked, record failure alert, accessible no alert, default rumps.alert.
+
+### Verification
+- `./init.sh check` / `./init.sh lint` passed
+- `./init.sh test` passed: 108/108
+- All 5 F036 tests pass
+
+### Files Changed
+- src/voice_claude_agent/app.py (added _check_mic_or_alert, _alert_patch, gate start/trigger/record)
+- tests/test_core.py (added TestMicDenialUX: 5 tests)
+- feature_list.json (F036 passes=true)
+- agent-progress.md (this entry)
+
+### Next Recommended Task
+- F037: verify session log parity between menu bar and CLI wake modes.
+
+### Risks / Notes
+- None.
+
 ## 2026-06-06 20:20 — Codex Review: F035 Verification
 
 ### Completed
