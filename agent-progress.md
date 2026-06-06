@@ -116,3 +116,31 @@
 - Real microphone requires macOS microphone permission. User must grant Terminal/VS Code mic access in System Settings.
 - SoundDeviceRecorder tested in import only; real mic tested manually via `voice-claude-agent record`.
 - whisper-cli backend in RecordingTranscriber is a stub — actual whisper.cpp not installed.
+
+## 2026-06-06 10:12 — Codex Review: Phase 2 Execution Check
+
+### Completed
+- Reviewed Claude's Phase 2 commit `6ad4a79`.
+- Verified dependencies install into `.venv`: `sounddevice 0.5.5`, `numpy 2.4.6`.
+- Verified `./init.sh check`, `./init.sh test`, `./init.sh lint`, and `.venv/bin/voice-claude-agent check` pass.
+- Ran `.venv/bin/voice-claude-agent demo-voice "请只回复 OK"` successfully against real Claude CLI.
+
+### Verification
+- `./init.sh install` passed
+- `./init.sh check` passed
+- `./init.sh test` passed: 36 passed
+- `./init.sh lint` passed
+- `.venv/bin/voice-claude-agent demo-voice "请只回复 OK"` passed at command level
+
+### Files Changed
+- agent-progress.md
+
+### Next Recommended Task
+- Claude must fix `demo-voice` so the pipeline executes the transcript returned by the transcriber, not the CLI argument directly.
+- Add a CLI-level test for `demo-voice` that fails if STT/transcriber output is ignored.
+- Update `feature_list.json` or add Phase 2-specific features so Phase 2 has explicit acceptance criteria beyond the original F010 interface check.
+
+### Risks / Notes
+- Phase 2 is not fully accepted yet. `demo-voice` prints `Transcription: [mock STT: 10 bytes of audio]`, but then runs Claude with the original stub text `请只回复 OK`; this means the CLI demo bypasses the STT result.
+- The integration test manually composes `FakeRecorder -> FakeTranscriber -> run_claude`, but does not exercise the actual `demo-voice` CLI command.
+- `voice-claude-agent` was not on shell PATH until using the project `.venv/bin/voice-claude-agent`; docs or init output should clarify this.
