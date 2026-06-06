@@ -7,6 +7,8 @@ import threading
 from pathlib import Path
 from unittest import mock
 
+import pytest
+
 # Ensure src is importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
@@ -1151,6 +1153,16 @@ class TestWhisperCliBackend:
 
 # ── Phase 6: Menu Bar App Tests ────────────────────────────
 class TestMenuBarApp:
+    @pytest.fixture(autouse=True)
+    def _mock_app_mic_check(self, monkeypatch):
+        import voice_claude_agent.app as app_mod
+
+        monkeypatch.setattr(
+            app_mod,
+            "check_mic_permission",
+            lambda: (True, "mock microphone accessible"),
+        )
+
     def test_app_class_imports(self):
         """VoiceClaudeApp should be importable and constructible."""
         from voice_claude_agent.app import VoiceClaudeApp
@@ -1213,6 +1225,16 @@ class TestMenuBarLifecycle:
     so the thread body is a no-op or a controlled mock. This avoids
     input() calls (which break under pytest) and threading warnings.
     """
+
+    @pytest.fixture(autouse=True)
+    def _mock_app_mic_check(self, monkeypatch):
+        import voice_claude_agent.app as app_mod
+
+        monkeypatch.setattr(
+            app_mod,
+            "check_mic_permission",
+            lambda: (True, "mock microphone accessible"),
+        )
 
     def test_start_stop_state_transitions_direct_state(self):
         """start/stop should transition _wake_active and update titles, without threads."""
@@ -1325,6 +1347,16 @@ class TestMenuBarLifecycle:
 
 # ── F033b: Trigger Recording (event-driven, no input()) ─────
 class TestTriggerRecording:
+    @pytest.fixture(autouse=True)
+    def _mock_app_mic_check(self, monkeypatch):
+        import voice_claude_agent.app as app_mod
+
+        monkeypatch.setattr(
+            app_mod,
+            "check_mic_permission",
+            lambda: (True, "mock microphone accessible"),
+        )
+
     def test_trigger_item_in_menu(self):
         """Menu should include 'Trigger Recording' item."""
         from voice_claude_agent.app import VoiceClaudeApp
@@ -1426,6 +1458,16 @@ class TestTriggerRecording:
 
 # ── F034: STT Backend & Env Passthrough ─────────────────────
 class TestAppSTTBackendPassthrough:
+    @pytest.fixture(autouse=True)
+    def _mock_app_mic_check(self, monkeypatch):
+        import voice_claude_agent.app as app_mod
+
+        monkeypatch.setattr(
+            app_mod,
+            "check_mic_permission",
+            lambda: (True, "mock microphone accessible"),
+        )
+
     def test_stt_backend_stored_on_instance(self):
         """VoiceClaudeApp(stt_backend='whisper-cli') should store it."""
         from voice_claude_agent.app import VoiceClaudeApp
@@ -1486,9 +1528,38 @@ class TestAppSTTBackendPassthrough:
         assert path == str(model_file), f"expected model path, got: {err}"
         assert err == ""
 
-    def test_launch_app_passes_stt_backend(self):
-        """VoiceClaudeApp accepts stt_backend kwarg and stores it."""
-        from voice_claude_agent.app import VoiceClaudeApp
+    def test_app_cli_passes_stt_backend_to_launch_app(self, monkeypatch):
+        """voice-claude-agent app --stt-backend should forward the selected backend."""
+        from click.testing import CliRunner
+        from voice_claude_agent.cli import main
 
-        app = VoiceClaudeApp(stt_backend="apple-speech")
-        assert app.stt_backend == "apple-speech"
+        captured = []
+        monkeypatch.setattr(
+            "voice_claude_agent.app.launch_app",
+            lambda stt_backend="text-input": captured.append(stt_backend),
+        )
+
+        result = CliRunner().invoke(main, ["app", "--stt-backend", "whisper-cli"])
+
+        assert result.exit_code == 0
+        assert captured == ["whisper-cli"]
+        assert "STT backend: whisper-cli" in result.output
+
+    def test_launch_app_constructs_app_with_stt_backend(self, monkeypatch):
+        """launch_app should construct VoiceClaudeApp with the selected backend and run it."""
+        import voice_claude_agent.app as app_mod
+
+        calls = []
+
+        class FakeApp:
+            def __init__(self, stt_backend="text-input"):
+                calls.append(("init", stt_backend))
+
+            def run(self):
+                calls.append(("run", None))
+
+        monkeypatch.setattr(app_mod, "VoiceClaudeApp", FakeApp)
+
+        app_mod.launch_app(stt_backend="apple-speech")
+
+        assert calls == [("init", "apple-speech"), ("run", None)]

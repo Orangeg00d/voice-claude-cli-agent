@@ -877,6 +877,34 @@
 ### Risks / Notes
 - None.
 
+## 2026-06-06 20:05 — Codex Review: F034 Verification
+
+### Completed
+- Reviewed Claude commit `de9f588`.
+- Confirmed `voice-claude-agent app --stt-backend ...` accepts the selected backend and forwards it to `launch_app`.
+- Confirmed `launch_app(stt_backend=...)` constructs `VoiceClaudeApp` with the selected backend.
+- Confirmed `_record_and_execute` passes `self.stt_backend` into `RecordingTranscriber`.
+- Confirmed `WHISPER_CPP_MODEL` resolves through `_resolve_whisper_model`.
+- Strengthened F034 tests to cover CLI forwarding and direct `launch_app` construction.
+- Isolated menu bar app tests from real microphone permission checks to avoid machine-dependent hangs.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh lint` passed
+- `./init.sh test` passed: 97/97
+- Focused menu bar/STT tests passed: 24/24
+
+### Files Changed
+- tests/test_core.py
+- feature_list.json
+- agent-progress.md
+
+### Next Recommended Task
+- F035: py2app standalone `.app` bundle.
+
+### Risks / Notes
+- F034 accepted. Real menu bar operation should still be manually smoke-tested once F035 packaging exists.
+
 ## 2026-06-06 19:43 — Codex Review: F033 Verification
 
 ### Completed
