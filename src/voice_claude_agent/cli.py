@@ -1,6 +1,7 @@
 """CLI entry point for Voice Claude Agent."""
 
 import sys
+import time
 
 import click
 
@@ -10,7 +11,9 @@ from voice_claude_agent.config import (
 )
 from voice_claude_agent.claude_runner import run_claude
 from voice_claude_agent.logging_store import write_session, write_last_result
+from voice_claude_agent.recorder import SoundDeviceRecorder, FakeRecorder
 from voice_claude_agent.risk import classify_risk, requires_confirmation
+from voice_claude_agent.stt import RecordingTranscriber, TextInputTranscriber
 from voice_claude_agent.summarizer import summarize
 from voice_claude_agent.tts import MacOSSaySpeaker, FakeSpeaker
 
@@ -167,6 +170,88 @@ def _run_pipeline(prompt: str, input_mode: str, tts_fake: bool) -> None:
     if tts_fake:
         assert isinstance(speaker, FakeSpeaker)
         click.echo(f"TTS (fake): {speaker.spoken[-1]}")
+
+
+@main.command()
+@click.option("--duration", "-d", default=5, help="Max recording duration in seconds.")
+def record(duration: int):
+    """Record audio from the microphone (push-to-talk) and print a summary.
+
+    Press Enter to start recording. Press Enter again to stop and transcribe.
+    """
+    recorder = SoundDeviceRecorder()
+    transcriber = RecordingTranscriber()
+
+    input("Press Enter to start recording...")
+    recorder.start()
+    click.echo(f"Recording... (max {duration}s, press Enter to stop)")
+
+    # Wait for stop signal or duration limit
+    start = time.monotonic()
+    try:
+        input()
+    except (EOFError, KeyboardInterrupt):
+        pass
+    elapsed = time.monotonic() - start
+    if elapsed > duration:
+        click.echo(f"Duration limit ({duration}s) reached.")
+
+    recorder.stop()
+    audio = recorder.get_audio()
+    click.echo(f"Recorded {len(audio)} bytes ({len(audio) / 2 / 16000:.1f}s)")
+
+    text = transcriber.transcribe(audio)
+    click.echo(f"Transcription: {text}")
+
+
+@main.command()
+@click.option("--duration", "-d", default=10, help="Max recording duration in seconds.")
+@click.option("--fake", is_flag=True, help="Use fake recorder for testing.")
+def voice(duration: int, fake: bool):
+    """Record voice, transcribe, run Claude CLI, and speak the result."""
+    if fake:
+        recorder = FakeRecorder(b"test audio data")
+        transcriber = TextInputTranscriber()
+    else:
+        recorder = SoundDeviceRecorder()
+        transcriber = RecordingTranscriber()
+
+    if not fake:
+        input("Press Enter to start recording...")
+        recorder.start()
+        click.echo(f"Recording... (max {duration}s, press Enter to stop)")
+        try:
+            input()
+        except (EOFError, KeyboardInterrupt):
+            pass
+        recorder.stop()
+        audio = recorder.get_audio()
+        click.echo(f"Recorded {len(audio)} bytes ({len(audio) / 2 / 16000:.1f}s)")
+    else:
+        audio = recorder.get_audio()
+
+    text = transcriber.transcribe(audio)
+    click.echo(f"Transcription: {text}")
+
+    if not text.strip():
+        click.echo("No speech detected. Aborting.")
+        return
+
+    _run_pipeline(text, input_mode="voice", tts_fake=False)
+
+
+@main.command()
+@click.argument("stub_text", default="请回复 OK")
+def demo_voice(stub_text: str):
+    """Run the voice pipeline with fake audio: recorder -> STT -> Claude CLI -> TTS."""
+    recorder = FakeRecorder(b"stub audio")
+    transcriber = TextInputTranscriber()
+
+    click.echo(f"Stub voice input: '{stub_text}'")
+    transcript = transcriber.transcribe(recorder.get_audio())
+    click.echo(f"Transcription: {transcript}")
+
+    _run_pipeline(stub_text, input_mode="voice", tts_fake=False)
 
 
 if __name__ == "__main__":

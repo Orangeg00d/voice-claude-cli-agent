@@ -135,7 +135,7 @@
         "Verify mock transcriber is available for testing"
       ],
       "passes": true,
-      "evidence": "stt.py created with Transcriber protocol, TextInputTranscriber (stdin) and FakeTranscriber (test) implementations"
+      "evidence": "Phase 2: stt.py enhanced with RecordingTranscriber (text-input + whisper-cli backends), recorder.py with real SoundDeviceRecorder + FakeRecorder. CLI: record, voice, demo-voice commands."
     },
     {
       "id": "F011",

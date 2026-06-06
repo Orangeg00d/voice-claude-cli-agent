@@ -11,12 +11,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from voice_claude_agent.claude_runner import ClaudeRunResult, run_claude
 from voice_claude_agent.confirmation import confirm_or_reject
 from voice_claude_agent.logging_store import write_session, write_last_result
+from voice_claude_agent.recorder import FakeRecorder
 from voice_claude_agent.risk import (
     RiskLevel,
     classify_risk,
     requires_confirmation,
     DESTRUCTIVE_KEYWORDS,
 )
+from voice_claude_agent.stt import FakeTranscriber, RecordingTranscriber
 from voice_claude_agent.summarizer import summarize
 from voice_claude_agent.tts import FakeSpeaker, MacOSSaySpeaker
 
@@ -326,3 +328,109 @@ class TestDemoTextPipeline:
 
         # Verify no Claude CLI was invoked (no log written)
         assert not (tmp_path / "sessions.jsonl").exists()
+
+
+# ── Recorder Tests ────────────────────────────────────────
+class TestRecorder:
+    def test_fake_recorder_lifecycle(self):
+        recorder = FakeRecorder(b"hello audio")
+        assert not recorder.is_recording()
+        recorder.start()
+        assert recorder.is_recording()
+        recorder.stop()
+        assert not recorder.is_recording()
+        assert recorder.get_audio() == b"hello audio"
+
+    def test_fake_recorder_counts_calls(self):
+        recorder = FakeRecorder()
+        recorder.start()
+        recorder.start()
+        recorder.stop()
+        assert len(recorder.start_calls) == 2
+        assert len(recorder.stop_calls) == 1
+
+    def test_fake_recorder_empty_default(self):
+        recorder = FakeRecorder()
+        assert recorder.get_audio() == b""
+
+
+# ── STT Tests ─────────────────────────────────────────────
+class TestSTT:
+    def test_fake_transcriber_returns_preset(self):
+        t = FakeTranscriber("hello world")
+        assert t.transcribe() == "hello world"
+        assert t.transcribe(b"ignored") == "hello world"
+
+    def test_fake_transcriber_tracks_calls(self):
+        t = FakeTranscriber("test")
+        t.transcribe(b"first")
+        t.transcribe(b"second")
+        assert len(t.calls) == 2
+        assert t.calls[0] == b"first"
+
+    def test_recording_transcriber_empty_audio(self):
+        t = RecordingTranscriber()
+        assert t.transcribe(b"") == ""
+
+    def test_recording_transcriber_text_input_backend(self):
+        t = RecordingTranscriber(backend="text-input")
+        result = t.transcribe(b"\x00" * 32000)  # 1 second of 16kHz int16
+        assert "32000 bytes" in result
+        assert "1.0s" in result
+
+
+# ── Voice Pipeline Integration Test ───────────────────────
+class TestVoicePipeline:
+    def test_demo_voice_with_fake_audio(self, tmp_path, monkeypatch):
+        """Full voice pipeline with fake audio and fake Claude."""
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_sessions_log_path",
+            lambda: tmp_path / "sessions.jsonl",
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_last_result_path",
+            lambda: tmp_path / "last_result.json",
+        )
+
+        # Setup fake components
+        recorder = FakeRecorder(b"stub audio data")
+        transcriber = FakeTranscriber("请回复 OK")
+
+        # Record
+        recorder.start()
+        recorder.stop()
+        audio = recorder.get_audio()
+        transcript = transcriber.transcribe(audio)
+
+        # Mock Claude
+        fake_proc = mock.MagicMock()
+        fake_proc.returncode = 0
+        fake_proc.stdout = "OK"
+        fake_proc.stderr = ""
+        with mock.patch("subprocess.run", return_value=fake_proc):
+            result = run_claude(transcript)
+            summary = summarize(result.stdout, result.exit_code, result.duration_seconds)
+
+            speaker = FakeSpeaker()
+            speaker.speak(summary)
+
+            write_session({
+                "input_mode": "voice",
+                "transcript": transcript,
+                "risk_level": "read_only",
+                "confirmation_required": False,
+                "confirmation_received": False,
+                "claude_command": result.command,
+                "exit_code": result.exit_code,
+                "summary": summary,
+                "spoken": True,
+            })
+
+        # Verify
+        assert (tmp_path / "sessions.jsonl").exists()
+        lines = (tmp_path / "sessions.jsonl").read_text().strip().split("\n")
+        record = json.loads(lines[0])
+        assert record["input_mode"] == "voice"
+        assert record["transcript"] == "请回复 OK"
+        assert record["exit_code"] == 0
+        assert len(speaker.spoken) == 1

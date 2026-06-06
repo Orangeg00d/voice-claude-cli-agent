@@ -83,3 +83,36 @@
 ### Risks / Notes
 - `agent-progress.md` from the initializer still contains Pending verification lines, even though `feature_list.json` marks F001-F012 passed. This was corrected by Codex verification above, but future Claude rounds must keep progress and feature evidence consistent.
 - `MacOSSaySpeaker` currently escapes quotes before passing an argv list to `subprocess.run`; this is not dangerous, but it can alter spoken text. Fix in a later polish task.
+
+## 2026-06-06 10:00 — Phase 2: Real Recording & Voice Pipeline
+
+### Completed
+- Rewrote recorder.py: AudioRecorder protocol, SoundDeviceRecorder (real mic via sounddevice/numpy), FakeRecorder for tests.
+- Enhanced stt.py: added RecordingTranscriber with pluggable backends (text-input for dev, whisper-cli stub for future), FakeTranscriber, TextInputTranscriber.
+- Added pyproject.toml deps: sounddevice, numpy.
+- Added CLI voice commands: `record` (mic test), `voice` (record → transcribe → Claude → TTS), `demo-voice` (fake audio stub).
+- Added 8 new tests: recorder lifecycle, STT fakes, recording transcriber backends, voice pipeline integration test.
+- Lint clean.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh test` passed: 36/36
+- `voice-claude-agent demo-voice "请只回复 OK"` passed
+- `ruff check src/ tests/` all clean
+
+### Files Changed
+- src/voice_claude_agent/recorder.py (rewritten)
+- src/voice_claude_agent/stt.py (enhanced)
+- src/voice_claude_agent/cli.py (added record, voice, demo-voice commands)
+- pyproject.toml (added sounddevice, numpy deps)
+- tests/test_core.py (added 8 new tests)
+- feature_list.json (updated F010 evidence)
+- agent-progress.md (this entry)
+
+### Next Recommended Task
+- Phase 3: Enhance wake trigger. Add a CLI wake loop (`voice-claude-agent wake` that waits for wake → records → transcribes → executes in a loop). Integrate wake.py ManualWakeTrigger with the voice pipeline.
+
+### Risks / Notes
+- Real microphone requires macOS microphone permission. User must grant Terminal/VS Code mic access in System Settings.
+- SoundDeviceRecorder tested in import only; real mic tested manually via `voice-claude-agent record`.
+- whisper-cli backend in RecordingTranscriber is a stub — actual whisper.cpp not installed.
