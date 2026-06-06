@@ -59,15 +59,15 @@ OPTIONS = {
 }
 
 
-# ── F042: Post-build fixup — extract _sounddevice_data dylib from zip ──
+# ── F042: Post-build fixup — extract _sounddevice_data package from zip ──
 
 def _fixup_portaudio_dylib(dist_dir: str) -> None:
-    """Extract libportaudio.dylib from python314.zip to the real filesystem.
+    """Extract _sounddevice_data from python314.zip to the real filesystem.
 
     py2app puts _sounddevice_data inside python314.zip, but dlopen()
     cannot load .dylib files from inside a zip archive.  We extract
-    the _sounddevice_data subtree to Resources/lib/ so it exists as
-    real files.
+    the entire _sounddevice_data package to Resources/lib/ and remove it
+    from the zip so sounddevice resolves its package path on disk.
     """
     resources = pathlib.Path(dist_dir) / "Contents" / "Resources"
     zip_path = resources / "lib" / "python314.zip"
@@ -80,36 +80,51 @@ def _fixup_portaudio_dylib(dist_dir: str) -> None:
         print("[F042] WARNING: python*.zip not found — skipping PortAudio fixup")
         return
 
+    package_prefix = "_sounddevice_data/"
     dest_root = resources / "lib"
     dest_root.mkdir(parents=True, exist_ok=True)
+    extracted_any = False
 
     with zipfile.ZipFile(zip_path, "r") as zf:
-        for name in zf.namelist():
-            if "_sounddevice_data/" in name and "libportaudio" in name:
-                # Extract the dylib
-                member = zf.getinfo(name)
-                dest = dest_root / name
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                with zf.open(member) as src, open(dest, "wb") as dst:
-                    shutil.copyfileobj(src, dst)
+        for member in zf.infolist():
+            name = member.filename
+            if not name.startswith(package_prefix):
+                continue
+            dest = dest_root / name
+            if name.endswith("/"):
+                dest.mkdir(parents=True, exist_ok=True)
+                continue
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            with zf.open(member) as src, open(dest, "wb") as dst:
+                shutil.copyfileobj(src, dst)
+            extracted_any = True
+            if "libportaudio" in name:
                 os.chmod(dest, 0o755)
-                print(f"[F042] Extracted {name} -> {dest}")
+            print(f"[F042] Extracted {name} -> {dest}")
 
-                # Remove from zip so there's no stale copy
-                # (can't modify in-place; we'll use a new zip)
+    if not extracted_any:
+        print(f"[F042] WARNING: {package_prefix} not found in {zip_path.name}")
+        return
 
-    # Rebuild the zip without the dylib entries
+    package_dir = dest_root / "_sounddevice_data"
+    package_dir.mkdir(parents=True, exist_ok=True)
+    init_py = package_dir / "__init__.py"
+    if not init_py.exists():
+        init_py.write_text("# Extracted by setup.py so sounddevice data files load from disk.\n")
+
+    # Rebuild the zip without _sounddevice_data. If the package remains in
+    # python314.zip, sounddevice resolves __path__ to the zip and dlopen fails.
     tmp_zip = zip_path.with_suffix(".tmp.zip")
     with zipfile.ZipFile(zip_path, "r") as zin:
         with zipfile.ZipFile(tmp_zip, "w", zipfile.ZIP_DEFLATED) as zout:
             for item in zin.infolist():
-                if "_sounddevice_data/" in item.filename and "libportaudio" in item.filename:
-                    continue  # skip — now on filesystem
+                if item.filename.startswith(package_prefix):
+                    continue
                 data = zin.read(item.filename)
                 zout.writestr(item, data)
 
     tmp_zip.replace(zip_path)
-    print(f"[F042] Removed libportaudio.dylib from {zip_path.name}")
+    print(f"[F042] Removed _sounddevice_data from {zip_path.name}")
 
 
 setup(

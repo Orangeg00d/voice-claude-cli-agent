@@ -2196,7 +2196,7 @@ class TestPortAudioDylibFix:
         assert "PortAudio" in detail
 
     def test_bundle_dylib_not_in_zip(self):
-        """After py2app build, libportaudio.dylib must NOT be in python314.zip."""
+        """After py2app build, _sounddevice_data must NOT be in python314.zip."""
         import zipfile
 
         bundle = Path("/Users/orange/Documents/Claude/Projects/语音助理/dist/VoiceClaudeAgent.app")
@@ -2211,8 +2211,8 @@ class TestPortAudioDylibFix:
 
         zip_path = zip_candidates[0]
         with zipfile.ZipFile(zip_path, "r") as zf:
-            dylib_in_zip = [n for n in zf.namelist() if "libportaudio" in n]
-        assert len(dylib_in_zip) == 0, f"libportaudio.dylib still in zip: {dylib_in_zip}"
+            package_in_zip = [n for n in zf.namelist() if n.startswith("_sounddevice_data/")]
+        assert len(package_in_zip) == 0, f"_sounddevice_data still in zip: {package_in_zip}"
 
     def test_bundle_dylib_on_filesystem(self):
         """After py2app build, libportaudio.dylib must exist as a real file."""
@@ -2222,9 +2222,44 @@ class TestPortAudioDylibFix:
             pytest.skip("Bundle not built. Run: python setup.py py2app")
 
         dylib = bundle / "Contents" / "Resources" / "lib" / "_sounddevice_data" / "portaudio-binaries" / "libportaudio.dylib"
+        package_init = bundle / "Contents" / "Resources" / "lib" / "_sounddevice_data" / "__init__.py"
+        assert package_init.exists(), f"_sounddevice_data package init not found at {package_init}"
         assert dylib.exists(), f"libportaudio.dylib not found at {dylib}"
         assert dylib.is_file()
         assert os.access(dylib, os.X_OK)
+
+    def test_bundle_sounddevice_data_resolves_to_filesystem(self):
+        """py2app sys.path order must still resolve _sounddevice_data to disk."""
+        import subprocess
+
+        bundle = Path("/Users/orange/Documents/Claude/Projects/语音助理/dist/VoiceClaudeAgent.app")
+        if not bundle.exists():
+            import pytest
+            pytest.skip("Bundle not built. Run: python setup.py py2app")
+
+        resources = bundle / "Contents" / "Resources"
+        zip_candidates = sorted(resources.glob("lib/python*.zip"))
+        if not zip_candidates:
+            import pytest
+            pytest.skip("No python*.zip found in bundle")
+
+        zip_path = zip_candidates[0]
+        filesystem_lib = resources / "lib"
+        code = f"""
+import sys
+sys.path[:] = [{str(zip_path)!r}, {str(filesystem_lib)!r}] + sys.path
+import _sounddevice_data
+package_path = next(iter(_sounddevice_data.__path__))
+print(package_path)
+assert ".zip" not in package_path
+"""
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        assert ".zip" not in result.stdout
 
     def test_mic_diagnostic_includes_portaudio_status(self):
         """_run_mic_diagnostic should include PortAudio load status."""

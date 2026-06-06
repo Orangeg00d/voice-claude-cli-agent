@@ -1266,3 +1266,31 @@
 
 ### Files Changed
 - setup.py, src/voice_claude_agent/config.py, src/voice_claude_agent/app.py, tests/test_core.py, feature_list.json, agent-progress.md
+
+## 2026-06-06 22:15 — Codex Review: F042 Packaging Correction
+
+### Finding
+- Claude's F042 fix extracted `libportaudio.dylib`, but left `_sounddevice_data/__init__.pyc` inside `python314.zip`.
+- With py2app-style `sys.path`, Python could still import `_sounddevice_data` from the zip, so sounddevice continued building a `python314.zip/_sounddevice_data/.../libportaudio.dylib` path and `dlopen` failed.
+
+### Completed
+- Updated `setup.py` so the post-build fixup extracts the entire `_sounddevice_data` package to `Contents/Resources/lib/_sounddevice_data/`.
+- Added a filesystem `__init__.py`, chmods `libportaudio.dylib`, and removes the full `_sounddevice_data/` subtree from `python314.zip`.
+- Added a regression test that simulates py2app `sys.path` order and asserts `_sounddevice_data` resolves to the filesystem, not the zip.
+- Rebuilt `dist/VoiceClaudeAgent.app`.
+
+### Verification
+- Bundle zip check: no `_sounddevice_data/` entries remain in `python314.zip`.
+- Simulated py2app import: `_sounddevice_data.__path__` resolves to `Contents/Resources/lib/_sounddevice_data`.
+- Simulated sounddevice import: `sounddevice._libname` resolves to the filesystem `libportaudio.dylib`.
+- `sd.query_devices(kind='input')` returned `MacBook Pro麦克风`.
+- `./init.sh check` passed.
+- `./init.sh lint` passed.
+- `./init.sh test` passed: 131/131.
+- Focused F042 + py2app tests passed: 12/12.
+
+### Files Changed
+- setup.py
+- tests/test_core.py
+- feature_list.json
+- agent-progress.md
