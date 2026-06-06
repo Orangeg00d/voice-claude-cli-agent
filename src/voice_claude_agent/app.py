@@ -77,6 +77,50 @@ class VoiceClaudeApp(rumps.App):
         self._update_mic_status()
         self._sync_menu_titles()
 
+        # Validate STT backend on startup
+        self._validate_stt_backend()
+
+    # ── STT backend validation ───────────────────────────────
+
+    def _validate_stt_backend(self) -> None:
+        """Check that the configured STT backend is usable.
+
+        For whisper-cli: verify binary + model. Shows alert + updates
+        mic_status_item with a specific error message on failure.
+        Does NOT crash — the app stays alive.
+        """
+        if self.stt_backend != "whisper-cli":
+            return
+
+        from voice_claude_agent.stt import _find_whisper_cpp_binary, _resolve_whisper_model
+
+        binary = _find_whisper_cpp_binary()
+        if not binary:
+            self.mic_status_item.title = "STT: whisper-cli not installed"
+            self._alert(
+                title="STT Backend Unavailable",
+                message=(
+                    "whisper-cli is the default STT backend, "
+                    "but whisper.cpp is not installed.\n\n"
+                    "Install it: brew install whisper-cpp\n"
+                    "Or set VOICE_STT_BACKEND=text-input and restart."
+                ),
+            )
+            return
+
+        model, model_err = _resolve_whisper_model()
+        if model is None:
+            self.mic_status_item.title = "STT: model not found"
+            self._alert(
+                title="Whisper Model Not Found",
+                message=(
+                    f"{model_err}\n\n"
+                    "Set WHISPER_CPP_MODEL to a downloaded GGML model file,\n"
+                    "or set VOICE_STT_BACKEND=text-input and restart."
+                ),
+            )
+            return
+
     # ── Mic permission helpers ────────────────────────────────
 
     def _update_mic_status(self) -> None:

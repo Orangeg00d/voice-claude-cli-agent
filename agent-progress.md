@@ -1164,3 +1164,24 @@
 
 ### Next Recommended Task
 - F040: default STT backend to whisper-cli in run_app.py.
+
+## 2026-06-07 09:15 — Phase 7: F040 — Default whisper-cli Backend
+
+### Completed
+- run_app.py now defaults VOICE_STT_BACKEND=whisper-cli (was text-input). Env override works.
+- VoiceClaudeApp._validate_stt_backend() checks whisper-cli binary + WHISPER_CPP_MODEL on startup.
+- Missing binary: alert "STT Backend Unavailable" with brew install hint.
+- Missing model: alert "Whisper Model Not Found" with WHISPER_CPP_MODEL hint.
+- 5 tests: default in run_app.py, env override, missing binary alert, missing model alert, text-input skips validation.
+
+### Verification
+- `./init.sh check` / lint passed, 120/120 tests collocated, all 5 F040 tests pass
+
+### Files Changed
+- run_app.py, src/voice_claude_agent/app.py, tests/test_core.py, feature_list.json, agent-progress.md
+
+### Next Recommended Task
+- Phase 7 complete (F039-F040). All 40 features pass. Real-world smoke testing or Phase 8 planning.
+
+### Risks / Notes
+- Whisper model validation only fires for whisper-cli backend; other backends skip silently.

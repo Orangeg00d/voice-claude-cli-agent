@@ -539,8 +539,8 @@
         "If whisper-cli or WHISPER_CPP_MODEL unavailable, show status/alert",
         "Env var override tested"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "run_app.py defaults to whisper-cli (VOICE_STT_BACKEND env override supported). VoiceClaudeApp._validate_stt_backend() checks whisper-cli binary + WHISPER_CPP_MODEL on startup — shows alerts if missing, updates mic_status_item. 5 tests: default in run_app.py, env override, missing binary alert, missing model alert, text-input skips validation. 120/120 tests, lint clean."
     }
   ]
 }

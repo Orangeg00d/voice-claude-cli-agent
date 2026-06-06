@@ -1979,3 +1979,86 @@ class TestNonInteractiveRecording:
 
         assert len(alerts) >= 1
         assert alerts[0]["title"] == "No Speech Detected"
+
+
+# ── F040: Default whisper-cli Backend ───────────────────────
+class TestDefaultWhisperBackend:
+    def test_run_app_default_is_whisper_cli(self):
+        """run_app.py main() should default VOICE_STT_BACKEND to whisper-cli."""
+        source = Path(__file__).resolve().parent.parent / "run_app.py"
+        content = source.read_text()
+        assert 'whisper-cli' in content
+        assert 'VOICE_STT_BACKEND' in content
+
+    def test_run_app_env_override(self, monkeypatch):
+        """Setting VOICE_STT_BACKEND=text-input should override the default."""
+        monkeypatch.setenv("VOICE_STT_BACKEND", "text-input")
+
+        import os
+        stt = os.environ.get("VOICE_STT_BACKEND", "whisper-cli")
+        assert stt == "text-input"
+
+    def test_whisper_cli_missing_binary_shows_alert(self, monkeypatch):
+        """When whisper-cli is backend but binary not found, alert should fire."""
+        import voice_claude_agent.app as app_mod
+
+        alerts = []
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
+        monkeypatch.setattr(
+            "voice_claude_agent.stt._find_whisper_cpp_binary",
+            lambda: None,
+        )
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app_instance = VoiceClaudeApp(
+            stt_backend="whisper-cli",
+            _alert_patch=lambda **kw: alerts.append(kw),
+        )
+        assert app_instance.stt_backend == "whisper-cli"
+        assert len(alerts) >= 1
+        assert alerts[0]["title"] == "STT Backend Unavailable"
+        assert "brew install whisper-cpp" in alerts[0]["message"]
+        assert "whisper-cli" in app_instance.mic_status_item.title
+
+    def test_whisper_model_missing_shows_alert(self, monkeypatch):
+        """When whisper-cli is backend but model env not set, alert should fire."""
+        import voice_claude_agent.app as app_mod
+
+        alerts = []
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
+        monkeypatch.setattr(
+            "voice_claude_agent.stt._find_whisper_cpp_binary",
+            lambda: "/fake/whisper-cli",
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.stt._resolve_whisper_model",
+            lambda: (None, "Model not found at /fake/model.bin"),
+        )
+        # Clear env var to ensure default is checked
+        monkeypatch.delenv("WHISPER_CPP_MODEL", raising=False)
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        VoiceClaudeApp(
+            stt_backend="whisper-cli",
+            _alert_patch=lambda **kw: alerts.append(kw),
+        )
+        assert len(alerts) >= 1
+        assert alerts[0]["title"] == "Whisper Model Not Found"
+        assert "WHISPER_CPP_MODEL" in alerts[0]["message"]
+
+    def test_text_input_backend_no_validation_alert(self, monkeypatch):
+        """text-input backend should NOT trigger STT validation alerts."""
+        import voice_claude_agent.app as app_mod
+
+        alerts = []
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        VoiceClaudeApp(
+            stt_backend="text-input",
+            _alert_patch=lambda **kw: alerts.append(kw),
+        )
+        assert len(alerts) == 0
