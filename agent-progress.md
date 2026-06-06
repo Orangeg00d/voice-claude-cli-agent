@@ -276,26 +276,29 @@
 - whisper-cli backend requires a whisper.cpp binary installed separately. The backend detects missing binary and returns an actionable error.
 - SoundDeviceRecorder construction doesn't throw — mic errors surface at `.start()` time. _safe_real_recorder handles this via the constructor itself (catches PortAudioError from sd.InputStream probe in check_mic_permission).
 
-## 2026-06-06 11:08 — Codex Review: Phase 3 Verification
+## 2026-06-06 12:20 — Codex Review: Phase 4 Execution Check
 
 ### Completed
-- Reviewed Claude Phase 3 commit `de4459c`.
-- Verified `wake --fake --once` runs trigger -> record -> STT -> Claude -> TTS and exits after one iteration.
-- Confirmed Phase 3 features F016-F018 are present with explicit acceptance criteria.
-- Repaired progress log ordering so Phase 2 and Phase 3 records are not interleaved.
+- Reviewed Claude Phase 4 commits `783fe40` and `bed4045`.
+- Found a blocking test hang: `wake --fake --once` with an STT error used `continue` before the `--once` exit check, causing an infinite loop.
+- Codex fixed wake loop error/empty-transcript paths so they respect `--once`.
+- Codex also routed `record` and `voice` real-recording paths through `_safe_record_attempt()` so start/stop failures are handled consistently.
+- Removed the duplicate out-of-order Phase 3 review block from this progress log.
 
 ### Verification
 - `./init.sh check` passed
-- `./init.sh test` passed: 41 passed
+- `./init.sh test` passed: 55 passed
 - `./init.sh lint` passed
+- `.venv/bin/voice-claude-agent check` passed and displayed Microphone/STT backend status
 - `.venv/bin/voice-claude-agent wake --fake --once` passed: transcript was `请回复 OK`, Claude returned `OK`
 
 ### Files Changed
+- src/voice_claude_agent/cli.py
 - agent-progress.md
 
 ### Next Recommended Task
-- Phase 4: real end-to-end voice loop polish. Add macOS mic permission checks and make real recording/STT failure modes user-friendly before choosing Whisper, whisper.cpp, or Apple Speech.
+- Before starting menu bar work, Claude should add a short README section documenting `--stt-backend`, Apple Speech limitations, and how to run fake vs real wake modes.
 
 ### Risks / Notes
-- Phase 3 is accepted for the fake/manual wake MVP.
-- Real wake loop still needs manual microphone permission testing and a real STT backend before it can be considered production-ready voice control.
+- Phase 4 is accepted after Codex's small harness fix.
+- The current `apple-speech` backend is a status/fallback path, not true programmatic transcript capture. Real production STT still needs whisper.cpp, OpenAI Whisper API, or a deeper Apple Speech integration.

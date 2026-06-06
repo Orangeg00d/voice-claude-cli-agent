@@ -1,7 +1,6 @@
 """CLI entry point for Voice Claude Agent."""
 
 import sys
-import time
 
 import click
 
@@ -122,6 +121,14 @@ def _safe_record_attempt(recorder, max_duration: int) -> bytes:
     if not audio:
         click.echo(click.style("No audio captured. Check microphone connection.", fg="red"))
     return audio
+
+
+def _stop_if_once(once: bool, iteration: int) -> bool:
+    """Return True when a wake loop should stop after this iteration."""
+    if once:
+        click.echo(f"Wake loop stopped after {iteration} iteration(s).")
+        return True
+    return False
 
 
 def _stt_is_error(transcript: str) -> bool:
@@ -295,22 +302,8 @@ def record(duration: int, stt_backend: str):
     click.echo(f"STT backend: {stt_backend}")
 
     input("Press Enter to start recording...")
-    recorder.start()
-    click.echo(f"Recording... (max {duration}s, press Enter to stop)")
-
-    start = time.monotonic()
-    try:
-        input()
-    except (EOFError, KeyboardInterrupt):
-        pass
-    elapsed = time.monotonic() - start
-    if elapsed > duration:
-        click.echo(f"Duration limit ({duration}s) reached.")
-
-    recorder.stop()
-    audio = recorder.get_audio()
+    audio = _safe_record_attempt(recorder, max_duration=duration)
     if not audio:
-        click.echo(click.style("No audio captured. Check microphone connection.", fg="red"))
         return
 
     click.echo(f"Recorded {len(audio)} bytes ({len(audio) / 2 / 16000:.1f}s)")
@@ -343,18 +336,8 @@ def voice(duration: int, fake: bool, stt_backend: str):
 
     if not fake:
         input("Press Enter to start recording...")
-        recorder.start()
-        click.echo(f"Recording... (max {duration}s, press Enter to stop)")
-        try:
-            input()
-        except (EOFError, KeyboardInterrupt):
-            pass
-        recorder.stop()
-        audio = recorder.get_audio()
+        audio = _safe_record_attempt(recorder, max_duration=duration)
         if not audio:
-            click.echo(
-                click.style("No audio captured. Check microphone connection.", fg="red")
-            )
             return
         click.echo(f"Recorded {len(audio)} bytes ({len(audio) / 2 / 16000:.1f}s)")
     else:
@@ -466,19 +449,22 @@ def wake(fake: bool, once: bool, stt_backend: str):
                         fg="yellow",
                     )
                 )
+                if _stop_if_once(once, iteration):
+                    break
                 continue
 
             if not transcript.strip():
                 click.echo(
                     f"[{iteration}] No speech detected. Waiting for next wake."
                 )
+                if _stop_if_once(once, iteration):
+                    break
                 continue
 
             # 4. Run pipeline
             _run_pipeline(transcript, input_mode="voice", tts_fake=False)
 
-            if once:
-                click.echo(f"Wake loop stopped after {iteration} iteration(s).")
+            if _stop_if_once(once, iteration):
                 break
 
     except KeyboardInterrupt:
