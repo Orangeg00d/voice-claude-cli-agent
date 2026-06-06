@@ -512,8 +512,8 @@
         "Write test that mocks _run_pipeline and verifies session log is written",
         "Verify `./init.sh test` passes all app tests"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "22 Phase 6 tests across 7 categories: menu structure (4), start/stop toggle (4), trigger recording (4), mic denial (4), session log parity (2), stt backend (2), app startup (2). Plus 6 py2app bundle tests in test_py2app.py. 110/110 total, lint clean."
     }
   ]
 }

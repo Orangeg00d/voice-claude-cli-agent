@@ -935,6 +935,36 @@
 - tests/test_core.py (TestSessionLogParity: 2 tests), feature_list.json, agent-progress.md
 
 ### Next Recommended Task
+- F038: final test coverage audit.
+
+## 2026-06-06 21:00 — Phase 6: F038 — Test Coverage Audit
+
+### Completed
+- Audited Phase 6 tests against F038 criteria. All covered by existing tests:
+  - Menu structure: 4 tests (items, separators, trigger item, help listing)
+  - Start/stop toggle: 4 tests (direct state, idempotency, dual transitions)
+  - Trigger recording: 4 tests (idle start, running no-dupe, stop events, loop→execute)
+  - Mic denial: 4 tests (blocked start, blocked trigger, recorder-alert, accessible no-alert)
+  - Session log parity: 2 tests (menu bar writes session+last_result, key set match with CLI)
+  - STT backend passthrough: 2 tests (stored, transcriber constructed with correct backend)
+  - App startup: 2 tests (imports, launch_app callable)
+  - py2app bundle: 6 tests in test_py2app.py
+- Total: 28 Phase 6 tests, 110/110 overall. Zero code changes needed.
+
+### Verification
+- `./init.sh check` / `lint` passed, 110/110 tests
+
+### Files Changed
+- feature_list.json (F038 passes=true)
+- agent-progress.md (this entry)
+
+### Next Recommended Task
+- Phase 1–6 complete (F001–F038). All 38 features pass. Project ready for real-world testing and refinement.
+
+### Risks / Notes
+- Phase 6 complete. All phases 1-6 done.
+
+### Next Recommended Task
 - F038: final test coverage wrap-up.
 
 ## 2026-06-06 20:33 — Codex Review: F037 Verification
