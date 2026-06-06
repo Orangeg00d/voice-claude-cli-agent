@@ -50,7 +50,10 @@ def check_mic_permission() -> tuple[bool, str]:
         stream.stop()
         stream.close()
         return True, "microphone accessible"
-    except ImportError:
+    except ImportError as e:
+        msg = str(e).lower()
+        if "_sounddevice_data" in msg or "libportaudio" in msg or "portaudio" in msg:
+            return False, f"PortAudio unavailable — sounddevice library load failed: {e}"
         return False, "sounddevice not installed — cannot verify microphone"
     except Exception as e:
         msg = str(e).lower()

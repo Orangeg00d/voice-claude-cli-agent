@@ -8,11 +8,24 @@ VOICE_STT_BACKEND env var: text-input, whisper-cli, or apple-speech.
 """
 
 import os
+import sys
+from pathlib import Path
 
-from voice_claude_agent.app import launch_app
+
+def _bootstrap_py2app_runtime_path() -> None:
+    """Make py2app's filesystem packages importable before app modules load."""
+    resources = Path(__file__).resolve().parent
+    python_lib = resources / "lib" / f"python{sys.version_info.major}.{sys.version_info.minor}"
+    if python_lib.exists():
+        python_lib_str = str(python_lib)
+        if python_lib_str not in sys.path:
+            sys.path.insert(0, python_lib_str)
 
 
 def main():
+    _bootstrap_py2app_runtime_path()
+    from voice_claude_agent.app import launch_app
+
     stt_backend = os.environ.get("VOICE_STT_BACKEND", "whisper-cli")
     launch_app(stt_backend=stt_backend)
 

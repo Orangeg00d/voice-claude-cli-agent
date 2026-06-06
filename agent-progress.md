@@ -1295,6 +1295,38 @@
 - feature_list.json
 - agent-progress.md
 
+## 2026-06-06 22:37 — Codex Review: F042 Runtime Bootstrap Correction
+
+### Finding
+- User still saw `No module named '_sounddevice_data'` in the live menu bar app after `_sounddevice_data` was moved beside `sounddevice.py`.
+- The bundle contents were correct, but the py2app runtime still needed an explicit app-entry bootstrap before importing `voice_claude_agent.app`.
+
+### Completed
+- Added `run_app._bootstrap_py2app_runtime_path()` to insert `Contents/Resources/lib/python3.14` into `sys.path` before app modules load.
+- Moved `launch_app` import inside `main()` so the bootstrap runs first.
+- Updated `check_mic_permission()` so `ModuleNotFoundError: _sounddevice_data` returns `False` with a PortAudio/sounddevice load failure message, not the misleading `sounddevice not installed`.
+- Expanded `Mic Diagnostic` to show a sys.path sample and `_sounddevice_data` path when import succeeds.
+- Added regression tests for the run_app bootstrap and `_sounddevice_data` ImportError classification.
+- Rebuilt `dist/VoiceClaudeAgent.app`.
+
+### Verification
+- Rebuilt bundle `run_app.py` contains the bootstrap.
+- Simulated app import resolves `_sounddevice_data` to `Contents/Resources/lib/python3.14/_sounddevice_data`.
+- `sounddevice._libname` resolves to the filesystem `libportaudio.dylib`.
+- `sd.query_devices(kind='input')` returned `MacBook Pro麦克风`.
+- `./init.sh check` passed.
+- `./init.sh lint` passed.
+- `./init.sh test` passed: 133/133.
+- Focused runtime/F042 + py2app tests passed: 21/21.
+
+### Files Changed
+- run_app.py
+- src/voice_claude_agent/app.py
+- src/voice_claude_agent/config.py
+- tests/test_core.py
+- feature_list.json
+- agent-progress.md
+
 ## 2026-06-06 22:23 — Codex Review: F042 App Runtime Path Correction
 
 ### Finding

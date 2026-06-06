@@ -151,21 +151,31 @@ class VoiceClaudeApp(rumps.App):
     def _run_mic_diagnostic(self, sender: rumps.MenuItem) -> None:
         """Run a full mic/recording diagnostic and show the results in an alert."""
         import platform
+        import sys
 
         lines = ["=== Mic Diagnostic ===", ""]
 
         # Bundle / app info
         lines.append("Bundle ID: com.voiceclaude.agent")
         lines.append(f"Python: {platform.python_version()}")
+        lines.append("Python path containing _sounddevice_data:")
+        sounddevice_data_paths = [p for p in sys.path if "_sounddevice_data" in p or "python3.14" in p]
+        if sounddevice_data_paths:
+            lines.extend(f"- {p}" for p in sounddevice_data_paths[:3])
+        else:
+            lines.append("- not present in sys.path sample")
 
         # Input device info
         device_name = "unknown"
         portaudio_load_ok = False
         try:
+            import _sounddevice_data
             import sounddevice as sd
             default_input = sd.query_devices(kind="input")
             device_name = default_input.get("name", "unknown")
             portaudio_load_ok = True
+            data_path = next(iter(_sounddevice_data.__path__), "unknown")
+            lines.append(f"_sounddevice_data path: {data_path}")
             lines.append(f"Default input device: {device_name}")
             lines.append(f"Input channels: {default_input.get('max_input_channels', '?')}")
             lines.append(f"Default sample rate: {default_input.get('default_samplerate', '?')} Hz")

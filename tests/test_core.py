@@ -632,6 +632,22 @@ class TestMicPermission:
         stream.stop.assert_called_once()
         stream.close.assert_called_once()
 
+    def test_check_mic_permission_importerror_sounddevice_data(self, monkeypatch):
+        monkeypatch.setattr("platform.system", lambda: "Darwin")
+        original_import = __import__
+
+        def _raise_importerror(name, *args, **kwargs):
+            if name == "sounddevice":
+                raise ModuleNotFoundError("No module named '_sounddevice_data'")
+            return original_import(name, *args, **kwargs)
+
+        monkeypatch.setattr("builtins.__import__", _raise_importerror)
+        has_perm, detail = check_mic_permission()
+
+        assert has_perm is False
+        assert "PortAudio unavailable" in detail
+        assert "_sounddevice_data" in detail
+
 
 class TestSTTBackends:
     def test_list_available_backends_includes_text_input(self):
@@ -2004,6 +2020,20 @@ class TestDefaultWhisperBackend:
         content = source.read_text()
         assert 'whisper-cli' in content
         assert 'VOICE_STT_BACKEND' in content
+
+    def test_run_app_bootstraps_py2app_python_lib(self, monkeypatch, tmp_path):
+        """run_app should add Resources/lib/pythonX.Y before app imports."""
+        import run_app
+
+        resources = tmp_path / "VoiceClaudeAgent.app" / "Contents" / "Resources"
+        python_lib = resources / "lib" / f"python{sys.version_info.major}.{sys.version_info.minor}"
+        python_lib.mkdir(parents=True)
+        monkeypatch.setattr(run_app, "__file__", str(resources / "run_app.py"))
+        monkeypatch.setattr(sys, "path", [])
+
+        run_app._bootstrap_py2app_runtime_path()
+
+        assert sys.path[0] == str(python_lib)
 
     def test_run_app_env_override(self, monkeypatch):
         """Setting VOICE_STT_BACKEND=text-input should override the default."""
