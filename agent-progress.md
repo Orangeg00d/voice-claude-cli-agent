@@ -877,6 +877,25 @@
 ### Risks / Notes
 - None.
 
+## 2026-06-06 20:15 — Phase 6: F035 — py2app Standalone .app Bundle
+
+### Completed
+- Added py2app to dev deps. Created setup.py with setuptools 82+ compat. Built dist/VoiceClaudeAgent.app.
+- 6 bundle tests in test_py2app.py. 103/103 tests, lint clean.
+
+### Verification
+- `./init.sh check` passed / lint passed / test 103/103
+- `python setup.py py2app -A` builds successfully
+
+### Files Changed
+- pyproject.toml, setup.py (new), run_app.py (new), tests/test_py2app.py (new), feature_list.json, agent-progress.md
+
+### Next Recommended Task
+- F036: mic permission denial UX.
+
+### Risks / Notes
+- Alias mode only works on this machine.
+
 ## 2026-06-06 20:05 — Codex Review: F034 Verification
 
 ### Completed

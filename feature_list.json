@@ -470,8 +470,8 @@
         "Verify the .app launches without a terminal (double-click from Finder)",
         "Verify the menu bar icon appears in the produced .app"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "setup.py with monkeypatch for setuptools 82+ compat. run_app.py entry point loads VoiceClaudeApp. Built dist/VoiceClaudeAgent.app via `python setup.py py2app -A` (alias mode). Bundle verified: Info.plist with LSUIElement=True + NSMicrophoneUsageDescription, signed Mach-O executable, python symlink. 6 bundle tests: setup.py exists, run_app.py exists, .app exists, Info.plist content, executable +x, python symlink. 103/103 tests, lint clean."
     },
     {
       "id": "F036",
