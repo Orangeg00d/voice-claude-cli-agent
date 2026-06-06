@@ -373,29 +373,6 @@
 ### Risks / Notes
 - None.
 
-## 2026-06-06 13:35 — Phase 5: F023 — CLI Help Command Verification
-
-### Completed
-- Verified `voice-claude-agent --help` lists all 7 commands: check, demo-text, run-text, record, voice, demo-voice, wake.
-- Matches the `[project.scripts]` entry point `voice-claude-agent = "voice_claude_agent.cli:main"` in pyproject.toml.
-- Zero code changes — `--help` output was already correct.
-
-### Verification
-- `./init.sh check` passed
-- `./init.sh test` passed: 55/55
-- `./init.sh lint` passed
-- `voice-claude-agent --help` — all 7 commands present
-
-### Files Changed
-- feature_list.json (F023 passes=true with evidence)
-- agent-progress.md (this entry)
-
-### Next Recommended Task
-- F024: verify wake loop prints per-iteration status (waiting, woke, recording, transcript, summary).
-
-### Risks / Notes
-- None. F023 required zero code changes.
-
 ## 2026-06-06 13:25 — Codex Review: F022 Verification
 
 ### Completed
@@ -420,3 +397,48 @@
 
 ### Risks / Notes
 - F022 accepted. The `click.__version__` check emits a deprecation warning, but it does not affect packaging or runtime behavior.
+
+## 2026-06-06 13:35 — Phase 5: F023 — CLI Help Command Verification
+
+### Completed
+- Verified `voice-claude-agent --help` lists all 7 commands: check, demo-text, run-text, record, voice, demo-voice, wake.
+- Matches the `[project.scripts]` entry point `voice-claude-agent = "voice_claude_agent.cli:main"` in pyproject.toml.
+- Zero code changes — `--help` output was already correct.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh test` passed: 55/55
+- `./init.sh lint` passed
+- `voice-claude-agent --help` — all 7 commands present
+
+### Files Changed
+- feature_list.json (F023 passes=true with evidence)
+- agent-progress.md (this entry)
+
+### Next Recommended Task
+- F024: verify wake loop prints per-iteration status (waiting, woke, recording, transcript, summary).
+
+### Risks / Notes
+- None. F023 required zero code changes.
+
+## 2026-06-06 13:45 — Codex Review: F023 Verification
+
+### Completed
+- Reviewed Claude commit `ebf6a1f`.
+- Confirmed only F023 was marked `passes=true`; F024-F031 remain pending.
+- Verified `.venv/bin/voice-claude-agent --help` lists all 7 expected commands.
+- Reordered progress log so Codex F022 review appears before F023 work.
+
+### Verification
+- `.venv/bin/voice-claude-agent --help` passed
+- `./init.sh test` passed: 55 passed
+- `./init.sh lint` passed
+
+### Files Changed
+- agent-progress.md
+
+### Next Recommended Task
+- F024: verify wake loop per-iteration status output with `wake --fake --once`.
+
+### Risks / Notes
+- F023 accepted. F024 should focus only on status output evidence and should not mark later UX items as passed.
