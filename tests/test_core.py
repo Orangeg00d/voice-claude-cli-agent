@@ -251,6 +251,21 @@ class TestClaudeRunnerResult:
             assert result.stdout == "All done."
             assert result.timed_out is False
 
+    def test_run_claude_uses_utf8_replace_decoding(self):
+        fake_proc = mock.MagicMock()
+        fake_proc.returncode = 0
+        fake_proc.stdout = "中文 output"
+        fake_proc.stderr = ""
+        with mock.patch("subprocess.run", return_value=fake_proc) as run_mock:
+            result = run_claude("test", timeout=5)
+
+        assert result.exit_code == 0
+        assert result.stdout == "中文 output"
+        run_mock.assert_called_once()
+        kwargs = run_mock.call_args.kwargs
+        assert kwargs["encoding"] == "utf-8"
+        assert kwargs["errors"] == "replace"
+
     def test_run_claude_timeout(self):
         import subprocess
 

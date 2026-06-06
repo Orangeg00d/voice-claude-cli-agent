@@ -1351,6 +1351,29 @@
 - src/voice_claude_agent/app.py
 - agent-progress.md
 
+## 2026-06-06 23:03 — Codex Review: Claude Output Decode Failure In Menu App
+
+### Finding
+- After the stuck-recording fix, user confirmed the app no longer stuck and recorded audio.
+- `agent_state/app-events.log` showed:
+  - `record_done bytes=162330`
+  - `stt_done transcript='Now you can go back to me, ok?'`
+  - `claude_start`
+  - `record_cycle_error UnicodeDecodeError: 'ascii' codec can't decode byte 0xe5...`
+- Root cause: `subprocess.run(..., text=True)` in `run_claude()` used the menu app's locale default encoding, which can be ASCII in py2app launch context.
+
+### Completed
+- Updated `run_claude()` to pass `encoding="utf-8"` and `errors="replace"` to `subprocess.run`.
+- Added a regression test asserting Claude subprocess output uses UTF-8 replacement decoding.
+
+### Verification
+- Focused Claude runner tests passed.
+
+### Files Changed
+- src/voice_claude_agent/claude_runner.py
+- tests/test_core.py
+- agent-progress.md
+
 ## 2026-06-06 22:37 — Codex Review: F042 Runtime Bootstrap Correction
 
 ### Finding
