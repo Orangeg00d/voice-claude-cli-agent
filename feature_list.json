@@ -318,8 +318,8 @@
         "Verify [1] Transcript: ... appears",
         "Verify Summary line appears before exit"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "voice-claude-agent wake --fake --once output contains: [1] Waiting for wake trigger..., [1] Woke! Recording..., [1] Transcript: 请回复 OK, Summary: Claude CLI 执行成功, Wake loop stopped after 1 iteration(s). All 5 status lines verified."
     },
     {
       "id": "F025",

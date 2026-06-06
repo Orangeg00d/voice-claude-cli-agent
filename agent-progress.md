@@ -421,6 +421,32 @@
 ### Risks / Notes
 - None. F023 required zero code changes.
 
+## 2026-06-06 14:00 — Phase 5: F024 — Wake Loop Status Output Verification
+
+### Completed
+- Verified `voice-claude-agent wake --fake --once` prints all per-iteration status lines:
+  - `[1] Waiting for wake trigger...`
+  - `[1] Woke! Recording...`
+  - `[1] Transcript: 请回复 OK`
+  - `Summary: Claude CLI 执行成功，耗时 4 秒。完整输出：OK`
+  - `Wake loop stopped after 1 iteration(s).`
+- Zero code changes — output was already complete.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh lint` passed
+- `voice-claude-agent wake --fake --once` — all 5 status lines confirmed
+
+### Files Changed
+- feature_list.json (F024 passes=true with evidence)
+- agent-progress.md (this entry)
+
+### Next Recommended Task
+- F025: verify wake loop handles empty/broken audio without crashing.
+
+### Risks / Notes
+- None.
+
 ## 2026-06-06 13:45 — Codex Review: F023 Verification
 
 ### Completed
