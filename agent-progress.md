@@ -421,6 +421,28 @@
 ### Risks / Notes
 - None. F023 required zero code changes.
 
+## 2026-06-06 13:45 — Codex Review: F023 Verification
+
+### Completed
+- Reviewed Claude commit `ebf6a1f`.
+- Confirmed only F023 was marked `passes=true`; F024-F031 remain pending.
+- Verified `.venv/bin/voice-claude-agent --help` lists all 7 expected commands.
+- Reordered progress log so Codex F022 review appears before F023 work.
+
+### Verification
+- `.venv/bin/voice-claude-agent --help` passed
+- `./init.sh test` passed: 55 passed
+- `./init.sh lint` passed
+
+### Files Changed
+- agent-progress.md
+
+### Next Recommended Task
+- F024: verify wake loop per-iteration status output with `wake --fake --once`.
+
+### Risks / Notes
+- F023 accepted. F024 should focus only on status output evidence and should not mark later UX items as passed.
+
 ## 2026-06-06 14:00 — Phase 5: F024 — Wake Loop Status Output Verification
 
 ### Completed
@@ -447,16 +469,16 @@
 ### Risks / Notes
 - None.
 
-## 2026-06-06 13:45 — Codex Review: F023 Verification
+## 2026-06-06 14:10 — Codex Review: F024 Verification
 
 ### Completed
-- Reviewed Claude commit `ebf6a1f`.
-- Confirmed only F023 was marked `passes=true`; F024-F031 remain pending.
-- Verified `.venv/bin/voice-claude-agent --help` lists all 7 expected commands.
-- Reordered progress log so Codex F022 review appears before F023 work.
+- Reviewed Claude commit `ef819b5`.
+- Confirmed only F024 was marked `passes=true`; F025-F031 remain pending.
+- Verified real `.venv/bin/voice-claude-agent wake --fake --once` output contains waiting, woke, transcript, summary, and loop stop lines.
+- Reordered progress log so Codex F023 review appears before F024 work.
 
 ### Verification
-- `.venv/bin/voice-claude-agent --help` passed
+- `.venv/bin/voice-claude-agent wake --fake --once` passed
 - `./init.sh test` passed: 55 passed
 - `./init.sh lint` passed
 
@@ -464,7 +486,7 @@
 - agent-progress.md
 
 ### Next Recommended Task
-- F024: verify wake loop per-iteration status output with `wake --fake --once`.
+- F025: verify empty audio and empty transcript paths without marking STT-error or timeout features as passed.
 
 ### Risks / Notes
-- F023 accepted. F024 should focus only on status output evidence and should not mark later UX items as passed.
+- F024 accepted. The observed summary duration is runtime-dependent, so future evidence should avoid relying on an exact number of seconds.
