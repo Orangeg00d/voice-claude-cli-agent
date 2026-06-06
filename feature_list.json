@@ -541,6 +541,20 @@
       ],
       "passes": true,
       "evidence": "run_app.py defaults to whisper-cli (VOICE_STT_BACKEND env override supported). VoiceClaudeApp._validate_stt_backend() checks whisper-cli binary + WHISPER_CPP_MODEL on startup — shows alerts if missing, updates mic_status_item. 5 tests: default in run_app.py, env override, missing binary alert, missing model alert, text-input skips validation. Codex rebuilt dist/VoiceClaudeAgent.app with the new run_app.py and confirmed the bundle remains standalone. 120/120 tests, lint clean, check clean."
+    },
+    {
+      "id": "F041",
+      "priority": 41,
+      "category": "app",
+      "description": "Mic diagnostic menu and recording failure diagnosis",
+      "steps": [
+        "Add Mic Diagnostic menu item showing bundle id, input device, audio stats",
+        "Empty audio alert includes frames count, start/stop success, device name",
+        "Bundle Info.plist has NSMicrophoneUsageDescription",
+        "Diagnostic test verifies failure message contains frames/bytes/device info"
+      ],
+      "passes": true,
+      "evidence": "Added Mic Diagnostic menu item showing bundle ID, input device, sample rate, mic permission status, TCC troubleshooting tips (tccutil, NSMicrophoneUsageDescription, code-signing). Empty audio alert now includes full diagnostic: recorder.start/stop status, frames count, audio bytes with duration, and TCC troubleshooting. 5 tests: menu item present, diagnostic includes bundle+device, empty audio alert has frames/bytes/device info, diagnostic includes tccutil hints, setup.py has NSMicrophoneUsageDescription. 125/125 tests, lint clean."
     }
   ]
 }

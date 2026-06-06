@@ -20,11 +20,12 @@ class VoiceClaudeApp(rumps.App):
     """macOS menu bar app for Voice Claude Agent.
 
     Menu items:
-      Start Wake      — begins the continuous wake loop
-      Stop Wake       — stops the wake loop
-      Trigger Record  — fires a single record → STT → Claude → TTS cycle
-      Mic Status      — shows current microphone permission
-      Quit            — exits the application (stops wake loop first)
+      Start Wake        — begins the continuous wake loop
+      Stop Wake         — stops the wake loop
+      Trigger Recording — fires a single record → STT → Claude → TTS cycle
+      Mic Diagnostic    — shows detailed mic/recording diagnostic info
+      Mic Status        — shows current microphone permission
+      Quit              — exits the application (stops wake loop first)
     """
 
     DEFAULT_RECORD_SECONDS = 5
@@ -47,17 +48,18 @@ class VoiceClaudeApp(rumps.App):
         self._wake_target = _wake_target or self._run_wake_loop
         self._alert = _alert_patch or self._rumps_alert
 
-        # State
         self._wake_active = False
         self._wake_event = threading.Event()
         self._trigger_event = threading.Event()
         self._wake_thread: threading.Thread | None = None
 
-        # Stable MenuItem refs
         self.start_item = rumps.MenuItem("Start Wake", callback=self._start_wake)
         self.stop_item = rumps.MenuItem("Stop Wake", callback=self._stop_wake)
         self.trigger_item = rumps.MenuItem(
             "Trigger Recording", callback=self._trigger_recording
+        )
+        self.diagnostic_item = rumps.MenuItem(
+            "Mic Diagnostic", callback=self._run_mic_diagnostic
         )
         self.mic_status_item = rumps.MenuItem(
             "Mic Status: checking...", callback=self._refresh_mic_status_event
@@ -69,6 +71,7 @@ class VoiceClaudeApp(rumps.App):
             self.stop_item,
             self.trigger_item,
             None,
+            self.diagnostic_item,
             self.mic_status_item,
             None,
             self.quit_item,
@@ -76,22 +79,13 @@ class VoiceClaudeApp(rumps.App):
 
         self._update_mic_status()
         self._sync_menu_titles()
-
-        # Validate STT backend on startup
         self._validate_stt_backend()
 
     # ── STT backend validation ───────────────────────────────
 
     def _validate_stt_backend(self) -> None:
-        """Check that the configured STT backend is usable.
-
-        For whisper-cli: verify binary + model. Shows alert + updates
-        mic_status_item with a specific error message on failure.
-        Does NOT crash — the app stays alive.
-        """
         if self.stt_backend != "whisper-cli":
             return
-
         from voice_claude_agent.stt import _find_whisper_cpp_binary, _resolve_whisper_model
 
         binary = _find_whisper_cpp_binary()
@@ -107,7 +101,6 @@ class VoiceClaudeApp(rumps.App):
                 ),
             )
             return
-
         model, model_err = _resolve_whisper_model()
         if model is None:
             self.mic_status_item.title = "STT: model not found"
@@ -119,7 +112,6 @@ class VoiceClaudeApp(rumps.App):
                     "or set VOICE_STT_BACKEND=text-input and restart."
                 ),
             )
-            return
 
     # ── Mic permission helpers ────────────────────────────────
 
@@ -153,6 +145,48 @@ class VoiceClaudeApp(rumps.App):
             )
             return False
         return True
+
+    # ── Mic Diagnostic ───────────────────────────────────────
+
+    def _run_mic_diagnostic(self, sender: rumps.MenuItem) -> None:
+        """Run a full mic/recording diagnostic and show the results in an alert."""
+        import platform
+
+        lines = ["=== Mic Diagnostic ===", ""]
+
+        # Bundle / app info
+        lines.append("Bundle ID: com.voiceclaude.agent")
+        lines.append(f"Python: {platform.python_version()}")
+
+        # Input device info
+        device_name = "unknown"
+        try:
+            import sounddevice as sd
+            default_input = sd.query_devices(kind="input")
+            device_name = default_input.get("name", "unknown")
+            lines.append(f"Default input device: {device_name}")
+            lines.append(f"Input channels: {default_input.get('max_input_channels', '?')}")
+            lines.append(f"Default sample rate: {default_input.get('default_samplerate', '?')} Hz")
+        except Exception as e:
+            lines.append(f"sounddevice query error: {e}")
+
+        lines.append("")
+
+        # TCC / permission info
+        has_mic, detail = check_mic_permission()
+        lines.append(f"Mic permission check: {'ACCESSIBLE' if has_mic else 'DENIED'}")
+        if detail:
+            lines.append(f"  Detail: {detail}")
+
+        lines.append("")
+        lines.append("If the .app does not appear in System Settings > Privacy & Security > Microphone:")
+        lines.append("- The bundle must contain NSMicrophoneUsageDescription in Info.plist")
+        lines.append("- The .app must be code-signed (ad-hoc is sufficient for TCC)")
+        lines.append("- The .app must be launched from /Applications, ~/Applications, or via Finder")
+        lines.append("- Running directly from dist/ or Terminal may not register TCC")
+        lines.append("- Use: 'tccutil reset Microphone com.voiceclaude.agent' to reset permissions")
+
+        self._alert(title="Mic Diagnostic", message="\n".join(lines))
 
     # ── Menu title sync ──────────────────────────────────────
 
@@ -192,11 +226,9 @@ class VoiceClaudeApp(rumps.App):
         self._sync_menu_titles()
 
     def _trigger_recording(self, sender: rumps.MenuItem) -> None:
-        """Single-cycle trigger, gated on mic permission."""
         self._update_mic_status()
         if not self._check_mic_or_alert():
             return
-
         if not self._wake_active:
             self._wake_active = True
             self._wake_event.clear()
@@ -229,32 +261,27 @@ class VoiceClaudeApp(rumps.App):
     # ── Non-interactive recording (NO input()) ───────────────
 
     def _record_and_execute(self) -> None:
-        """One full cycle: record N seconds → STT → Claude → TTS → log.
-
-        Uses time-based recording (DEFAULT_RECORD_SECONDS) instead of input().
-        Menu status updates at each stage so the user sees progress.
-        """
         from voice_claude_agent.cli import _run_pipeline
         from voice_claude_agent.stt import RecordingTranscriber
 
-        # 1. Open mic
         recorder = self._open_mic_or_alert()
         if recorder is None:
             return
 
-        # 2. Record
         self.trigger_item.title = "Recording..."
-        audio = self._record_fixed_duration(recorder)
+        audio, diag = self._record_fixed_duration_with_diag(recorder)
         if not audio:
             self.mic_status_item.title = "Mic: No audio captured"
             self.trigger_item.title = "Trigger Recording"
             self._alert(
                 title="No Audio",
-                message="No audio was captured. Check your microphone connection.",
+                message=(
+                    "No audio was captured. Check your microphone connection.\n\n"
+                    f"{diag}"
+                ),
             )
             return
 
-        # 3. STT
         self.trigger_item.title = "Transcribing..."
         transcriber = RecordingTranscriber(backend=self.stt_backend)
         transcript = transcriber.transcribe(audio)
@@ -271,23 +298,16 @@ class VoiceClaudeApp(rumps.App):
         if transcript.startswith("[STT error:"):
             self.mic_status_item.title = "Mic: STT Error"
             self.trigger_item.title = "Trigger Recording"
-            self._alert(
-                title="STT Error",
-                message=transcript,
-            )
+            self._alert(title="STT Error", message=transcript)
             return
 
-        # 4. Claude pipeline
         self.trigger_item.title = "Running Claude..."
         _run_pipeline(transcript, input_mode="voice", tts_fake=False)
 
-        # 5. Done
         self.trigger_item.title = "Done ✓"
-        # Reset after a short visible delay
         threading.Timer(1.5, lambda: setattr(self.trigger_item, "title", "Trigger Recording")).start()
 
     def _open_mic_or_alert(self):
-        """Open the sounddevice recorder. Returns recorder or None (with alert)."""
         from voice_claude_agent.cli import _safe_real_recorder
 
         recorder = _safe_real_recorder()
@@ -304,24 +324,58 @@ class VoiceClaudeApp(rumps.App):
             return None
         return recorder
 
-    def _record_fixed_duration(self, recorder) -> bytes:
-        """Record for DEFAULT_RECORD_SECONDS. Returns audio bytes or empty."""
+    def _record_fixed_duration_with_diag(self, recorder) -> tuple[bytes, str]:
+        """Record for DEFAULT_RECORD_SECONDS. Returns (audio_bytes, diagnostic_string)."""
+        diag_parts = []
+        device_name = "unknown"
+
+        try:
+            import sounddevice as sd
+            dev = sd.query_devices(kind="input")
+            device_name = dev.get("name", "unknown")
+        except Exception as e:
+            device_name = f"query error: {e}"
+        diag_parts.append(f"Input device: {device_name}")
+
+        frames_count = 0
+        audio_len = 0
+
         try:
             recorder.start()
         except Exception as e:
-            self.mic_status_item.title = f"Mic: start error ({e})"
-            return b""
+            diag_parts.append(f"recorder.start: FAILED ({e})")
+            return b"", "\n".join(diag_parts)
+
+        diag_parts.append("recorder.start: OK")
 
         time.sleep(self.DEFAULT_RECORD_SECONDS)
 
         try:
             recorder.stop()
         except Exception as e:
-            self.mic_status_item.title = f"Mic: stop error ({e})"
-            return b""
+            diag_parts.append(f"recorder.stop: FAILED ({e})")
+            return b"", "\n".join(diag_parts)
+
+        diag_parts.append("recorder.stop: OK")
+
+        if hasattr(recorder, "_frames"):
+            frames_count = len(recorder._frames)
+        diag_parts.append(f"Frames captured: {frames_count}")
 
         audio = recorder.get_audio()
-        return audio or b""
+        audio_len = len(audio)
+        diag_parts.append(f"Audio bytes: {audio_len} ({audio_len / 2 / 16000:.1f}s at 16kHz)")
+
+        if not audio:
+            diag_parts.append("RESULT: EMPTY AUDIO")
+            diag_parts.append("")
+            diag_parts.append("Possible causes:")
+            diag_parts.append("- Mic permission denied for bundle. Check System Settings > Privacy & Security > Microphone.")
+            diag_parts.append("- Bundle ID is com.voiceclaude.agent — verify this appears in the mic permissions list.")
+            diag_parts.append("- If built via py2app, ensure NSMicrophoneUsageDescription is in Info.plist.")
+            diag_parts.append("- The .app must be code-signed (ad-hoc is fine).")
+
+        return audio, "\n".join(diag_parts)
 
 
 def launch_app(stt_backend: str = "text-input") -> None:

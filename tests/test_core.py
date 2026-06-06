@@ -1506,9 +1506,12 @@ class TestAppSTTBackendPassthrough:
             "voice_claude_agent.cli._run_pipeline",
             _mock.Mock(),
         )
+        # Mock SafeRecorder so _record_fixed_duration_with_diag handles the mock
+        mock_recorder = _mock.MagicMock()
+        mock_recorder.get_audio.return_value = b"test audio data"
         monkeypatch.setattr(
             "voice_claude_agent.cli._safe_real_recorder",
-            _mock.Mock(return_value=_mock.Mock()),
+            _mock.Mock(return_value=mock_recorder),
         )
         monkeypatch.setattr(
             "voice_claude_agent.cli._safe_record_attempt",
@@ -1851,13 +1854,13 @@ class TestNonInteractiveRecording:
         ]
         code = "\n".join(code_lines)
         assert "input(" not in code, "_record_and_execute must not use input()"
-        src2 = inspect.getsource(VoiceClaudeApp._record_fixed_duration)
+        src2 = inspect.getsource(VoiceClaudeApp._record_fixed_duration_with_diag)
         code2_lines = [
             line for line in src2.split("\n")
             if "input(" not in line or not line.strip().startswith("#")
         ]
         code2 = "\n".join(code2_lines)
-        assert "input(" not in code2, "_record_fixed_duration must not use input()"
+        assert "input(" not in code2, "_record_fixed_duration_with_diag must not use input()"
 
     def test_stage_titles_update_during_cycle(self, monkeypatch):
         """Trigger Recording menu item title should change through stages."""
@@ -2072,4 +2075,88 @@ class TestDefaultWhisperBackend:
             stt_backend="text-input",
             _alert_patch=lambda **kw: alerts.append(kw),
         )
-        assert len(alerts) == 0
+
+
+# ── F041: Mic Diagnostic & Recording Failure Info ───────────
+class TestMicDiagnostic:
+    def test_diagnostic_menu_item_present(self):
+        """Menu should contain 'Mic Diagnostic' item."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        titles = set()
+        for m in app.menu:
+            if m is not None:
+                t = m.title
+                if callable(t):
+                    titles.add(t())
+                else:
+                    titles.add(str(t))
+        assert "Mic Diagnostic" in titles
+
+    def test_diagnostic_includes_bundle_and_device_info(self):
+        """_run_mic_diagnostic alert should include bundle ID and device info."""
+        alerts = []
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._run_mic_diagnostic(app.diagnostic_item)
+
+        assert len(alerts) == 1
+        assert alerts[0]["title"] == "Mic Diagnostic"
+        msg = alerts[0]["message"]
+        assert "com.voiceclaude.agent" in msg
+        assert "sounddevice" in msg.lower() or "python" in msg.lower()
+        assert "Mic permission check" in msg
+
+    def test_empty_audio_alert_includes_diagnostic_info(self, monkeypatch):
+        """When recording returns empty audio, the alert must include diagnostic fields."""
+        import voice_claude_agent.app as app_mod
+
+        alerts = []
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "DEFAULT_RECORD_SECONDS", 0.01)
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+
+        # Recorder returns empty audio
+        mock_rec = mock.MagicMock()
+        mock_rec.get_audio.return_value = b""
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            mock.MagicMock(return_value=mock_rec),
+        )
+
+        app._record_and_execute()
+
+        # Should have a "No Audio" alert with diagnostic details
+        no_audio = [a for a in alerts if a["title"] == "No Audio"]
+        assert len(no_audio) >= 1
+        msg = no_audio[0]["message"]
+        assert "Input device" in msg
+        assert "Frames captured" in msg
+        assert "Audio bytes" in msg
+        assert "recorder.start" in msg
+        assert "recorder.stop" in msg
+
+    def test_diagnostic_includes_tcc_troubleshooting(self):
+        """_run_mic_diagnostic should include TCC/gatekeeper troubleshooting tips."""
+        alerts = []
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._run_mic_diagnostic(app.diagnostic_item)
+
+        msg = alerts[0]["message"]
+        assert "tccutil" in msg
+        assert "NSMicrophoneUsageDescription" in msg
+
+    def test_bundle_info_plist_has_mic_key(self):
+        """setup.py plist should include NSMicrophoneUsageDescription."""
+        setup_py = Path(__file__).resolve().parent.parent / "setup.py"
+        content = setup_py.read_text()
+        assert "NSMicrophoneUsageDescription" in content

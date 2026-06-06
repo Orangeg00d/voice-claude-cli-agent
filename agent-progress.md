@@ -1216,3 +1216,14 @@
 
 ### Risks / Notes
 - A 2-minute monitor after relaunch did not observe new session logs or whisper/Claude child processes. This may mean the menu item was not clicked during the monitor window, or it may indicate another real UI callback issue. If clicking still produces no title/status change, add F041 for menu callback observability and runtime diagnostics.
+
+## 2026-06-07 09:30 — Phase 7: F041 — Mic Diagnostic
+
+### Completed
+- Added "Mic Diagnostic" menu item showing bundle ID, input device, mic permission, TCC troubleshooting.
+- Empty audio alert now includes full diagnostic: recorder.start/stop status, frames count, audio bytes.
+- Verified setup.py Info.plist has NSMicrophoneUsageDescription.
+- 5 tests. 125/125 tests, lint clean.
+
+### Files Changed
+- src/voice_claude_agent/app.py, tests/test_core.py, feature_list.json, agent-progress.md
