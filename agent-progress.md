@@ -849,6 +849,30 @@
 
 ### Risks / Notes
 - F033 is now fully event-driven — ready for headless operation. No more input() blocking.
+
+## 2026-06-06 19:43 — Codex Review: F033 Verification
+
+### Completed
+- Reviewed Claude commits `bea1098` and `62ecd8a`.
+- Confirmed F033 no longer uses `input()` in the menu bar wake loop.
+- Confirmed the app now exposes a stable "Trigger Recording" menu item backed by `_trigger_event`.
+- Confirmed `_stop_wake` sets both `_wake_event` and `_trigger_event`, so a waiting loop can unblock and exit.
+- Confirmed F034-F038 remain pending.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh lint` passed
+- `./init.sh test` passed: 91 passed
+
+### Files Changed
+- agent-progress.md
+
+### Next Recommended Task
+- F034: verify the menu bar wake loop respects the selected `--stt-backend` and `WHISPER_CPP_MODEL`.
+
+### Risks / Notes
+- F033 accepted. Real microphone behavior still needs later manual testing in the running menu bar app, but the start/stop/trigger lifecycle is now event-driven and test-covered.
+
 - Found existing tests depended on real macOS microphone / Apple Speech behavior and could hang or vary by machine.
 - Codex added deterministic tests for Apple Speech Dictation OFF and ON status paths by mocking `subprocess.run`.
 - Codex isolated the Darwin microphone permission test from real hardware by mocking `sounddevice.InputStream`.
