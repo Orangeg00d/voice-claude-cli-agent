@@ -6,6 +6,7 @@ import time
 import click
 
 from voice_claude_agent.config import (
+    check_mic_permission,
     find_claude_executable,
     get_agent_state_dir,
 )
@@ -13,10 +14,17 @@ from voice_claude_agent.claude_runner import run_claude
 from voice_claude_agent.logging_store import write_session, write_last_result
 from voice_claude_agent.recorder import SoundDeviceRecorder, FakeRecorder
 from voice_claude_agent.risk import classify_risk, requires_confirmation
-from voice_claude_agent.stt import FakeTranscriber, RecordingTranscriber, TextInputTranscriber
+from voice_claude_agent.stt import (
+    FakeTranscriber,
+    RecordingTranscriber,
+    TextInputTranscriber,
+    list_available_backends,
+)
 from voice_claude_agent.summarizer import summarize
 from voice_claude_agent.tts import MacOSSaySpeaker, FakeSpeaker
 from voice_claude_agent.wake import ManualWakeTrigger
+
+_STT_BACKEND_HELP = "STT backend: text-input (dev), whisper-cli, or apple-speech (macOS)"
 
 
 def _check_dependencies() -> dict:
@@ -30,6 +38,9 @@ def _check_dependencies() -> dict:
         "claude_available": False,
         "claude_version": None,
         "say_available": False,
+        "mic_permission": False,
+        "mic_detail": "",
+        "stt_backends": [],
         "agent_state_dir": str(get_agent_state_dir()),
     }
 
@@ -54,7 +65,37 @@ def _check_dependencies() -> dict:
 
     status["say_available"] = shutil.which("say") is not None
 
+    # Check mic permission
+    status["mic_permission"], status["mic_detail"] = check_mic_permission()
+
+    # List STT backends
+    status["stt_backends"] = list_available_backends()
+
     return status
+
+
+def _warn_mic(permission: bool, detail: str) -> None:
+    """Print a user-friendly warning if mic permission is missing."""
+    if permission:
+        return
+    click.echo(click.style("WARNING: Microphone not available", fg="yellow", bold=True))
+    click.echo(f"  {detail}")
+    click.echo("  Grant permission in: System Settings > Privacy & Security > Microphone")
+    click.echo("  Then restart your terminal and try again.")
+    click.echo()
+
+
+def _safe_real_recorder() -> SoundDeviceRecorder | None:
+    """Create a SoundDeviceRecorder, returning None on failure with a message."""
+    try:
+        return SoundDeviceRecorder()
+    except Exception as e:
+        click.echo(click.style(f"Microphone error: {e}", fg="red"))
+        click.echo(
+            "Check mic permission in System Settings > Privacy & Security > Microphone."
+        )
+        click.echo("Use --fake or --stt-backend text-input for testing without a mic.")
+        return None
 
 
 @click.group()
@@ -64,7 +105,7 @@ def main():
 
 @main.command()
 def check():
-    """Check dependencies and Claude CLI availability."""
+    """Check dependencies, Claude CLI, microphone, and STT backends."""
     status = _check_dependencies()
     click.echo("=== Voice Claude Agent — Dependency Check ===")
     click.echo(f"  Platform:         {status['platform']}")
@@ -77,6 +118,14 @@ def check():
     if status["claude_version"]:
         click.echo(f"  Claude version:   {status['claude_version']}")
     click.echo(f"  macOS say:        {'AVAILABLE' if status['say_available'] else 'NOT FOUND'}")
+    click.echo(
+        f"  Microphone:       {'ACCESSIBLE' if status['mic_permission'] else 'DENIED / UNAVAILABLE'}"
+    )
+    if status["mic_detail"]:
+        click.echo(f"    ({status['mic_detail']})")
+    click.echo(
+        f"  STT backends:     {', '.join(status['stt_backends']) if status['stt_backends'] else 'none'}"
+    )
     click.echo(f"  Agent state dir:  {status['agent_state_dir']}")
 
     all_ok = (
@@ -85,7 +134,10 @@ def check():
         and status["platform"] == "Darwin"
     )
     if all_ok:
-        click.echo("\nAll checks passed.")
+        click.echo("\nAll critical checks passed.")
+        if not status["mic_permission"]:
+            click.echo("Microphone is not available — real voice recording will not work.")
+            click.echo("Use --fake for testing, or grant mic permission in System Settings.")
     else:
         issues = []
         if not status["claude_available"]:
@@ -136,7 +188,9 @@ def _run_pipeline(prompt: str, input_mode: str, tts_fake: bool) -> None:
         confirmation_received = True
 
     # 3. Execute Claude CLI
-    click.echo(f"Running: claude -p \"{prompt[:80]}{'...' if len(prompt) > 80 else ''}\"")
+    click.echo(
+        f"Running: claude -p \"{prompt[:80]}{'...' if len(prompt) > 80 else ''}\""
+    )
     result = run_claude(prompt)
 
     # 4. Summarize
@@ -175,19 +229,28 @@ def _run_pipeline(prompt: str, input_mode: str, tts_fake: bool) -> None:
 
 @main.command()
 @click.option("--duration", "-d", default=5, help="Max recording duration in seconds.")
-def record(duration: int):
-    """Record audio from the microphone (push-to-talk) and print a summary.
+@click.option(
+    "--stt-backend", default="text-input", help=_STT_BACKEND_HELP,
+)
+def record(duration: int, stt_backend: str):
+    """Record audio from the microphone (push-to-talk) and print transcription.
 
-    Press Enter to start recording. Press Enter again to stop and transcribe.
+    Press Enter to start recording. Press Enter again to stop.
     """
-    recorder = SoundDeviceRecorder()
-    transcriber = RecordingTranscriber()
+    permission, detail = check_mic_permission()
+    _warn_mic(permission, detail)
+
+    recorder = _safe_real_recorder()
+    if recorder is None:
+        return
+
+    transcriber = RecordingTranscriber(backend=stt_backend)
+    click.echo(f"STT backend: {stt_backend}")
 
     input("Press Enter to start recording...")
     recorder.start()
     click.echo(f"Recording... (max {duration}s, press Enter to stop)")
 
-    # Wait for stop signal or duration limit
     start = time.monotonic()
     try:
         input()
@@ -199,6 +262,10 @@ def record(duration: int):
 
     recorder.stop()
     audio = recorder.get_audio()
+    if not audio:
+        click.echo(click.style("No audio captured. Check microphone connection.", fg="red"))
+        return
+
     click.echo(f"Recorded {len(audio)} bytes ({len(audio) / 2 / 16000:.1f}s)")
 
     text = transcriber.transcribe(audio)
@@ -208,14 +275,24 @@ def record(duration: int):
 @main.command()
 @click.option("--duration", "-d", default=10, help="Max recording duration in seconds.")
 @click.option("--fake", is_flag=True, help="Use fake recorder for testing.")
-def voice(duration: int, fake: bool):
+@click.option(
+    "--stt-backend", default="text-input", help=_STT_BACKEND_HELP,
+)
+def voice(duration: int, fake: bool, stt_backend: str):
     """Record voice, transcribe, run Claude CLI, and speak the result."""
     if fake:
         recorder = FakeRecorder(b"test audio data")
         transcriber = TextInputTranscriber()
     else:
-        recorder = SoundDeviceRecorder()
-        transcriber = RecordingTranscriber()
+        permission, detail = check_mic_permission()
+        _warn_mic(permission, detail)
+
+        real = _safe_real_recorder()
+        if real is None:
+            return
+        recorder = real
+        transcriber = RecordingTranscriber(backend=stt_backend)
+        click.echo(f"STT backend: {stt_backend}")
 
     if not fake:
         input("Press Enter to start recording...")
@@ -227,6 +304,11 @@ def voice(duration: int, fake: bool):
             pass
         recorder.stop()
         audio = recorder.get_audio()
+        if not audio:
+            click.echo(
+                click.style("No audio captured. Check microphone connection.", fg="red")
+            )
+            return
         click.echo(f"Recorded {len(audio)} bytes ({len(audio) / 2 / 16000:.1f}s)")
     else:
         audio = recorder.get_audio()
@@ -257,7 +339,10 @@ def demo_voice(stub_text: str):
 @main.command()
 @click.option("--fake", is_flag=True, help="Use fake recorder/STT for testing.")
 @click.option("--once", is_flag=True, help="Run one iteration and exit (no loop).")
-def wake(fake: bool, once: bool):
+@click.option(
+    "--stt-backend", default="text-input", help=_STT_BACKEND_HELP,
+)
+def wake(fake: bool, once: bool, stt_backend: str):
     """Wake loop: wait for trigger → record → STT → Claude CLI → TTS.
 
     Runs in a loop until Ctrl+C. In --fake mode, uses a FakeRecorder
@@ -269,8 +354,15 @@ def wake(fake: bool, once: bool):
         recorder = FakeRecorder(b"stub wake audio")
         transcriber = FakeTranscriber("请回复 OK")
     else:
-        recorder = SoundDeviceRecorder()
-        transcriber = RecordingTranscriber()
+        permission, detail = check_mic_permission()
+        _warn_mic(permission, detail)
+
+        real = _safe_real_recorder()
+        if real is None:
+            return
+        recorder = real
+        transcriber = RecordingTranscriber(backend=stt_backend)
+        click.echo(f"STT backend: {stt_backend}")
 
     click.echo("Voice Claude Agent — Wake Mode")
     click.echo("Press Ctrl+C to exit.")
@@ -293,6 +385,7 @@ def wake(fake: bool, once: bool):
             recorder.start()
             if fake:
                 import time as _time
+
                 _time.sleep(0.5)
             else:
                 click.echo("Press Enter to stop recording...")
@@ -303,12 +396,23 @@ def wake(fake: bool, once: bool):
             recorder.stop()
             audio = recorder.get_audio()
 
+            if not audio and not fake:
+                click.echo(
+                    click.style(
+                        f"[{iteration}] No audio captured. Check microphone.",
+                        fg="red",
+                    )
+                )
+                continue
+
             # 3. STT
             transcript = transcriber.transcribe(audio)
             click.echo(f"[{iteration}] Transcript: {transcript}")
 
             if not transcript.strip():
-                click.echo(f"[{iteration}] No speech detected. Waiting for next wake.")
+                click.echo(
+                    f"[{iteration}] No speech detected. Waiting for next wake."
+                )
                 continue
 
             # 4. Run pipeline

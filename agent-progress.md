@@ -228,6 +228,54 @@
 - Fake wake loop fully verified via CliRunner.
 - The wake command does not yet handle "no speech" gracefully in fake mode (it always gets a transcript). Fine for MVP.
 
+## 2026-06-06 Codex Review: Phase 3 Accepted
+
+### Completed
+- Verified commit `de4459c`: `wake` command with `--fake`/`--once` + 3 tests.
+- Verified F016–F018 marked `passes=true`.
+- `./init.sh check` / `test` / `lint` all pass.
+- `voice-claude-agent wake --fake --once` runs one full pipeline iteration.
+
+### Files Changed
+- agent-progress.md only.
+
+### Next Recommended Task
+- Phase 4: Focus on real mic permission check, STT backend selection (whisper-cli, apple-speech), and user-facing error messages when recording fails.
+
+## 2026-06-06 11:30 — Phase 4: Mic Permission Check & STT Backend Selection
+
+### Completed
+- Added `check_mic_permission()` to config.py — probes sounddevice InputStream, returns (bool, detail).
+- Added `check_apple_speech_available()` to config.py.
+- Enhanced check command: shows Microphone status (ACCESSIBLE / DENIED / UNAVAILABLE) and available STT backends.
+- Rewrote stt.py: added `apple-speech` backend (macOS dictation via osascript), `whisper-cli` with WAV conversion + timeout handling, `list_available_backends()`, `_pcm_to_wav()` helper.
+- Hardened CLI real-recording paths: `_warn_mic()` prints yellow warning with System Settings path, `_safe_real_recorder()` returns None on PortAudio error instead of crashing, `voice`/`wake`/`record` all gate on mic availability.
+- Added `--stt-backend` option to `record`, `voice`, and `wake` commands.
+- Added 10 new tests: mic permission check, STT backend listing, apple-speech transcription, unknown backend handling, warn mic UX, check command output, safe recorder error path.
+- Added F019–F021 Phase 4 features (all passes=true).
+
+### Verification
+- `./init.sh check` passed — shows Microphone ACCESSIBLE, STT backends: text-input, whisper-cli, apple-speech
+- `./init.sh test` passed: 51/51
+- `ruff check src/ tests/` all clean
+- `voice-claude-agent check` — mic status and STT backends displayed correctly
+
+### Files Changed
+- src/voice_claude_agent/config.py (added check_mic_permission, check_apple_speech_available)
+- src/voice_claude_agent/stt.py (rewritten: apple-speech backend, _pcm_to_wav, list_available_backends)
+- src/voice_claude_agent/cli.py (check enhanced, _warn_mic, _safe_real_recorder, --stt-backend on record/voice/wake)
+- tests/test_core.py (added 10 Phase 4 tests: TestMicPermission, TestSTTBackends, TestRecordingErrorUX)
+- feature_list.json (added F019–F021, all passes=true)
+- agent-progress.md (this entry)
+
+### Next Recommended Task
+- macOS menu bar app (rumps/PyObjC). Package the agent as a .app bundle. Let the user start/stop the wake loop from the menu bar.
+
+### Risks / Notes
+- Real Apple Speech dictation requires "Enable Dictation" in System Settings. The apple-speech backend detects this and prints a clear error if disabled.
+- whisper-cli backend requires a whisper.cpp binary installed separately. The backend detects missing binary and returns an actionable error.
+- SoundDeviceRecorder construction doesn't throw — mic errors surface at `.start()` time. _safe_real_recorder handles this via the constructor itself (catches PortAudioError from sd.InputStream probe in check_mic_permission).
+
 ## 2026-06-06 11:08 — Codex Review: Phase 3 Verification
 
 ### Completed

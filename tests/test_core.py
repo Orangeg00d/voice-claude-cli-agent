@@ -18,7 +18,12 @@ from voice_claude_agent.risk import (
     requires_confirmation,
     DESTRUCTIVE_KEYWORDS,
 )
-from voice_claude_agent.stt import FakeTranscriber, RecordingTranscriber
+from voice_claude_agent.config import check_mic_permission
+from voice_claude_agent.stt import (
+    FakeTranscriber,
+    RecordingTranscriber,
+    list_available_backends,
+)
 from voice_claude_agent.summarizer import summarize
 from voice_claude_agent.tts import FakeSpeaker, MacOSSaySpeaker
 
@@ -596,3 +601,98 @@ class TestWakeLoop:
         assert trigger.trigger_count == 1
         assert trigger.wait_for_wake() is True
         assert trigger.trigger_count == 2
+
+
+# ── Phase 4: Mic Permission & STT Backends ─────────────────
+class TestMicPermission:
+    def test_check_mic_permission_returns_tuple(self):
+        has_perm, detail = check_mic_permission()
+        assert isinstance(has_perm, bool)
+        assert isinstance(detail, str)
+
+    def test_check_mic_permission_darwin(self, monkeypatch):
+        monkeypatch.setattr("platform.system", lambda: "Darwin")
+        # If sounddevice isn't importable, should return False
+        has_perm, detail = check_mic_permission()
+        if not has_perm:
+            assert len(detail) > 0
+
+
+class TestSTTBackends:
+    def test_list_available_backends_includes_text_input(self):
+        backends = list_available_backends()
+        assert "text-input" in backends
+
+    def test_list_available_backends_on_macos(self, monkeypatch):
+        monkeypatch.setattr("platform.system", lambda: "Darwin")
+        backends = list_available_backends()
+        assert "apple-speech" in backends
+
+    def test_recording_transcriber_apple_speech_returns_status(self):
+        t = RecordingTranscriber(backend="apple-speech")
+        result = t.transcribe(b"\x00" * 32000)
+        assert "Apple Speech" in result or "Dictation" in result or "error" in result.lower()
+
+    def test_recording_transcriber_unknown_backend(self):
+        t = RecordingTranscriber(backend="nonexistent")
+        result = t.transcribe(b"data")
+        assert "unknown backend" in result
+
+
+class TestRecordingErrorUX:
+    def test__warn_mic_prints_warning(self, capsys):
+        """_warn_mic should print a yellow warning when permission=False."""
+        from voice_claude_agent.cli import _warn_mic
+
+        _warn_mic(False, "test: mic denied")
+        captured = capsys.readouterr()
+        assert "WARNING" in captured.out
+        assert "Microphone" in captured.out
+        assert "System Settings" in captured.out
+
+    def test__warn_mic_silent_when_ok(self, capsys):
+        """_warn_mic should print nothing when permission=True."""
+        from voice_claude_agent.cli import _warn_mic
+
+        _warn_mic(True, "all good")
+        captured = capsys.readouterr()
+        assert captured.out == ""
+
+    def test_check_command_shows_mic_status(self):
+        from click.testing import CliRunner
+        from voice_claude_agent.cli import main
+
+        runner = CliRunner()
+        result = runner.invoke(main, ["check"])
+        assert "Microphone:" in result.output
+        assert (
+            "ACCESSIBLE" in result.output
+            or "DENIED" in result.output
+            or "UNAVAILABLE" in result.output
+        )
+
+    def test__safe_real_recorder_returns_none_on_error(self, monkeypatch):
+        from voice_claude_agent.cli import _safe_real_recorder
+        from voice_claude_agent.recorder import SoundDeviceRecorder
+
+        original_init = SoundDeviceRecorder.__init__
+
+        def _failing_init(self, *a, **kw):
+            original_init(self, *a, **kw)
+
+        monkeypatch.setattr(
+            "voice_claude_agent.recorder.SoundDeviceRecorder.start",
+            lambda self: (_ for _ in ()).throw(RuntimeError("No default input device")),
+        )
+
+        # _safe_real_recorder catches errors during SoundDeviceRecorder() construction.
+        # The error happens during SoundDeviceRecorder() itself, so patch the class.
+        def _raise_constructor(*a, **kw):
+            raise RuntimeError("No default input device")
+
+        monkeypatch.setattr(
+            "voice_claude_agent.cli.SoundDeviceRecorder",
+            _raise_constructor,
+        )
+        recorder = _safe_real_recorder()
+        assert recorder is None

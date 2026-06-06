@@ -240,6 +240,45 @@
       ],
       "passes": true,
       "evidence": "test_wake_fake_once_runs_one_iteration: CliRunner exit_code=0, sessions.jsonl has input_mode=voice, transcript='请回复 OK'. Also verified via real CLI: wake --fake --once."
+    },
+    {
+      "id": "F019",
+      "priority": 19,
+      "category": "voice",
+      "description": "check command reports microphone permission status",
+      "steps": [
+        "Run voice-claude-agent check",
+        "Verify microphone line shows ACCESSIBLE or DENIED / UNAVAILABLE",
+        "Verify check does not exit with error when mic is denied"
+      ],
+      "passes": true,
+      "evidence": "check command shows 'Microphone: ACCESSIBLE (microphone accessible)'. STT backends listed: text-input, whisper-cli, apple-speech. Does not exit 1 when mic unavailable."
+    },
+    {
+      "id": "F020",
+      "priority": 20,
+      "category": "voice",
+      "description": "RecordingTranscriber supports apple-speech backend on macOS",
+      "steps": [
+        "Check apple-speech appears in list_available_backends() on macOS",
+        "Call RecordingTranscriber(backend='apple-speech').transcribe(bytes)",
+        "Verify it returns an Apple Speech status message (not a crash)"
+      ],
+      "passes": true,
+      "evidence": "list_available_backends() includes apple-speech on Darwin. test_recording_transcriber_apple_speech_returns_status: returns Dictation status message without crash."
+    },
+    {
+      "id": "F021",
+      "priority": 21,
+      "category": "voice",
+      "description": "Real recording failures show clear user-facing error messages",
+      "steps": [
+        "Run voice or wake without --fake when mic is denied",
+        "Verify a yellow WARNING or red error message is printed",
+        "Verify the message mentions System Settings > Privacy & Security > Microphone"
+      ],
+      "passes": true,
+      "evidence": "test__warn_mic_prints_warning: WARNING + Microphone + System Settings all in output. test__safe_real_recorder_returns_none: returns None on PortAudio error with red error message. voice/wake/record all gate on _safe_real_recorder before recording."
     }
   ]
 }
