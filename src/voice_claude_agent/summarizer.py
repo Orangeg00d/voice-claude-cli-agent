@@ -19,7 +19,7 @@ def summarize(result_text: str, exit_code: int, duration_seconds: float) -> str:
             return f"Claude CLI 执行失败，退出码 {exit_code}，无输出。"
         return f"Claude CLI 执行失败，退出码 {exit_code}。输出预览：{preview}"
 
-    lines = [l for l in result_text.strip().split("\n") if l.strip()]
+    lines = [line for line in result_text.strip().split("\n") if line.strip()]
     if not lines:
         return "Claude CLI 执行完成，但无输出内容。"
 
@@ -27,7 +27,7 @@ def summarize(result_text: str, exit_code: int, duration_seconds: float) -> str:
         return f"Claude CLI 执行成功，耗时 {duration_seconds:.0f} 秒。完整输出：{result_text.strip()}"
 
     first_lines = lines[:3]
-    preview = "\n".join(l.rstrip()[:120] for l in first_lines)
+    preview = "\n".join(line.rstrip()[:120] for line in first_lines)
     return (
         f"Claude CLI 执行成功，耗时 {duration_seconds:.0f} 秒，"
         f"共 {len(result_text)} 字符。开头内容：{preview}"

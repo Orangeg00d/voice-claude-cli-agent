@@ -1,13 +1,9 @@
 """Tests for Voice Claude Agent core modules."""
 
 import json
-import os
 import sys
-import tempfile
 from pathlib import Path
 from unittest import mock
-
-import pytest
 
 # Ensure src is importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
@@ -20,7 +16,6 @@ from voice_claude_agent.risk import (
     classify_risk,
     requires_confirmation,
     DESTRUCTIVE_KEYWORDS,
-    RECOVERABLE_KEYWORDS,
 )
 from voice_claude_agent.summarizer import summarize
 from voice_claude_agent.tts import FakeSpeaker, MacOSSaySpeaker

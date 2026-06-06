@@ -4,6 +4,22 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$PROJECT_ROOT"
 
+if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "$VIRTUAL_ENV/bin/python" ]; then
+  PYTHON="$VIRTUAL_ENV/bin/python"
+elif [ -x "$PROJECT_ROOT/.venv/bin/python" ]; then
+  PYTHON="$PROJECT_ROOT/.venv/bin/python"
+else
+  PYTHON="python3"
+fi
+
+if [ -n "${VIRTUAL_ENV:-}" ] && [ -x "$VIRTUAL_ENV/bin/ruff" ]; then
+  RUFF="$VIRTUAL_ENV/bin/ruff"
+elif [ -x "$PROJECT_ROOT/.venv/bin/ruff" ]; then
+  RUFF="$PROJECT_ROOT/.venv/bin/ruff"
+else
+  RUFF="ruff"
+fi
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -32,7 +48,7 @@ do_check() {
 
   # Python
   local pyver
-  pyver=$(python3 -c "import sys; print(sys.version.split()[0])" 2>/dev/null || echo "")
+  pyver=$("$PYTHON" -c "import sys; print(sys.version.split()[0])" 2>/dev/null || echo "")
   if [ -z "$pyver" ]; then
     say_err "Python 3 not found"
     ok=false
@@ -56,7 +72,7 @@ do_check() {
   fi
 
   # Project package
-  if python3 -c "import voice_claude_agent" 2>/dev/null; then
+  if "$PYTHON" -c "import voice_claude_agent" 2>/dev/null; then
     say_ok "voice_claude_agent package importable"
   else
     say_warn "voice_claude_agent not importable — run './init.sh install'"
@@ -86,7 +102,7 @@ do_test() {
     say_err "pyproject.toml not found — run './init.sh install' first"
     exit 1
   fi
-  python3 -m pytest tests/ -v "$@"
+  "$PYTHON" -m pytest tests/ -v "$@"
 }
 
 # ── demo-text ────────────────────────────────────────────
@@ -95,13 +111,13 @@ do_demo_text() {
   echo "=== Voice Claude Agent — Demo Text ==="
   echo "Prompt: $prompt"
   echo ""
-  python3 -m voice_claude_agent.cli demo-text "$prompt"
+  "$PYTHON" -m voice_claude_agent.cli demo-text "$prompt"
 }
 
 # ── lint ─────────────────────────────────────────────────
 do_lint() {
-  if command -v ruff &>/dev/null; then
-    ruff check src/ tests/ "$@"
+  if command -v "$RUFF" &>/dev/null; then
+    "$RUFF" check src/ tests/ "$@"
   else
     say_warn "ruff not installed — install dev dependencies first"
   fi
@@ -109,8 +125,8 @@ do_lint() {
 
 # ── format ───────────────────────────────────────────────
 do_format() {
-  if command -v ruff &>/dev/null; then
-    ruff format src/ tests/ "$@"
+  if command -v "$RUFF" &>/dev/null; then
+    "$RUFF" format src/ tests/ "$@"
   else
     say_warn "ruff not installed — install dev dependencies first"
   fi

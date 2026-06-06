@@ -2,7 +2,7 @@
 
 import subprocess
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from voice_claude_agent.config import DEFAULT_TIMEOUT_SECONDS
 

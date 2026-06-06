@@ -1,7 +1,5 @@
 """Risk confirmation handler. MVP uses CLI yes/no input."""
 
-import sys
-
 
 def ask_confirmation(prompt: str) -> bool:
     """Ask user to confirm a high-risk action. Returns True if confirmed."""

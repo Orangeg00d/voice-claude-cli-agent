@@ -1,17 +1,14 @@
 """CLI entry point for Voice Claude Agent."""
 
 import sys
-from pathlib import Path
 
 import click
 
 from voice_claude_agent.config import (
     find_claude_executable,
     get_agent_state_dir,
-    get_project_root,
 )
 from voice_claude_agent.claude_runner import run_claude
-from voice_claude_agent.confirmation import confirm_or_reject
 from voice_claude_agent.logging_store import write_session, write_last_result
 from voice_claude_agent.risk import classify_risk, requires_confirmation
 from voice_claude_agent.summarizer import summarize
