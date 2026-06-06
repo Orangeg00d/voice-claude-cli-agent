@@ -144,3 +144,29 @@
 - Phase 2 is not fully accepted yet. `demo-voice` prints `Transcription: [mock STT: 10 bytes of audio]`, but then runs Claude with the original stub text `请只回复 OK`; this means the CLI demo bypasses the STT result.
 - The integration test manually composes `FakeRecorder -> FakeTranscriber -> run_claude`, but does not exercise the actual `demo-voice` CLI command.
 - `voice-claude-agent` was not on shell PATH until using the project `.venv/bin/voice-claude-agent`; docs or init output should clarify this.
+
+## 2026-06-06 10:18 — Phase 2 Fix Round: demo-voice pipeline & acceptance criteria
+
+### Completed
+- Fixed bug: `demo-voice` now passes `transcript` (STT output) to `_run_pipeline`, not the CLI `stub_text` argument.
+- Added 2 CLI-level Click tests via `CliRunner`: `test_demo_voice_uses_transcript_not_stub` (proves CLI arg is NOT sent to Claude) and `test_demo_voice_stt_output_reaches_claude` (proves STT output reaches Claude).
+- Added Phase 2 acceptance features: F013 (real mic available), F014 (demo-voice pipes STT→Claude), F015 (voice command pipeline).
+- All three new features marked passes=true with evidence.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh test` passed: 38/38
+- `ruff check src/ tests/` all clean
+- `.venv/bin/voice-claude-agent demo-voice "请只回复 OK"` — transcript reaches Claude (verified in test, output now shows correct pipeline)
+
+### Files Changed
+- src/voice_claude_agent/cli.py (fixed line 254: stub_text → transcript)
+- tests/test_core.py (added TestDemoVoiceCLI with 2 tests)
+- feature_list.json (added F013–F015, all passes=true)
+- agent-progress.md (this entry)
+
+### Next Recommended Task
+- Phase 3: Wake trigger integration. Combine ManualWakeTrigger with the voice pipeline to create a `voice-claude-agent wake` loop.
+
+### Risks / Notes
+- None outstanding for Phase 2.

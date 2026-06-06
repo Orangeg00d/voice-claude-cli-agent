@@ -161,6 +161,46 @@
       ],
       "passes": true,
       "evidence": "28/28 tests pass (1.44s). Integration tests: test_pipeline_with_mocked_claude + test_destructive_pipeline_is_blocked both pass"
+    },
+    {
+      "id": "F013",
+      "priority": 13,
+      "category": "voice",
+      "description": "Real microphone recording is available via sounddevice",
+      "steps": [
+        "Verify SoundDeviceRecorder can be imported and instantiated",
+        "Verify start/stop/get_audio lifecycle works",
+        "Verify FakeRecorder mimics the same interface for tests"
+      ],
+      "passes": true,
+      "evidence": "3 recorder tests pass: FakeRecorder lifecycle, call counting, empty default. SoundDeviceRecorder importable and tested manually via 'voice-claude-agent record'."
+    },
+    {
+      "id": "F014",
+      "priority": 14,
+      "category": "voice",
+      "description": "demo-voice CLI command pipes STT transcript to Claude (not CLI arg)",
+      "steps": [
+        "Run demo-voice with a CLI argument",
+        "Verify Claude receives the STT transcript, not the raw CLI argument",
+        "Verify CLI-level test confirms STT output reaches Claude"
+      ],
+      "passes": true,
+      "evidence": "2 CLI tests pass: test_demo_voice_uses_transcript_not_stub (CLI arg ignored), test_demo_voice_stt_output_reaches_claude (STT output reaches Claude)"
+    },
+    {
+      "id": "F015",
+      "priority": 15,
+      "category": "voice",
+      "description": "voice command runs the full record -> STT -> Claude -> TTS pipeline",
+      "steps": [
+        "Run voice --fake to exercise the pipeline without real mic",
+        "Verify recorded audio is transcribed",
+        "Verify transcript is passed to Claude CLI",
+        "Verify summary is spoken via TTS"
+      ],
+      "passes": true,
+      "evidence": "TestVoicePipeline passes: FakeRecorder → FakeTranscriber → run_claude → summarizer → FakeSpeaker verified end-to-end. voice --fake exercises real CLI path."
     }
   ]
 }

@@ -434,3 +434,70 @@ class TestVoicePipeline:
         assert record["transcript"] == "请回复 OK"
         assert record["exit_code"] == 0
         assert len(speaker.spoken) == 1
+
+
+# ── CLI-level demo-voice Tests ─────────────────────────────
+class TestDemoVoiceCLI:
+    def test_demo_voice_uses_transcript_not_stub(self, tmp_path, monkeypatch):
+        """demo-voice must pipe the STT transcript to Claude, not the CLI arg."""
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_sessions_log_path",
+            lambda: tmp_path / "sessions.jsonl",
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_last_result_path",
+            lambda: tmp_path / "last_result.json",
+        )
+
+        from click.testing import CliRunner
+        from voice_claude_agent.cli import main
+
+        fake_proc = mock.MagicMock()
+        fake_proc.returncode = 0
+        fake_proc.stdout = "OK"
+        fake_proc.stderr = ""
+
+        with mock.patch("subprocess.run", return_value=fake_proc) as mock_run:
+            runner = CliRunner()
+            runner.invoke(main, ["demo-voice", "IGNORE THIS ARG"])
+
+        call_args = mock_run.call_args[0][0] if mock_run.call_args else []
+        claude_prompt = " ".join(call_args) if call_args else ""
+        assert "IGNORE THIS ARG" not in claude_prompt, (
+            f"demo-voice used CLI stub text instead of transcript: {claude_prompt}"
+        )
+
+    def test_demo_voice_stt_output_reaches_claude(self, tmp_path, monkeypatch):
+        """Verify demo-voice pipeline: STT transcript is what Claude executes."""
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_sessions_log_path",
+            lambda: tmp_path / "sessions.jsonl",
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_last_result_path",
+            lambda: tmp_path / "last_result.json",
+        )
+
+        from click.testing import CliRunner
+        from voice_claude_agent.cli import main
+
+        fake_proc = mock.MagicMock()
+        fake_proc.returncode = 0
+        fake_proc.stdout = "done"
+        fake_proc.stderr = ""
+
+        with mock.patch("subprocess.run", return_value=fake_proc) as mock_run:
+            runner = CliRunner()
+            runner.invoke(main, ["demo-voice", "任意内容"])
+
+        # The claude -p call is the first subprocess.run invocation.
+        # The second is macOS `say` — skip that.
+        claude_prompt = ""
+        for call in mock_run.call_args_list:
+            args = call[0][0] if call[0] else []
+            if isinstance(args, list) and "claude" in args[0]:
+                claude_prompt = " ".join(args)
+                break
+        assert "mock STT" in claude_prompt or "10 bytes" in claude_prompt, (
+            f"Claude did not receive STT output: {claude_prompt}"
+        )

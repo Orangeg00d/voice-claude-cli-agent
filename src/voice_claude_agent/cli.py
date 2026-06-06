@@ -247,11 +247,10 @@ def demo_voice(stub_text: str):
     recorder = FakeRecorder(b"stub audio")
     transcriber = TextInputTranscriber()
 
-    click.echo(f"Stub voice input: '{stub_text}'")
     transcript = transcriber.transcribe(recorder.get_audio())
     click.echo(f"Transcription: {transcript}")
 
-    _run_pipeline(stub_text, input_mode="voice", tts_fake=False)
+    _run_pipeline(transcript, input_mode="voice", tts_fake=False)
 
 
 if __name__ == "__main__":
