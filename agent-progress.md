@@ -174,6 +174,55 @@
 ## 2026-06-06 10:48 — Codex Review: Phase 2 Fix Accepted
 
 ### Completed
+- Verified demo-voice fix (commit `4cc50e8`): Claude now receives the STT transcript.
+- Verified 2 new CLI tests: `test_demo_voice_uses_transcript_not_stub`, `test_demo_voice_stt_output_reaches_claude`.
+- Verified Phase 2 features F013–F015 are `passes=true` with correct evidence.
+- Verified `./init.sh check`, `./init.sh test`, `./init.sh lint` all pass.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh test` passed: 38 passed
+- `./init.sh lint` passed
+
+### Files Changed
+- agent-progress.md
+
+### Next Recommended Task
+- Phase 3: Wake trigger integration as described in agent-progress.md.
+
+### Risks / Notes
+- Phase 3 acceptance features F016–F018 have not yet been added to feature_list.json. Claude should add them before implementing.
+
+## 2026-06-06 11:00 — Phase 3: Wake Loop Integration
+
+### Completed
+- Added `wake` CLI command: loop of wake → record → STT → Claude → TTS.
+- Integrated ManualWakeTrigger with auto_trigger (--fake) and push-to-talk (real).
+- --once flag for single-iteration testing; Ctrl+C for clean loop exit.
+- Added Phase 3 features F016–F018 to feature_list.json.
+- Added 3 wake loop tests: --fake --once, Ctrl+C exit, ManualWakeTrigger auto_trigger.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh test` passed: 41/41
+- `ruff check src/ tests/` all clean
+- `voice-claude-agent wake --fake --once` — full loop runs one iteration, Claude CLI invoked, result spoken
+
+### Files Changed
+- src/voice_claude_agent/cli.py (added wake command)
+- tests/test_core.py (added TestWakeLoop: 3 tests)
+- feature_list.json (added F016–F018, all passes=true)
+- agent-progress.md (this entry)
+
+### Next Recommended Task
+- Phase 4: End-to-end voice closed loop. Polish the real `wake` loop (real mic + RecordingTranscriber). Add macOS mic permission check. Consider whisper.cpp / Apple Speech integration.
+
+### Risks / Notes
+- Real wake loop requires macOS mic permission, tested manually via `voice-claude-agent wake`.
+- Fake wake loop fully verified via CliRunner.
+- The wake command does not yet handle "no speech" gracefully in fake mode (it always gets a transcript). Fine for MVP.
+
+### Completed
 - Reviewed Claude fix commit `4cc50e8`.
 - Confirmed `demo-voice` no longer bypasses the transcriber output.
 - Found one usability issue: `demo-voice "请只回复 OK"` sent mock audio metadata to Claude instead of a useful fake transcript.

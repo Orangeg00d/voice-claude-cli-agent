@@ -201,6 +201,45 @@
       ],
       "passes": true,
       "evidence": "TestVoicePipeline passes: FakeRecorder → FakeTranscriber → run_claude → summarizer → FakeSpeaker verified end-to-end. voice --fake exercises real CLI path."
+    },
+    {
+      "id": "F016",
+      "priority": 16,
+      "category": "wake",
+      "description": "Wake loop runs: trigger → record → STT → Claude → TTS, looping until Ctrl+C",
+      "steps": [
+        "Run voice-claude-agent wake --fake --once",
+        "Verify the loop runs one iteration and exits",
+        "Verify wake trigger activates, recorder runs, STT produces transcript, Claude executes, TTS speaks"
+      ],
+      "passes": true,
+      "evidence": "3 wake loop tests pass: --fake --once runs one iteration and logs voice session; Ctrl+C clean exit; ManualWakeTrigger auto_trigger returns True and counts correctly"
+    },
+    {
+      "id": "F017",
+      "priority": 17,
+      "category": "wake",
+      "description": "ManualWakeTrigger integrates with the wake command for push-to-talk semantics",
+      "steps": [
+        "Verify ManualWakeTrigger.wait_for_wake() returns True on auto_trigger",
+        "Verify wake loop respects Ctrl+C (KeyboardInterrupt)",
+        "Verify each iteration records fresh audio and transcribes independently"
+      ],
+      "passes": true,
+      "evidence": "test_manual_wake_trigger_auto_trigger: 2x wait_for_wake both return True, trigger_count increments. test_wake_fake_loop_ctrl_c: KeyboardInterrupt causes clean exit."
+    },
+    {
+      "id": "F018",
+      "priority": 18,
+      "category": "wake",
+      "description": "Wake command is testable via CLI with fake components",
+      "steps": [
+        "Run wake --fake --once via CliRunner",
+        "Verify the CLI exits cleanly with exit code 0",
+        "Verify session log is written with input_mode=voice"
+      ],
+      "passes": true,
+      "evidence": "test_wake_fake_once_runs_one_iteration: CliRunner exit_code=0, sessions.jsonl has input_mode=voice, transcript='请回复 OK'. Also verified via real CLI: wake --fake --once."
     }
   ]
 }

@@ -516,3 +516,83 @@ class TestDemoVoiceCLI:
         assert "请回复 OK" in claude_prompt, (
             f"Claude did not receive STT output: {claude_prompt}"
         )
+
+
+# ── Phase 3: Wake Loop Tests ──────────────────────────────
+class TestWakeLoop:
+    def test_wake_fake_once_runs_one_iteration(self, tmp_path, monkeypatch):
+        """wake --fake --once should run one full pipeline iteration and exit."""
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_sessions_log_path",
+            lambda: tmp_path / "sessions.jsonl",
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_last_result_path",
+            lambda: tmp_path / "last_result.json",
+        )
+
+        from click.testing import CliRunner
+        from voice_claude_agent.cli import main
+
+        fake_proc = mock.MagicMock()
+        fake_proc.returncode = 0
+        fake_proc.stdout = "OK"
+        fake_proc.stderr = ""
+
+        with mock.patch("subprocess.run", return_value=fake_proc):
+            runner = CliRunner()
+            result = runner.invoke(main, ["wake", "--fake", "--once"])
+
+        assert result.exit_code == 0
+        assert "Wake loop stopped after 1 iteration" in result.output
+        assert (tmp_path / "sessions.jsonl").exists()
+        lines = (tmp_path / "sessions.jsonl").read_text().strip().split("\n")
+        record = json.loads(lines[0])
+        assert record["input_mode"] == "voice"
+        assert record["transcript"] == "请回复 OK"
+
+    def test_wake_fake_loop_ctrl_c_exits_cleanly(self, tmp_path, monkeypatch):
+        """On second iteration, simulate Ctrl+C. Should exit with status 0."""
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_sessions_log_path",
+            lambda: tmp_path / "sessions.jsonl",
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_last_result_path",
+            lambda: tmp_path / "last_result.json",
+        )
+
+        from click.testing import CliRunner
+        from voice_claude_agent.cli import main
+
+        fake_proc = mock.MagicMock()
+        fake_proc.returncode = 0
+        fake_proc.stdout = "OK"
+        fake_proc.stderr = ""
+
+        call_count = 0
+
+        def _side_effect(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count >= 3:
+                raise KeyboardInterrupt()
+            return fake_proc
+
+        with mock.patch("subprocess.run", side_effect=_side_effect):
+            runner = CliRunner()
+            result = runner.invoke(main, ["wake", "--fake"])
+
+        # Should exit cleanly
+        assert "Wake loop stopped" in result.output
+        assert result.exit_code == 0
+
+    def test_manual_wake_trigger_auto_trigger(self):
+        """ManualWakeTrigger with auto_trigger=True returns True immediately."""
+        from voice_claude_agent.wake import ManualWakeTrigger
+
+        trigger = ManualWakeTrigger(auto_trigger=True)
+        assert trigger.wait_for_wake() is True
+        assert trigger.trigger_count == 1
+        assert trigger.wait_for_wake() is True
+        assert trigger.trigger_count == 2

@@ -16,6 +16,7 @@ from voice_claude_agent.risk import classify_risk, requires_confirmation
 from voice_claude_agent.stt import FakeTranscriber, RecordingTranscriber, TextInputTranscriber
 from voice_claude_agent.summarizer import summarize
 from voice_claude_agent.tts import MacOSSaySpeaker, FakeSpeaker
+from voice_claude_agent.wake import ManualWakeTrigger
 
 
 def _check_dependencies() -> dict:
@@ -251,6 +252,74 @@ def demo_voice(stub_text: str):
     click.echo(f"Transcription: {transcript}")
 
     _run_pipeline(transcript, input_mode="voice", tts_fake=False)
+
+
+@main.command()
+@click.option("--fake", is_flag=True, help="Use fake recorder/STT for testing.")
+@click.option("--once", is_flag=True, help="Run one iteration and exit (no loop).")
+def wake(fake: bool, once: bool):
+    """Wake loop: wait for trigger → record → STT → Claude CLI → TTS.
+
+    Runs in a loop until Ctrl+C. In --fake mode, uses a FakeRecorder
+    and FakeTranscriber so no real mic is required.
+    """
+    trigger = ManualWakeTrigger(auto_trigger=fake)
+
+    if fake:
+        recorder = FakeRecorder(b"stub wake audio")
+        transcriber = FakeTranscriber("请回复 OK")
+    else:
+        recorder = SoundDeviceRecorder()
+        transcriber = RecordingTranscriber()
+
+    click.echo("Voice Claude Agent — Wake Mode")
+    click.echo("Press Ctrl+C to exit.")
+    click.echo()
+
+    iteration = 0
+    try:
+        while True:
+            iteration += 1
+
+            # 1. Wait for wake
+            click.echo(f"[{iteration}] Waiting for wake trigger...")
+            if not trigger.wait_for_wake():
+                click.echo("Wake trigger cancelled. Exiting.")
+                break
+
+            click.echo(f"[{iteration}] Woke! Recording...")
+
+            # 2. Record
+            recorder.start()
+            if fake:
+                import time as _time
+                _time.sleep(0.5)
+            else:
+                click.echo("Press Enter to stop recording...")
+                try:
+                    input()
+                except (EOFError, KeyboardInterrupt):
+                    pass
+            recorder.stop()
+            audio = recorder.get_audio()
+
+            # 3. STT
+            transcript = transcriber.transcribe(audio)
+            click.echo(f"[{iteration}] Transcript: {transcript}")
+
+            if not transcript.strip():
+                click.echo(f"[{iteration}] No speech detected. Waiting for next wake.")
+                continue
+
+            # 4. Run pipeline
+            _run_pipeline(transcript, input_mode="voice", tts_fake=False)
+
+            if once:
+                click.echo(f"Wake loop stopped after {iteration} iteration(s).")
+                break
+
+    except KeyboardInterrupt:
+        click.echo(f"\nWake loop stopped after {iteration} iteration(s).")
 
 
 if __name__ == "__main__":
