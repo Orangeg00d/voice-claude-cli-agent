@@ -527,7 +527,7 @@
         "Test proves menu bar recording path never uses input()"
       ],
       "passes": true,
-      "evidence": "Replaced input()-based recording with time-based: _record_fixed_duration records 5s via time.sleep. Menu status updates: Recording... → Transcribing... → Running Claude... → Done ✓ (resets after 1.5s). Empty audio shows 'No Audio' alert. Empty transcript shows 'No Speech Detected' alert. STT error shows native alert. 5 tests: no input() in code, stage title updates, empty audio alert, STT error alert, empty transcript alert. 115/115 tests, lint clean."
+      "evidence": "Replaced input()-based recording with time-based: _record_fixed_duration records 5s via time.sleep. Menu status updates: Recording... → Transcribing... → Running Claude... → Done ✓ (resets after 1.5s). Empty audio shows 'No Audio' alert. Empty transcript shows 'No Speech Detected' alert. STT error shows native alert. 5 tests: no input() in code, stage title updates, empty audio alert, STT error alert, empty transcript alert. Codex verified menu/app focused tests and full suite. 120/120 tests, lint clean, check clean."
     },
     {
       "id": "F040",
@@ -540,7 +540,7 @@
         "Env var override tested"
       ],
       "passes": true,
-      "evidence": "run_app.py defaults to whisper-cli (VOICE_STT_BACKEND env override supported). VoiceClaudeApp._validate_stt_backend() checks whisper-cli binary + WHISPER_CPP_MODEL on startup — shows alerts if missing, updates mic_status_item. 5 tests: default in run_app.py, env override, missing binary alert, missing model alert, text-input skips validation. 120/120 tests, lint clean."
+      "evidence": "run_app.py defaults to whisper-cli (VOICE_STT_BACKEND env override supported). VoiceClaudeApp._validate_stt_backend() checks whisper-cli binary + WHISPER_CPP_MODEL on startup — shows alerts if missing, updates mic_status_item. 5 tests: default in run_app.py, env override, missing binary alert, missing model alert, text-input skips validation. Codex rebuilt dist/VoiceClaudeAgent.app with the new run_app.py and confirmed the bundle remains standalone. 120/120 tests, lint clean, check clean."
     }
   ]
 }

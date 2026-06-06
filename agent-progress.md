@@ -1185,3 +1185,34 @@
 
 ### Risks / Notes
 - Whisper model validation only fires for whisper-cli backend; other backends skip silently.
+
+## 2026-06-06 21:15 — Codex Review: F039/F040 Verification
+
+### Completed
+- Reviewed Claude commits `1c42da5` and `d5a7acc`.
+- Confirmed menu bar `_record_and_execute()` no longer calls CLI `_safe_record_attempt()` or `input()`.
+- Confirmed menu bar recording now uses `_record_fixed_duration()` with fixed-duration recording.
+- Confirmed user-visible status transitions exist for Recording, Transcribing, Running Claude, Done, empty audio, empty transcript, and STT error paths.
+- Confirmed `run_app.py` defaults to `VOICE_STT_BACKEND=whisper-cli` unless the environment overrides it.
+- Confirmed startup validation checks whisper.cpp binary and `WHISPER_CPP_MODEL`, then shows native alerts instead of crashing.
+- Rebuilt `dist/VoiceClaudeAgent.app` with the updated `run_app.py`; bundle remains standalone.
+- Fixed a test isolation regression: old F034/F032 menu tests could block on real native STT validation alerts after F040, so Codex added alert/validation isolation where those tests are not testing validation behavior.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh lint` passed
+- `./init.sh test` passed: 120/120
+- Focused menu/app tests passed: 41/41
+- `tests/test_py2app.py` passed: 6/6 after rebuilding the app bundle
+- Re-launched the rebuilt `.app`; process starts and inherits `WHISPER_CPP_MODEL`.
+
+### Files Changed
+- tests/test_core.py
+- feature_list.json
+- agent-progress.md
+
+### Next Recommended Task
+- Continue manual smoke test on the rebuilt app: click `Trigger Recording`, confirm the menu title changes to `Recording...`, speak a short command, and verify whether `whisper-cli`, Claude, and session logging run.
+
+### Risks / Notes
+- A 2-minute monitor after relaunch did not observe new session logs or whisper/Claude child processes. This may mean the menu item was not clicked during the monitor window, or it may indicate another real UI callback issue. If clicking still produces no title/status change, add F041 for menu callback observability and runtime diagnostics.

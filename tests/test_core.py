@@ -1162,6 +1162,11 @@ class TestMenuBarApp:
             "check_mic_permission",
             lambda: (True, "mock microphone accessible"),
         )
+        monkeypatch.setattr(
+            app_mod.VoiceClaudeApp,
+            "_validate_stt_backend",
+            lambda self: None,
+        )
 
     def test_app_class_imports(self):
         """VoiceClaudeApp should be importable and constructible."""
@@ -1472,7 +1477,10 @@ class TestAppSTTBackendPassthrough:
         """VoiceClaudeApp(stt_backend='whisper-cli') should store it."""
         from voice_claude_agent.app import VoiceClaudeApp
 
-        app = VoiceClaudeApp(stt_backend="whisper-cli")
+        app = VoiceClaudeApp(
+            stt_backend="whisper-cli",
+            _alert_patch=lambda **kw: None,
+        )
         assert app.stt_backend == "whisper-cli"
 
     def test_stt_backend_default_is_text_input(self):
@@ -1488,7 +1496,10 @@ class TestAppSTTBackendPassthrough:
 
         from voice_claude_agent.app import VoiceClaudeApp
 
-        app = VoiceClaudeApp(stt_backend="whisper-cli")
+        app = VoiceClaudeApp(
+            stt_backend="whisper-cli",
+            _alert_patch=lambda **kw: None,
+        )
 
         # Mock _run_pipeline (it's in cli.py)
         monkeypatch.setattr(
