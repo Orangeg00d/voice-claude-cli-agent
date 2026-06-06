@@ -1,20 +1,113 @@
 # Voice Claude CLI Agent
 
-一个面向 macOS 的本地语音 Agent 项目。目标是让用户通过按键或语音唤醒发出开发指令，由本地 Claude CLI 执行任务，并在完成后用语音播报结果。
+一个面向 macOS 的本地语音 Agent 项目。目标是让用户通过语音唤醒发出开发指令，由本地 Claude CLI 执行任务，并在完成后用语音播报结果。
 
-## 当前目标
+## 快速开始
 
-第一阶段先实现文本/按键触发 MVP：
+```bash
+# 安装
+./init.sh install          # 创建 .venv 并安装所有依赖
 
-```text
-文本指令
-  -> Claude CLI
-  -> 结果记录
-  -> 摘要
-  -> macOS say 语音播报
+# 检查环境
+./init.sh check            # Python, Claude CLI, macOS say, 麦克风, STT 后端
+voice-claude-agent check   # 同上 (CLI 命令版)
+
+# 文本模式 — 无需麦克风
+voice-claude-agent demo-text "请回复 OK"    # 完整演示：Claude → 摘要 → TTS (fake)
+voice-claude-agent run-text "总结当前项目"   # 正式执行 + macOS say 播报
+
+# 语音测试 — 无需麦克风 (使用 fake 组件)
+voice-claude-agent demo-voice "帮我检查 git 状态"   # fake 录音 → STT → Claude → say
+voice-claude-agent voice --fake                     # 手动输入文本模拟语音
+voice-claude-agent wake --fake --once               # 唤醒循环，单次迭代
+
+# 真语音 — 需要麦克风权限
+voice-claude-agent record                    # 纯录音 + 转写 (不执行 Claude)
+voice-claude-agent voice                     # 录音 → STT → Claude → say
+voice-claude-agent wake                      # 唤醒循环，Enter 触发，Ctrl+C 退出
+
+# 开发
+./init.sh test     # 运行测试
+./init.sh lint     # ruff 检查
+./init.sh format   # ruff 格式化
 ```
 
-真实麦克风、真实 STT、真实唤醒词和 macOS 常驻 App 会在后续阶段逐步加入。
+## 当前阶段 — Phase 4 (完成)
+
+Phase 1-3 已完成。Phase 4 补充了真机防护：
+
+- 运行 `voice-claude-agent check` 即可看到麦克风权限、可用 STT 后端。
+- `record` / `voice` / `wake` 不使用 `--fake` 时会先检查麦克风，失败则打印详细错误。
+- 录音崩溃、STT 返回错误、Claude 超时均已受保护，循环不会闪退。
+
+## 架构
+
+```text
+macOS 常驻进程 (CLI 原型)
+  -> 按键/命令行触发 (wake --fake 或 Enter 手动唤醒)
+  -> 录音 (sounddevice, 16kHz mono PCM)
+  -> Speech-to-Text (可插拔后端)
+  -> 风险分类 (只读 / 可恢复 / 破坏性)
+  -> 确认 (高风险动作 yes/no)
+  -> Claude CLI 执行 (claude -p, subprocess)
+  -> 结果摘要
+  -> Text-to-Speech (macOS say)
+  -> JSONL 日志
+```
+
+## STT 后端
+
+`--stt-backend` 选项控制语音转文字使用哪个后端。在 `voice`、`record`、`wake` 命令中均可用：
+
+| 后端 | 说明 | 需要 |
+|------|------|------|
+| `text-input` (默认) | 打印录音统计，不真正转写。适合开发和调试。 | 无 |
+| `whisper-cli` | 调用本地 whisper.cpp 二进制做离域转写。 | 安装 [whisper.cpp](https://github.com/ggerganov/whisper.cpp) |
+| `apple-speech` | 使用 macOS 内建听写引擎 (NSSpeechRecognizer via osascript)。 | 系统设置 > 键盘 > 听写 开关打开 |
+
+### Apple Speech 说明与限制
+
+Apple Speech 后端会：
+
+1. 先检查系统听写开关 (`DictationIMEnabled`)。
+2. 如果未开启，直接返回明确的错误提示并建议换后端。
+3. 如果已开启，通过 AppleScript 播放 WAV 以触发听写。
+
+**已知限制**：Apple Speech 的转写结果会出现在**当前活跃的文本输入框**中，而非程序化捕获。这意味着它适合「边说边打」的场景，但无法自动把转写文本送回 wake 循环。这是 macOS 内建听写 API 的限制。如果需要**完全自动化的语音转文字**，请安装 whisper.cpp 并使用 `--stt-backend whisper-cli`。
+
+```bash
+# 查看所有可用后端
+voice-claude-agent check
+# 示例输出 → STT backends: text-input, whisper-cli, apple-speech
+
+# 尝试 Apple Speech（如果听写已开启）
+voice-claude-agent record --stt-backend apple-speech
+
+# 尝试 whisper.cpp（需要先安装）
+brew install whisper-cpp
+voice-claude-agent voice --stt-backend whisper-cli
+```
+
+## Fake / Real 模式
+
+所有语音命令都有 `--fake` 选项，不依赖真实麦克风即可测试完整链路：
+
+| 命令 | fake 模式行为 | real 模式行为 |
+|------|-------------|-------------|
+| `demo-voice` | 总是 fake：预设录音 + 预设 transcript | — |
+| `voice --fake` | 用 FakeRecorder 录音 + 手动输入文本 | 真录音 → STT → Claude → say |
+| `voice` | — | 检查麦克风权限 → 真录音 → STT → Claude → say |
+| `wake --fake --once` | 自动触发 → 模拟录音 → 预设 transcript | — |
+| `wake --fake` | 自动循环，Ctrl+C 退出 | — |
+| `wake` | — | Enter 手动唤醒，循环录音 + STT + Claude |
+
+```bash
+# 无麦克风的完整测试
+voice-claude-agent wake --fake --once
+
+# 真麦克风 + 唤醒循环
+voice-claude-agent wake
+```
 
 ## 协同开发模式
 
@@ -43,8 +136,8 @@
 - 平台：macOS。
 - 第一版语言：Python。
 - 第一版 TTS：macOS `say`。
-- 第一版 STT：先做接口和 mock。
-- 第一版唤醒：先做按键/命令行触发。
+- 第一版 STT：可插拔接口，MVP 提供 text-input / whisper-cli / apple-speech 三种后端。
+- 第一版唤醒：按键/命令行触发 (ManualWakeTrigger)。
 - 最终形态：macOS 常驻 App。
 - App 不需要开机自动启动。
 - 允许 App 运行期间常驻监听麦克风。
@@ -52,4 +145,4 @@
 
 ## 开发状态
 
-当前仓库仍处于计划与初始化阶段。下一步应由 Claude Desktop 执行 initializer 任务，建立 Python 项目骨架、`init.sh`、`feature_list.json`、`agent-progress.md` 和最小 demo-text 链路。
+Phase 1-4 已完成。F001-F021 全部通过。54 个测试。详见 `feature_list.json`、`agent-progress.md`。
