@@ -279,6 +279,143 @@
       ],
       "passes": true,
       "evidence": "test__warn_mic_prints_warning: WARNING + Microphone + System Settings all in output. test__safe_real_recorder_returns_none: returns None on PortAudio error with red error message. voice/wake/record all gate on _safe_real_recorder before recording."
+    },
+    {
+      "id": "F022",
+      "priority": 22,
+      "category": "packaging",
+      "description": "Project can be installed as an editable package via ./init.sh install",
+      "steps": [
+        "Run ./init.sh install in a clean venv",
+        "Verify voice-claude-agent entry point is registered",
+        "Verify voice_claude_agent package is importable",
+        "Verify all dependencies (click, sounddevice, numpy, pytest, ruff) resolve"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F023",
+      "priority": 23,
+      "category": "packaging",
+      "description": "voice-claude-agent --help lists all available commands",
+      "steps": [
+        "Run voice-claude-agent --help",
+        "Verify check, demo-text, run-text, record, voice, demo-voice, wake are listed"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F024",
+      "priority": 24,
+      "category": "ux",
+      "description": "wake loop prints per-iteration status: waiting, woke, recording, transcript, summary",
+      "steps": [
+        "Run voice-claude-agent wake --fake --once",
+        "Verify [1] Waiting for wake trigger... appears",
+        "Verify [1] Woke! Recording... appears",
+        "Verify [1] Transcript: ... appears",
+        "Verify Summary line appears before exit"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F025",
+      "priority": 25,
+      "category": "ux",
+      "description": "wake loop handles empty/broken audio without crashing",
+      "steps": [
+        "Simulate recorder returning empty audio bytes",
+        "Verify wake prints No audio captured and continues to next iteration",
+        "Simulate STT returning empty transcript",
+        "Verify wake prints No speech detected and continues to next iteration"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F026",
+      "priority": 26,
+      "category": "ux",
+      "description": "wake loop handles STT backend errors without crashing",
+      "steps": [
+        "Simulate STT returning [STT error: ...] prefix",
+        "Verify wake prints yellow warning about STT error",
+        "Verify wake skips Claude execution and continues to next iteration"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F027",
+      "priority": 27,
+      "category": "ux",
+      "description": "Claude CLI timeout is handled gracefully in the pipeline",
+      "steps": [
+        "Simulate Claude CLI exceeding timeout",
+        "Verify _run_pipeline logs a session with summary='Timed out'",
+        "Verify TTS speaks a timeout message"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F028",
+      "priority": 28,
+      "category": "ux",
+      "description": "Real recording start/stop errors are caught and reported",
+      "steps": [
+        "Simulate recorder.start() raising an exception",
+        "Verify Recording start failed error is printed in red",
+        "Verify wake loop continues to next iteration instead of crashing"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F029",
+      "priority": 29,
+      "category": "voice",
+      "description": "whisper-cli backend produces a real transcription when whisper.cpp is installed",
+      "steps": [
+        "Install whisper.cpp (brew install whisper-cpp)",
+        "Record a short speech sample",
+        "Run voice --stt-backend whisper-cli",
+        "Verify transcript is actual speech text, not an error message or audio stats"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F030",
+      "priority": 30,
+      "category": "voice",
+      "description": "apple-speech backend detects dictation on/off and returns appropriate status",
+      "steps": [
+        "Run check: verify apple-speech is listed as available on macOS",
+        "Call RecordingTranscriber(backend='apple-speech').transcribe(...)",
+        "If dictation is OFF: verify prompt to enable it in System Settings",
+        "If dictation is ON: verify audio is played for dictation (non-crashing)"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F031",
+      "priority": 31,
+      "category": "docs",
+      "description": "README covers STT backends, fake/real modes, and Apple Speech limitations",
+      "steps": [
+        "Read README.md",
+        "Verify --stt-backend option is documented for voice, record, wake",
+        "Verify table explains text-input, whisper-cli, apple-speech",
+        "Verify Apple Speech section explains the 'text appears in active field' limitation",
+        "Verify fake/real mode table is present"
+      ],
+      "passes": false,
+      "evidence": ""
     }
   ]
 }
