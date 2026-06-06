@@ -160,15 +160,27 @@ class VoiceClaudeApp(rumps.App):
 
         # Input device info
         device_name = "unknown"
+        portaudio_load_ok = False
         try:
             import sounddevice as sd
             default_input = sd.query_devices(kind="input")
             device_name = default_input.get("name", "unknown")
+            portaudio_load_ok = True
             lines.append(f"Default input device: {device_name}")
             lines.append(f"Input channels: {default_input.get('max_input_channels', '?')}")
             lines.append(f"Default sample rate: {default_input.get('default_samplerate', '?')} Hz")
         except Exception as e:
             lines.append(f"sounddevice query error: {e}")
+
+        # PortAudio library path
+        lines.append("")
+        lines.append(f"PortAudio loaded: {'YES' if portaudio_load_ok else 'NO'}")
+        try:
+            import sounddevice as sd
+            lib_path = sd._libname if hasattr(sd, '_libname') else "unknown"
+            lines.append(f"PortAudio library: {lib_path}")
+        except Exception:
+            lines.append("PortAudio library: unable to determine")
 
         lines.append("")
 

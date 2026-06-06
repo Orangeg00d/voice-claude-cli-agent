@@ -1255,3 +1255,14 @@
 
 ### Files Changed
 - src/voice_claude_agent/app.py, tests/test_core.py, feature_list.json, agent-progress.md
+
+## 2026-06-07 09:50 — Phase 7: F042 — PortAudio Dylib Fix
+
+### Completed
+- setup.py post-build fixup extracts libportaudio.dylib from python314.zip to real filesystem.
+- check_mic_permission returns False on PortAudio dylib load failures.
+- Mic Diagnostic shows PortAudio loaded status.
+- 5 tests. 130/130 tests, lint clean.
+
+### Files Changed
+- setup.py, src/voice_claude_agent/config.py, src/voice_claude_agent/app.py, tests/test_core.py, feature_list.json, agent-progress.md

@@ -2161,3 +2161,79 @@ class TestMicDiagnostic:
         setup_py = Path(__file__).resolve().parent.parent / "setup.py"
         content = setup_py.read_text()
         assert "NSMicrophoneUsageDescription" in content
+
+
+# ── F042: PortAudio Dylib Fix ───────────────────────────────
+class TestPortAudioDylibFix:
+    def test_check_mic_permission_false_on_portaudio_dylib_error(self, monkeypatch):
+        """When sounddevice raises a PortAudio dylib load error,
+        check_mic_permission must return (False, ...)."""
+        from voice_claude_agent.config import check_mic_permission
+
+        monkeypatch.setattr("platform.system", lambda: "Darwin")
+
+        def _raise(*a, **kw):
+            raise OSError("cannot load library '/path/to/libportaudio.dylib': dlopen(...)")
+
+        monkeypatch.setattr("sounddevice.InputStream", _raise)
+        has_mic, detail = check_mic_permission()
+        assert has_mic is False
+        assert "PortAudio" in detail
+        assert "libportaudio" in detail.lower()
+
+    def test_check_mic_permission_false_on_generic_portaudio_error(self, monkeypatch):
+        """Generic PortAudio errors should also return False."""
+        from voice_claude_agent.config import check_mic_permission
+
+        monkeypatch.setattr("platform.system", lambda: "Darwin")
+
+        def _raise(*a, **kw):
+            raise OSError("PortAudio error: device unavailable")
+
+        monkeypatch.setattr("sounddevice.InputStream", _raise)
+        has_mic, detail = check_mic_permission()
+        assert has_mic is False
+        assert "PortAudio" in detail
+
+    def test_bundle_dylib_not_in_zip(self):
+        """After py2app build, libportaudio.dylib must NOT be in python314.zip."""
+        import zipfile
+
+        bundle = Path("/Users/orange/Documents/Claude/Projects/语音助理/dist/VoiceClaudeAgent.app")
+        if not bundle.exists():
+            import pytest
+            pytest.skip("Bundle not built. Run: python setup.py py2app")
+
+        zip_candidates = sorted(bundle.glob("Contents/Resources/lib/python*.zip"))
+        if not zip_candidates:
+            import pytest
+            pytest.skip("No python*.zip found in bundle")
+
+        zip_path = zip_candidates[0]
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            dylib_in_zip = [n for n in zf.namelist() if "libportaudio" in n]
+        assert len(dylib_in_zip) == 0, f"libportaudio.dylib still in zip: {dylib_in_zip}"
+
+    def test_bundle_dylib_on_filesystem(self):
+        """After py2app build, libportaudio.dylib must exist as a real file."""
+        bundle = Path("/Users/orange/Documents/Claude/Projects/语音助理/dist/VoiceClaudeAgent.app")
+        if not bundle.exists():
+            import pytest
+            pytest.skip("Bundle not built. Run: python setup.py py2app")
+
+        dylib = bundle / "Contents" / "Resources" / "lib" / "_sounddevice_data" / "portaudio-binaries" / "libportaudio.dylib"
+        assert dylib.exists(), f"libportaudio.dylib not found at {dylib}"
+        assert dylib.is_file()
+        assert os.access(dylib, os.X_OK)
+
+    def test_mic_diagnostic_includes_portaudio_status(self):
+        """_run_mic_diagnostic should include PortAudio load status."""
+        alerts = []
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._run_mic_diagnostic(app.diagnostic_item)
+
+        msg = alerts[0]["message"]
+        assert "PortAudio" in msg

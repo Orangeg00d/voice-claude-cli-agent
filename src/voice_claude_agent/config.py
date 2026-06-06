@@ -56,6 +56,11 @@ def check_mic_permission() -> tuple[bool, str]:
         msg = str(e).lower()
         if "permission" in msg or "not authorized" in msg or "input device" in msg:
             return False, f"Microphone permission denied: {e}"
+        # Detect PortAudio dynamic library load failures
+        if "cannot load library" in msg and "libportaudio" in msg:
+            return False, f"PortAudio unavailable — sounddevice library load failed: {e}"
+        if "portaudio" in msg:
+            return False, f"PortAudio error — sounddevice library load failed: {e}"
         return True, f"Microphone check passed with warning: {e}"
 
 

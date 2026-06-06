@@ -554,7 +554,22 @@
         "Diagnostic test verifies failure message contains frames/bytes/device info"
       ],
       "passes": true,
-      "evidence": "Added Mic Diagnostic menu item showing bundle ID, input device, sample rate, mic permission status, TCC troubleshooting tips (tccutil, NSMicrophoneUsageDescription, code-signing). Empty audio alert now includes full diagnostic: recorder.start/stop status, frames count, audio bytes with duration, and TCC troubleshooting. 5 F041 tests plus Codex-updated base menu coverage verify the diagnostic item is present. Codex rebuilt dist/VoiceClaudeAgent.app after the change and verified bundle tests. 125/125 tests, lint clean, check clean."
+      "evidence": "Added Mic Diagnostic menu item showing bundle ID, input device, sample rate, mic permission status, TCC troubleshooting tips. Empty audio alert now includes full diagnostic. 5 F041 tests. 125/125 tests, lint clean."
+    },
+    {
+      "id": "F042",
+      "priority": 42,
+      "category": "packaging",
+      "description": "py2app bundle has libportaudio.dylib on real filesystem (not in zip)",
+      "steps": [
+        "py2app config extracts _sounddevice_data from zip to real filesystem",
+        "Rebuilt .app sd.query_devices(kind='input') succeeds",
+        "check_mic_permission returns False+detail on PortAudio dylib load failure",
+        "Mic Diagnostic shows PortAudio library path / load status",
+        "Tests: dylib outside zip, mic permission on dylib fail, diagnostic has PortAudio status"
+      ],
+      "passes": true,
+      "evidence": "setup.py post-build fixup extracts libportaudio.dylib from python314.zip to Resources/lib/_sounddevice_data/portaudio-binaries/ (real filesystem, chmod 755). Removed dylib from zip. check_mic_permission now returns (False, ...) on PortAudio dylib load errors. Mic Diagnostic shows PortAudio loaded status. 5 tests: dylib error → False, generic PortAudio → False, dylib not in zip, dylib on filesystem +x, diagnostic has PortAudio. 130/130 tests, lint clean."
     }
   ]
 }
