@@ -234,6 +234,9 @@ def _run_pipeline(prompt: str, input_mode: str, tts_fake: bool) -> None:
     if result.timed_out:
         click.echo(click.style("Claude CLI timed out.", fg="red"))
         speaker.speak("Claude CLI 执行超时，请检查任务或重试。")
+        if tts_fake:
+            assert isinstance(speaker, FakeSpeaker)
+            click.echo(f"TTS (fake): {speaker.spoken[-1]}")
         write_session({
             "input_mode": input_mode,
             "transcript": prompt,

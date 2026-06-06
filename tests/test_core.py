@@ -770,8 +770,8 @@ class TestPhase4ExceptionHandling:
         assert "different --stt-backend" in result.output
         assert not (tmp_path / "sessions.jsonl").exists()
 
-    def test_pipeline_timeout_creates_session(self, tmp_path, monkeypatch):
-        """_run_pipeline should log a session even when Claude times out."""
+    def test_pipeline_timeout_creates_session(self, tmp_path, monkeypatch, capsys):
+        """_run_pipeline should log and speak a timeout when Claude times out."""
         monkeypatch.setattr(
             "voice_claude_agent.logging_store.get_sessions_log_path",
             lambda: tmp_path / "sessions.jsonl",
@@ -803,6 +803,10 @@ class TestPhase4ExceptionHandling:
         record = json.loads(lines[0])
         assert record["summary"] == "Timed out"
         assert record["exit_code"] == -1
+
+        captured = capsys.readouterr()
+        assert "Claude CLI timed out." in captured.out
+        assert "TTS (fake): Claude CLI 执行超时，请检查任务或重试。" in captured.out
 
 
 # ── F025: Empty Audio / Empty Transcript Resilience ──────

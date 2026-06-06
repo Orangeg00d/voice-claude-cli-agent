@@ -558,6 +558,29 @@
 ### Next Recommended Task
 - F028: verify recording start/stop error handling.
 
+## 2026-06-06 15:20 — Codex Review: F027 Verification
+
+### Completed
+- Reviewed Claude commit `179a28f`.
+- Confirmed only F027 was marked `passes=true`; F028-F031 remain pending.
+- Found the timeout test verified session logging but did not verify fake TTS output.
+- Codex updated the timeout branch to print `TTS (fake): ...` consistently, matching the success path, and added assertions for the spoken timeout message.
+
+### Verification
+- `./init.sh test` passed: 60 passed
+- `./init.sh lint` passed
+
+### Files Changed
+- src/voice_claude_agent/cli.py
+- tests/test_core.py
+- agent-progress.md
+
+### Next Recommended Task
+- F028: verify recorder.start()/stop() failures are caught, reported, and do not crash the wake loop.
+
+### Risks / Notes
+- F027 accepted after Codex added explicit TTS verification.
+
 ## 2026-06-06 14:55 — Codex Review: F026 Verification
 
 ### Completed
