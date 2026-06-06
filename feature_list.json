@@ -358,8 +358,8 @@
         "Verify _run_pipeline logs a session with summary='Timed out'",
         "Verify TTS speaks a timeout message"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "test_pipeline_timeout_creates_session: ClaudeRunResult(timed_out=True) → session written with summary='Timed out', exit_code=-1. cli.py lines 234-248: result.timed_out → red 'Claude CLI timed out.' message + TTS 'Claude CLI 执行超时，请检查任务或重试。' + write_session. 60/60 tests, lint clean."
     },
     {
       "id": "F028",

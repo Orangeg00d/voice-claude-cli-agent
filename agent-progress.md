@@ -539,6 +539,25 @@
 ### Risks / Notes
 - None. F026 was already fully implemented.
 
+## 2026-06-06 15:00 — Phase 5: F027 — Claude Timeout Handling
+
+### Completed
+- Verified existing code (cli.py:234-248): `result.timed_out` → red "Claude CLI timed out." + TTS "Claude CLI 执行超时..." + `write_session(summary="Timed out")`.
+- Verified existing test `test_pipeline_timeout_creates_session`: ClaudeRunResult(timed_out=True) → session.jsonl entry with summary="Timed out", exit_code=-1.
+- Zero code changes — timeout handling was already implemented in Phase 4.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh lint` passed
+- 60/60 tests pass (pre-existing `test_pipeline_timeout_creates_session` covers F027)
+
+### Files Changed
+- feature_list.json (F027 passes=true with evidence)
+- agent-progress.md (this entry)
+
+### Next Recommended Task
+- F028: verify recording start/stop error handling.
+
 ## 2026-06-06 14:55 — Codex Review: F026 Verification
 
 ### Completed
