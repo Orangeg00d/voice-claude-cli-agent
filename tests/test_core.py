@@ -2221,8 +2221,11 @@ class TestPortAudioDylibFix:
             import pytest
             pytest.skip("Bundle not built. Run: python setup.py py2app")
 
-        dylib = bundle / "Contents" / "Resources" / "lib" / "_sounddevice_data" / "portaudio-binaries" / "libportaudio.dylib"
-        package_init = bundle / "Contents" / "Resources" / "lib" / "_sounddevice_data" / "__init__.py"
+        package_root = bundle / "Contents" / "Resources" / "lib" / f"python{sys.version_info.major}.{sys.version_info.minor}"
+        dylib = package_root / "_sounddevice_data" / "portaudio-binaries" / "libportaudio.dylib"
+        package_init = package_root / "_sounddevice_data" / "__init__.py"
+        sounddevice_py = package_root / "sounddevice.py"
+        assert sounddevice_py.exists(), f"sounddevice.py not found at {sounddevice_py}"
         assert package_init.exists(), f"_sounddevice_data package init not found at {package_init}"
         assert dylib.exists(), f"libportaudio.dylib not found at {dylib}"
         assert dylib.is_file()
@@ -2244,7 +2247,7 @@ class TestPortAudioDylibFix:
             pytest.skip("No python*.zip found in bundle")
 
         zip_path = zip_candidates[0]
-        filesystem_lib = resources / "lib"
+        filesystem_lib = resources / "lib" / f"python{sys.version_info.major}.{sys.version_info.minor}"
         code = f"""
 import sys
 sys.path[:] = [{str(zip_path)!r}, {str(filesystem_lib)!r}] + sys.path

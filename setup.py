@@ -81,7 +81,9 @@ def _fixup_portaudio_dylib(dist_dir: str) -> None:
         return
 
     package_prefix = "_sounddevice_data/"
-    dest_root = resources / "lib"
+    dest_root = resources / "lib" / f"python{sys.version_info.major}.{sys.version_info.minor}"
+    if not dest_root.exists():
+        dest_root = resources / "lib"
     dest_root.mkdir(parents=True, exist_ok=True)
     extracted_any = False
 

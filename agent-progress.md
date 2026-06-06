@@ -1294,3 +1294,30 @@
 - tests/test_core.py
 - feature_list.json
 - agent-progress.md
+
+## 2026-06-06 22:23 — Codex Review: F042 App Runtime Path Correction
+
+### Finding
+- User's rebuilt app diagnostic no longer showed the original zip `dlopen` failure, but showed `No module named '_sounddevice_data'`.
+- Root cause: `_sounddevice_data` had been extracted to `Contents/Resources/lib/_sounddevice_data`, while py2app runtime imports `sounddevice.py` from `Contents/Resources/lib/python3.14`.
+
+### Completed
+- Updated `setup.py` to extract `_sounddevice_data` beside `sounddevice.py` at `Contents/Resources/lib/python3.14/_sounddevice_data`.
+- Updated F042 bundle tests to assert `sounddevice.py`, `_sounddevice_data/__init__.py`, and `libportaudio.dylib` are co-located under `lib/python3.14`.
+- Rebuilt `dist/VoiceClaudeAgent.app`.
+
+### Verification
+- `python314.zip` contains no `_sounddevice_data/` entries.
+- Simulated app import path resolves `_sounddevice_data` to `Contents/Resources/lib/python3.14/_sounddevice_data`.
+- `sounddevice._libname` resolves to `Contents/Resources/lib/python3.14/_sounddevice_data/portaudio-binaries/libportaudio.dylib`.
+- `sd.query_devices(kind='input')` returned `MacBook Pro麦克风`.
+- `./init.sh check` passed.
+- `./init.sh lint` passed.
+- `./init.sh test` passed: 131/131.
+- Focused F042 + py2app tests passed: 12/12.
+
+### Files Changed
+- setup.py
+- tests/test_core.py
+- feature_list.json
+- agent-progress.md

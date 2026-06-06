@@ -569,7 +569,7 @@
         "Tests: dylib outside zip, mic permission on dylib fail, diagnostic has PortAudio status"
       ],
       "passes": true,
-      "evidence": "Codex audit found the initial fix still left _sounddevice_data/__init__.pyc in python314.zip, so sounddevice could resolve the data package to a zip path and keep failing dlopen. setup.py now extracts the whole _sounddevice_data package to Resources/lib/_sounddevice_data/, creates filesystem __init__.py, chmods libportaudio.dylib, and removes the entire _sounddevice_data subtree from python314.zip. Verified simulated py2app sys.path resolves _sounddevice_data and sounddevice._libname to the filesystem dylib; sd.query_devices(kind='input') returns MacBook Pro麦克风. Tests: 131/131, focused F042+py2app 12/12, ./init.sh check/lint/test clean."
+      "evidence": "Codex audit found the initial fix still left _sounddevice_data/__init__.pyc in python314.zip, so sounddevice could resolve the data package to a zip path and keep failing dlopen. A follow-up manual diagnostic showed Resources/lib/_sounddevice_data was also not on the app runtime sys.path, causing No module named '_sounddevice_data'. setup.py now extracts the whole _sounddevice_data package beside sounddevice.py at Resources/lib/python3.14/_sounddevice_data/, creates filesystem __init__.py, chmods libportaudio.dylib, and removes the entire _sounddevice_data subtree from python314.zip. Verified simulated app sys.path resolves _sounddevice_data and sounddevice._libname to the filesystem dylib; sd.query_devices(kind='input') returns MacBook Pro麦克风. Tests: 131/131, focused F042+py2app 12/12, ./init.sh check/lint/test clean."
     }
   ]
 }
