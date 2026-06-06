@@ -9,7 +9,7 @@ import time
 
 import rumps
 
-from voice_claude_agent.config import check_mic_permission
+from voice_claude_agent.config import check_mic_permission, get_agent_state_dir
 
 # Silence rumps debug output during tests
 import logging
@@ -158,6 +158,7 @@ class VoiceClaudeApp(rumps.App):
         # Bundle / app info
         lines.append("Bundle ID: com.voiceclaude.agent")
         lines.append(f"Python: {platform.python_version()}")
+        lines.append(f"Agent state dir: {get_agent_state_dir()}")
         lines.append("Python path containing _sounddevice_data:")
         sounddevice_data_paths = [p for p in sys.path if "_sounddevice_data" in p or "python3.14" in p]
         if sounddevice_data_paths:

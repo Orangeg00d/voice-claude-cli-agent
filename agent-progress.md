@@ -1295,6 +1295,39 @@
 - feature_list.json
 - agent-progress.md
 
+## 2026-06-06 22:50 — Codex Review: App Session Log Location
+
+### Finding
+- User's real menu bar recording succeeded, but the repo `agent_state/sessions.jsonl` initially did not show the new entry.
+- The app had written runtime logs into `dist/VoiceClaudeAgent.app/Contents/Resources/lib/agent_state` because bundled `config.py` derived project root from its packaged module path.
+
+### Observed Real Log
+- Transcript: `Now you can listen to my words.`
+- Claude command: `claude -p "Now you can listen to my words."`
+- Exit code: 0
+- Summary: Claude replied, `I'm listening! How can I help you today? ...`
+- spoken: true
+
+### Completed
+- Added `VOICE_CLAUDE_AGENT_STATE_DIR` override support in `config.get_agent_state_dir()`.
+- Added `run_app._bootstrap_state_dir()` so development `dist/VoiceClaudeAgent.app` writes to the repo `agent_state`, while installed apps default to `~/Library/Application Support/VoiceClaudeAgent/agent_state`.
+- Added `Agent state dir` to Mic Diagnostic.
+- Migrated the successful real recording log from the old bundle-internal state dir back to repo `agent_state`.
+- Added tests for the env override and development app state-dir bootstrap.
+- Rebuilt `dist/VoiceClaudeAgent.app`.
+
+### Verification
+- `./init.sh check` passed.
+- `./init.sh lint` passed.
+- `./init.sh test` passed: 135/135.
+
+### Files Changed
+- run_app.py
+- src/voice_claude_agent/app.py
+- src/voice_claude_agent/config.py
+- tests/test_core.py
+- agent-progress.md
+
 ## 2026-06-06 22:37 — Codex Review: F042 Runtime Bootstrap Correction
 
 ### Finding

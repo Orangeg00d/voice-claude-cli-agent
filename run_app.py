@@ -22,8 +22,29 @@ def _bootstrap_py2app_runtime_path() -> None:
             sys.path.insert(0, python_lib_str)
 
 
+def _bootstrap_state_dir() -> None:
+    """Keep app runtime logs out of the .app bundle."""
+    if os.environ.get("VOICE_CLAUDE_AGENT_STATE_DIR"):
+        return
+
+    resources = Path(__file__).resolve().parent
+    project_root = resources.parents[3] if len(resources.parents) > 3 else None
+    if project_root and (project_root / "feature_list.json").exists():
+        state_dir = project_root / "agent_state"
+    else:
+        state_dir = (
+            Path.home()
+            / "Library"
+            / "Application Support"
+            / "VoiceClaudeAgent"
+            / "agent_state"
+        )
+    os.environ["VOICE_CLAUDE_AGENT_STATE_DIR"] = str(state_dir)
+
+
 def main():
     _bootstrap_py2app_runtime_path()
+    _bootstrap_state_dir()
     from voice_claude_agent.app import launch_app
 
     stt_backend = os.environ.get("VOICE_STT_BACKEND", "whisper-cli")

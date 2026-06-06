@@ -156,6 +156,14 @@ class TestSummarizer:
 
 # ── Logging Store Tests ───────────────────────────────────
 class TestLoggingStore:
+    def test_agent_state_dir_env_override(self, monkeypatch, tmp_path):
+        from voice_claude_agent.config import get_agent_state_dir
+
+        state_dir = tmp_path / "custom_state"
+        monkeypatch.setenv("VOICE_CLAUDE_AGENT_STATE_DIR", str(state_dir))
+
+        assert get_agent_state_dir() == state_dir
+
     def test_write_session_creates_jsonl(self, tmp_path, monkeypatch):
         monkeypatch.setattr(
             "voice_claude_agent.logging_store.get_sessions_log_path",
@@ -2034,6 +2042,29 @@ class TestDefaultWhisperBackend:
         run_app._bootstrap_py2app_runtime_path()
 
         assert sys.path[0] == str(python_lib)
+
+    def test_run_app_bootstraps_dev_state_dir(self, monkeypatch, tmp_path):
+        """Development dist builds should write logs to the repo agent_state."""
+        import run_app
+
+        project_root = tmp_path / "project"
+        resources = (
+            project_root
+            / "dist"
+            / "VoiceClaudeAgent.app"
+            / "Contents"
+            / "Resources"
+        )
+        resources.mkdir(parents=True)
+        (project_root / "feature_list.json").write_text("[]")
+        monkeypatch.setattr(run_app, "__file__", str(resources / "run_app.py"))
+        monkeypatch.delenv("VOICE_CLAUDE_AGENT_STATE_DIR", raising=False)
+
+        run_app._bootstrap_state_dir()
+
+        assert os.environ["VOICE_CLAUDE_AGENT_STATE_DIR"] == str(
+            project_root / "agent_state"
+        )
 
     def test_run_app_env_override(self, monkeypatch):
         """Setting VOICE_STT_BACKEND=text-input should override the default."""

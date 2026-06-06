@@ -1,5 +1,6 @@
 """Configuration management."""
 
+import os
 import shutil
 from pathlib import Path
 
@@ -9,6 +10,9 @@ def get_project_root() -> Path:
 
 
 def get_agent_state_dir() -> Path:
+    state_dir = os.environ.get("VOICE_CLAUDE_AGENT_STATE_DIR")
+    if state_dir:
+        return Path(state_dir).expanduser()
     return get_project_root() / "agent_state"
 
 
