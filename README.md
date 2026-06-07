@@ -167,7 +167,7 @@ voice-claude-agent wake
 
 ## 开发状态
 
-Phase 1-7 已完成。F001-F048 全部通过。详情见 `feature_list.json`。
+Phase 1-7 已完成至 F049。详情见 `feature_list.json`。
 
 ## Manual Smoke Test（手动验收）
 
@@ -177,7 +177,7 @@ Phase 1-7 已完成。F001-F048 全部通过。详情见 `feature_list.json`。
 # 终端模式
 voice-claude-agent app
 
-# 或直接双击 .app（需先构建）
+# 或从 Finder 双击 dist/VoiceClaudeAgent.app（需先构建）
 open dist/VoiceClaudeAgent.app
 ```
 

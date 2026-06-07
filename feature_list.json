@@ -666,7 +666,7 @@
         "Verify it documents known limitations (TCC, PortAudio, TTS truncation)"
       ],
       "passes": true,
-      "evidence": "README Manual Smoke Test section added: launch instructions (voice-claude-agent app / open dist/...app), 8-item menu behavior table, 4 known limitations (TCC, PortAudio, TTS truncation, no wake word). All F049 steps verified."
+      "evidence": "README Manual Smoke Test section documents terminal launch and Finder double-click launch for dist/VoiceClaudeAgent.app, expected behavior for 8 menu items, and known limitations for TCC, PortAudio, TTS truncation, and no wake word. README status updated through F049. All F049 steps verified."
     },
     {
       "id": "F050",
@@ -678,8 +678,8 @@
         "Verify Phase 7 entries exist for F043-F050",
         "Verify each entry lists verification commands and test counts"
       ],
-      "passes": true,
-      "evidence": "agent-progress.md has 11 Phase 7 entries (F043-F050 + Codex review entries). Each lists verification commands and test counts. F050 steps verified."
+      "passes": false,
+      "evidence": ""
     }
   ]
 }

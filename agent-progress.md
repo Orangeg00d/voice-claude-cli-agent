@@ -1677,3 +1677,19 @@
 
 ### Verification
 - ./init.sh check/lint passed
+
+## 2026-06-07 12:42 — Codex Review: F049 README Smoke Test Docs
+
+### Finding
+- F049 content was present and matched the acceptance steps.
+- README status still said only F001-F048 had passed, so it did not reflect F049.
+- Claude also marked F050 as passed before Codex reviewed it.
+
+### Completed
+- Updated README project status through F049.
+- Made the .app launch instruction explicitly mention Finder double-click launch.
+- Kept F049 as passed with updated evidence.
+- Restored F050 to `passes=false` pending a separate Codex review.
+
+### Verification
+- `./init.sh check` and `./init.sh lint` passed.
