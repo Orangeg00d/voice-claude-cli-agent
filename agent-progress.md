@@ -2115,3 +2115,21 @@
 
 ### Verification
 - ./init.sh check/lint passed, 223 tests collected
+
+## 2026-06-07 19:45 — Codex Review: F067 GitHub Release Metadata
+
+### Finding
+- F067 correctly added README badges, GITHUB_RELEASE_DRAFT.md, and REPOSITORY_METADATA.md without runtime code changes.
+- README, RELEASE_NOTES, and DEVELOPER_PROGRAM_APPLICATION.md still reported Phase 1-12 / F001-F066 / 66 items after F067.
+- GITHUB_RELEASE_DRAFT.md used "222+ pytest tests" while the current verified suite is exactly 223 tests.
+
+### Completed
+- Updated README to Phase 1-13 / F001-F067 / 67 items and linked GITHUB_RELEASE_DRAFT.md and REPOSITORY_METADATA.md.
+- Updated RELEASE_NOTES with the F067 GitHub release display section.
+- Updated DEVELOPER_PROGRAM_APPLICATION.md to 67 acceptance items and complete documentation links.
+- Changed release draft wording to "223 pytest tests" and updated F067 evidence.
+
+### Verification
+- `./init.sh check` passed.
+- `./init.sh lint` passed.
+- `./init.sh test -q` passed: 223/223.

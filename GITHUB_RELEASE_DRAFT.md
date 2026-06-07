@@ -12,7 +12,7 @@ hands-free interaction with Claude CLI through a menu-bar app.
 - **TTS** via macOS `say`
 - **Three-tier risk classification**: read-only / recoverable / destructive
 - **Voice confirmation for high-risk actions**: say "同意" to proceed, "取消" to abort
-- **222+ pytest tests**, ruff-clean, full pipeline coverage
+- **223 pytest tests**, ruff-clean, full pipeline coverage
 - **Standalone .app bundle** via py2app
 - **Structured logging**: app_events.jsonl, sessions.jsonl, last_result.json
 - **Health Check + Mic Diagnostic** from the menu bar
