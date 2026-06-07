@@ -679,7 +679,7 @@
         "Verify each entry lists verification commands and test counts"
       ],
       "passes": true,
-      "evidence": "agent-progress.md has 11+ Phase 7 entries (F039-F050 + reviews). Each lists verification commands and test counts. F039-F049 all have timestamps, file lists, and risk notes. 166 tests collected, lint clean, check clean."
+      "evidence": "agent-progress.md has Phase 7 entries for F039-F050 plus Codex review entries. Entries list verification commands and test counts, including F043-F049 review corrections and F050 audit completion. 167/167 tests, lint clean, check clean."
     }
   ]
 }

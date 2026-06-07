@@ -167,7 +167,7 @@ voice-claude-agent wake
 
 ## 开发状态
 
-Phase 1-7 已完成至 F049。详情见 `feature_list.json`。
+Phase 1-7 已完成。F001-F050 全部通过。详情见 `feature_list.json`。
 
 ## Manual Smoke Test（手动验收）
 
