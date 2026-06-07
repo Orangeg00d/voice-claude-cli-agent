@@ -566,6 +566,63 @@ class VoiceClaudeApp(rumps.App):
                 )
                 return
 
+            # ── F064: Voice confirmation for high-risk actions ──
+            from voice_claude_agent.risk import classify_risk, requires_confirmation as _req_conf
+            from voice_claude_agent.confirmation import is_voice_confirm
+
+            risk = classify_risk(transcript)
+            if _req_conf(risk):
+                self._append_runtime_event("risk_high_confirm_start")
+                # TTS: ask user to confirm
+                from voice_claude_agent.tts import MacOSSaySpeaker
+                speaker = MacOSSaySpeaker()
+                speaker.speak(f"检测到高风险动作：{transcript[:60]}。请说同意以继续，或说取消以拒绝。")
+                self._append_runtime_event("risk_high_confirm_tts")
+
+                # Record confirmation audio
+                self.trigger_item.title = "Confirm? Say 同意 or 取消..."
+                conf_audio, conf_diag = self._record_with_timeout(recorder)
+                self._append_runtime_event(
+                    "risk_high_confirm_recorded",
+                    audio_bytes=len(conf_audio) if conf_audio else 0,
+                )
+                if not conf_audio:
+                    self.mic_status_item.title = "Mic: No confirmation audio"
+                    self._alert_on_main(
+                        title="Confirmation Failed",
+                        message="No audio captured for confirmation. Action aborted.",
+                    )
+                    return
+
+                conf_transcriber = RecordingTranscriber(backend=self.stt_backend)
+                conf_text = conf_transcriber.transcribe(conf_audio)
+                self._append_runtime_event(
+                    "risk_high_confirm_stt",
+                    transcript_preview=conf_text[:60],
+                )
+
+                verdict = is_voice_confirm(conf_text)
+                if verdict is True:
+                    self._append_runtime_event("risk_high_confirm_accepted")
+                elif verdict is False:
+                    self._append_runtime_event("risk_high_confirm_rejected")
+                    self.mic_status_item.title = "Mic: Action rejected"
+                    speaker.speak("高风险动作已被拒绝，未执行。")
+                    return
+                else:
+                    self._append_runtime_event("risk_high_confirm_unclear")
+                    self.mic_status_item.title = "Mic: Confirmation unclear"
+                    self._alert_on_main(
+                        title="Confirmation Unclear",
+                        message=(
+                            f"Heard: '{conf_text}'\n\n"
+                            "Could not determine yes/no. Action aborted for safety."
+                        ),
+                    )
+                    return
+
+            # ── End F064 ────────────────────────────────────────
+
             self.trigger_item.title = "Running Claude..."
             claude_start = _time.monotonic()
             self._append_runtime_event("claude_start", elapsed=f"{claude_start - cycle_start:.3f}s")

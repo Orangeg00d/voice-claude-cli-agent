@@ -34,3 +34,31 @@ def confirm_or_reject(
         return True, "User confirmed the high-risk action."
     else:
         return False, "User rejected the high-risk action."
+
+
+# ── F064: Voice-based confirmation keywords ────────────────
+
+_CONFIRM_ACCEPT: set[str] = {
+    "同意", "确认", "继续", "可以", "好", "行", "是的", "是", "对",
+    "yes", "ok", "y", "go", "do it", "proceed", "confirm",
+}
+_CONFIRM_REJECT: set[str] = {
+    "取消", "不要", "拒绝", "不行", "不", "否",
+    "no", "cancel", "n", "abort", "stop",
+}
+
+
+def is_voice_confirm(transcript: str) -> bool | None:
+    """Check if a voice transcript means confirm/accept.
+
+    Returns True=yes, False=no, None=unclear (try again).
+    """
+    clean = transcript.strip().lower()
+    # Check reject first (longer, more specific)
+    for kw in sorted(_CONFIRM_REJECT, key=len, reverse=True):
+        if kw in clean:
+            return False
+    for kw in sorted(_CONFIRM_ACCEPT, key=len, reverse=True):
+        if kw in clean:
+            return True
+    return None

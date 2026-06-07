@@ -871,6 +871,21 @@
         "Timeout or unrelated transcript cancels safely or prompts again with clear TTS/menu feedback",
         "Tests cover approve, reject, timeout/unrelated, and no Claude run before approval"
       ],
+      "passes": true,
+      "evidence": "Voice confirmation flow in _record_and_execute: after STT, if classify_risk returns EXTERNAL_OR_DESTRUCTIVE, TTS asks user to confirm, then records confirmation audio, transcribes it, and checks is_voice_confirm(). Agree keywords (同意/确认/继续 etc.) proceed, reject (取消/不要/拒绝 etc.) abort, unclear aborts for safety. Low-risk skips. is_voice_confirm added to confirmation.py with 中英双语 keyword sets, reject checked first to avoid false positives. 5 tests: agree, reject, unclear, high-risk flow, low-risk skip. 219 tests collected, lint clean."
+    },
+    {
+      "id": "F064",
+      "priority": 64,
+      "category": "safety",
+      "description": "Voice confirmation for high-risk Claude actions",
+      "steps": [
+        "When transcript is classified as high-risk, TTS asks user to confirm",
+        "User speaks confirmation (同意/确认/继续) or rejection (取消/不要/拒绝)",
+        "App records confirmation audio, transcribes it, and checks intent",
+        "If confirmed, proceeds with Claude execution; if rejected, aborts",
+        "Non-high-risk transcripts skip confirmation and execute directly"
+      ],
       "passes": false,
       "evidence": ""
     }

@@ -4021,3 +4021,123 @@ class TestTriggerSerialization:
         # Setting it to False again should be a no-op
         app._cycle_in_progress = False
         assert app._cycle_in_progress is False
+
+
+# ── F064: Voice Confirmation for High-Risk Actions ──────────
+class TestVoiceConfirmation:
+    def test_is_voice_confirm_agree(self):
+        """is_voice_confirm should return True for agreement keywords."""
+        from voice_claude_agent.confirmation import is_voice_confirm
+
+        assert is_voice_confirm("同意") is True
+        assert is_voice_confirm("确认执行") is True
+        assert is_voice_confirm("可以继续") is True
+        assert is_voice_confirm("好的") is True
+
+    def test_is_voice_confirm_reject(self):
+        """is_voice_confirm should return False for rejection keywords."""
+        from voice_claude_agent.confirmation import is_voice_confirm
+
+        assert is_voice_confirm("取消") is False
+        assert is_voice_confirm("不要") is False
+        assert is_voice_confirm("拒绝执行") is False
+        assert is_voice_confirm("不行") is False
+
+    def test_is_voice_confirm_unclear(self):
+        """is_voice_confirm should return None for unclear input."""
+        from voice_claude_agent.confirmation import is_voice_confirm
+
+        assert is_voice_confirm("今天天气如何") is None
+        assert is_voice_confirm("") is None
+
+    def test_high_risk_triggers_confirmation_flow(self, tmp_path, monkeypatch):
+        """When transcript is high-risk, _record_and_execute should trigger confirmation."""
+        import voice_claude_agent.app as app_mod
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "DEFAULT_RECORD_SECONDS", 0)
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "RECORD_WORKER_GRACE_SECONDS", 0)
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(
+            stt_backend="text-input",
+            _alert_patch=lambda **kw: None,
+            _wake_target=lambda: None,
+        )
+
+        # First recording: a high-risk prompt
+        mock_rec = __import__("unittest").mock.MagicMock()
+        mock_rec.get_audio.side_effect = [b"audio1", b"audio2"]
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            __import__("unittest").mock.MagicMock(return_value=mock_rec),
+        )
+        monkeypatch.setattr("voice_claude_agent.cli._run_pipeline", __import__("unittest").mock.MagicMock())
+
+        # STT returns high-risk transcript, then confirmation
+        transcribe_calls = ["git push origin main --force", "同意"]
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.RecordingTranscriber",
+            __import__("unittest").mock.MagicMock(
+                return_value=__import__("unittest").mock.MagicMock(
+                    transcribe=__import__("unittest").mock.MagicMock(side_effect=transcribe_calls)
+                )
+            ),
+        )
+
+        monkeypatch.setattr(
+            "voice_claude_agent.config.get_app_events_log_path",
+            lambda: tmp_path / "app_events.jsonl",
+        )
+
+        app.record_seconds = 0
+        app._record_and_execute()
+
+        # After execution, risk confirmation should have been accepted
+        assert app.trigger_item.title in ("Trigger Recording", "Done ✓")
+
+    def test_low_risk_skips_confirmation(self, tmp_path, monkeypatch):
+        """Low-risk transcripts should skip voice confirmation."""
+        import voice_claude_agent.app as app_mod
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "DEFAULT_RECORD_SECONDS", 0)
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "RECORD_WORKER_GRACE_SECONDS", 0)
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(
+            stt_backend="text-input",
+            _alert_patch=lambda **kw: None,
+            _wake_target=lambda: None,
+        )
+
+        mock_rec = __import__("unittest").mock.MagicMock()
+        mock_rec.get_audio.return_value = b"audio"
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            __import__("unittest").mock.MagicMock(return_value=mock_rec),
+        )
+        monkeypatch.setattr("voice_claude_agent.cli._run_pipeline", __import__("unittest").mock.MagicMock())
+
+        # Low-risk transcript
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.RecordingTranscriber",
+            __import__("unittest").mock.MagicMock(
+                return_value=__import__("unittest").mock.MagicMock(
+                    transcribe=__import__("unittest").mock.MagicMock(return_value="请解释这段代码")
+                )
+            ),
+        )
+
+        monkeypatch.setattr(
+            "voice_claude_agent.config.get_app_events_log_path",
+            lambda: tmp_path / "app_events.jsonl",
+        )
+
+        app.record_seconds = 0
+        app._record_and_execute()
+
+        # Should complete normally
+        assert app.trigger_item.title in ("Trigger Recording", "Done ✓")
