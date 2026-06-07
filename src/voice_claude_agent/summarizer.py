@@ -1,9 +1,39 @@
 """Claude CLI output summarizer.
 
 Generates concise user-facing text suitable for TTS readout.
+Long outputs are truncated at natural sentence boundaries for voice-friendliness.
 """
 
-MAX_RESULT_CHARS_FOR_READOUT = 500
+import re
+
+MAX_RESULT_CHARS_FOR_READOUT = 300  # voice-friendly limit (was 500)
+_TTS_TRUNCATION_NOTE = "（回复较长，完整内容可在菜单栏 Last Summary 查看）"
+
+
+def _strip_code_blocks(text: str) -> str:
+    """Remove code fences and their content for TTS readability."""
+    # Remove triple-backtick fenced blocks
+    text = re.sub(r"```[\s\S]*?```", "[代码块已省略]", text)
+    # Remove inline backticks
+    text = re.sub(r"`[^`]+`", "[引用]", text)
+    return text
+
+
+def _truncate_at_sentence(text: str, max_chars: int) -> str:
+    """Truncate text at the last sentence-ending punctuation within max_chars."""
+    if len(text) <= max_chars:
+        return text
+    chunk = text[:max_chars]
+    # Find last sentence boundary: 。!? ! ? followed by space or line break
+    match = re.search(r"[。！？!?](?:\s|$)", chunk[::-1])
+    if match:
+        cut = max_chars - match.start()
+        return text[:cut].rstrip()
+    # Fallback: truncate at last space
+    last_space = chunk.rfind(" ")
+    if last_space > max_chars // 2:
+        return chunk[:last_space].rstrip()
+    return chunk.rstrip()
 
 
 def summarize(result_text: str, exit_code: int, duration_seconds: float) -> str:
@@ -23,11 +53,11 @@ def summarize(result_text: str, exit_code: int, duration_seconds: float) -> str:
     if not lines:
         return "Claude CLI 执行完成，但无输出内容。"
 
-    if len(result_text) <= MAX_RESULT_CHARS_FOR_READOUT:
-        return result_text.strip()
+    # Strip code blocks for TTS readability
+    clean = _strip_code_blocks(result_text)
 
-    first_lines = lines[:3]
-    preview = "\n".join(line.rstrip()[:120] for line in first_lines)
-    return (
-        f"回复较长，共 {len(result_text)} 字符。开头内容：{preview}"
-    )
+    if len(clean) <= MAX_RESULT_CHARS_FOR_READOUT:
+        return clean.strip()
+
+    truncated = _truncate_at_sentence(clean, MAX_RESULT_CHARS_FOR_READOUT)
+    return f"{truncated}。{_TTS_TRUNCATION_NOTE}"

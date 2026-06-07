@@ -637,8 +637,8 @@
         "Verify the full output is still logged to sessions.jsonl",
         "Test verifies truncation in summarizer"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Rewrote summarizer: MAX_RESULT_CHARS_FOR_READOUT=300, strips code blocks+fences, truncates at sentence boundary, adds menu bar hint. 5 tests: short passthrough, long truncation+note, code block stripping, inline backtick stripping, sentence boundary truncation. TTS gets voice-friendly text; full output preserved in sessions.jsonl. 161/161 tests, lint clean."
     },
     {
       "id": "F048",

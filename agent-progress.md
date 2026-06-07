@@ -1609,3 +1609,11 @@
 - tests/test_core.py
 - feature_list.json
 - agent-progress.md
+
+## 2026-06-07 11:15 — Phase 7: F047 — TTS Truncation Strategy
+
+### Completed
+- Rewrote summarizer: strips code blocks/fences, truncates at sentence boundary, adds menu bar hint. 5 tests.
+
+### Verification
+- ./init.sh check/lint passed, 161/161 tests

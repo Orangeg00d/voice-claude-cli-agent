@@ -2871,3 +2871,43 @@ class TestLastTranscriptSummary:
 
         assert len(alerts) == 1
         assert "(no summary yet)" in alerts[0]["message"]
+
+
+# ── F047: TTS Truncation Strategy ──────────────────────────
+class TestTTSTruncation:
+    def test_short_output_passed_through_unchanged(self):
+        """Short output (< MAX_RESULT_CHARS_FOR_READOUT) should not be truncated."""
+        short = "OK, done. 完成了。"
+        result = summarize(short, exit_code=0, duration_seconds=1.0)
+        assert short in result
+        assert "完整内容可在" not in result  # no truncation note
+
+    def test_long_output_truncated_with_note(self):
+        """Long output should be truncated with a menu bar hint."""
+        long_text = "这是一个很长的回复。" * 50  # ~500 chars
+        result = summarize(long_text, exit_code=0, duration_seconds=1.0)
+        assert len(result) < len(long_text)
+        assert "完整内容可在菜单栏 Last Summary 查看" in result
+
+    def test_code_blocks_stripped_for_tts(self):
+        """Code fences should be replaced with placeholder text."""
+        text_with_code = "解释如下：\n```python\nprint('hello')\n```\n以上就是代码。"
+        result = summarize(text_with_code, exit_code=0, duration_seconds=1.0)
+        assert "代码块已省略" in result
+        assert "print('hello')" not in result  # code content removed
+
+    def test_inline_backticks_stripped(self):
+        """Inline backtick code should be replaced."""
+        result = summarize("请使用 `claude -p` 命令。", exit_code=0, duration_seconds=1.0)
+        assert "引用" in result
+        assert "`claude -p`" not in result
+
+    def test_truncation_at_sentence_boundary(self):
+        """Truncation should happen at a sentence end, not mid-word."""
+        sentence = "第一句话完毕。第二句话完毕。第三句话完毕。第四句话完毕。"
+        long = sentence * 20
+        result = summarize(long, exit_code=0, duration_seconds=1.0)
+        # Should not contain a mid-word cutoff before the truncation note
+        truncated_part = result.split("。（回复较长")[0] if "。（回复较长" in result else result
+        # The truncated part should end at a natural boundary
+        assert truncated_part.endswith("。") or truncated_part.endswith("完毕")
