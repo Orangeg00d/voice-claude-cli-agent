@@ -49,10 +49,10 @@ JSON
 
 ## v0.1.0 Release
 
-Phases 1-10 已完成，共 62 项验收 (F001-F062) 全部通过，210 个测试，lint clean。Phase 10 完成了真实使用验收中的稳定性与中文体验修正。
+Phases 1-10 已完成，共 63 项验收 (F001-F063) 全部通过，214 个测试，lint clean。Phase 10 完成了真实使用验收中的稳定性、中文体验与连续触发保护修正。下一项 F064 将实现菜单栏语音流程中的高风险动作语音确认。
 
 核心能力：
-- CLI 文本/语音命令执行，高风险动作二次确认
+- CLI 文本/语音命令执行，高风险动作二次确认；菜单栏语音确认仍在 F064 计划中
 - 菜单栏 App (rumps) + py2app .app 构建
 - whisper.cpp 离线语音转文字
 - 录音诊断、错误恢复、并发安全
@@ -189,7 +189,7 @@ voice-claude-agent wake
 
 ## 开发状态
 
-v0.1.0 Release — F001-F062 (Phase 1-10) 全部通过。210 个测试。详情见 `feature_list.json`、`RELEASE_NOTES.md`。
+v0.1.0 Release — F001-F063 (Phase 1-10) 全部通过。214 个测试。详情见 `feature_list.json`、`RELEASE_NOTES.md`。
 
 ## Manual Smoke Test（手动验收）
 

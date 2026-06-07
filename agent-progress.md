@@ -2006,3 +2006,20 @@
 
 ### Files Changed
 - tests/test_core.py, feature_list.json, agent-progress.md
+
+## 2026-06-07 17:35 — Codex Review: F063 Trigger Serialization
+
+### Finding
+- F063 is a useful stability audit for rapid Trigger Recording clicks, but it is not the previously discussed voice-confirmation feature for risky actions.
+- Claude implemented this in one round as an audit/test feature only; no runtime app code changed in this commit.
+- README and RELEASE_NOTES still showed stale F001-F062 / 210-test status after F063.
+
+### Completed
+- Verified F063 tests are meaningful enough to accept as trigger serialization coverage.
+- Added F064 as the explicit next safety feature: voice confirmation for risky actions in the menu-bar voice flow.
+- Updated README and RELEASE_NOTES to F001-F063 / 214 tests and documented that menu-bar voice confirmation remains pending.
+
+### Verification
+- `./init.sh check` passed.
+- `./init.sh lint` passed.
+- `./init.sh test -q` passed: 214/214.

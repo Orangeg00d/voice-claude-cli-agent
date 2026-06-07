@@ -857,6 +857,22 @@
       ],
       "passes": true,
       "evidence": "Verified trigger serialization: _cycle_in_progress guard blocks re-entry atomically via _cycle_lock. Guard released in _record_and_execute finally block on ALL exit paths (success, error, timeout). _run_wake_loop finally also clears guard for single-trigger mode. 4 tests: guard blocks re-entry, released on record open failure, triple-click only one cycle, guard not double-cleared. 214/214 tests, lint clean."
+    },
+    {
+      "id": "F064",
+      "priority": 64,
+      "category": "safety",
+      "description": "Voice confirmation for risky actions in the menu-bar voice flow",
+      "steps": [
+        "When a voice command is classified as external/destructive, menu app asks for confirmation instead of blocking on CLI input",
+        "Store the pending command and enter an awaiting_confirmation state",
+        "Next voice transcript of yes/confirm/同意/确认/继续 proceeds with the original command",
+        "Next voice transcript of no/cancel/取消/不要 rejects the original command",
+        "Timeout or unrelated transcript cancels safely or prompts again with clear TTS/menu feedback",
+        "Tests cover approve, reject, timeout/unrelated, and no Claude run before approval"
+      ],
+      "passes": false,
+      "evidence": ""
     }
   ]
 }
