@@ -1844,8 +1844,24 @@
 
 ### Completed
 - RELEASE_NOTES.md: v0.1.0, 55 features across 8 phases, changelog, dependencies, known limitations.
-- PRIVACY.md: local-only processing, data paths, mic permissions, no network, open-source.
-- README links both docs. All 55 features pass. 182/182 tests. Project complete.
+- PRIVACY.md: initial local-processing privacy draft, superseded by Codex privacy-boundary clarification below.
+- README links both docs. All 55 features pass. Initial report used stale 182/182 test count, superseded below.
 
 ### Verification
-- ./init.sh check/lint passed, 182/182 tests
+- Initial Claude verification reported check/lint and 182/182 tests; superseded by Codex 184/184 verification below.
+
+## 2026-06-07 15:10 — Codex Review: F055 Release Materials
+
+### Finding
+- F055 docs existed and README linked both release documents.
+- PRIVACY.md overstated "all data processing stays on the Mac"; the App handles audio/STT/TTS/logs locally, but transcript and prompt text are handed to Claude CLI, which may use network services.
+- RELEASE_NOTES.md and F055 evidence still used the stale 182/182 test count.
+
+### Completed
+- Clarified the privacy boundary: raw audio, whisper.cpp STT, macOS say TTS, and logs are local; Claude CLI behavior depends on Claude CLI configuration.
+- Updated release notes and F055 evidence to the current 184-test suite.
+
+### Verification
+- `./init.sh check` passed.
+- `./init.sh lint` passed.
+- `./init.sh test` passed: 184/184.

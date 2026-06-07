@@ -746,7 +746,7 @@
         "Ensure README links to release docs"
       ],
       "passes": true,
-      "evidence": "RELEASE_NOTES.md + PRIVACY.md created. README links both. 182/182 tests."
+      "evidence": "RELEASE_NOTES.md + PRIVACY.md created. README links both. Codex corrected privacy wording to distinguish local audio/STT/TTS/logs from Claude CLI transcript/prompt network processing. 184/184 tests, lint clean."
     }
   ]
 }
