@@ -569,7 +569,117 @@
         "Tests: dylib outside zip, mic permission on dylib fail, diagnostic has PortAudio status"
       ],
       "passes": true,
-      "evidence": "Codex audit found the initial fix still left _sounddevice_data/__init__.pyc in python314.zip, so sounddevice could resolve the data package to a zip path and keep failing dlopen. Follow-up manual diagnostics showed Resources/lib/_sounddevice_data was not on the app runtime sys.path, and later that the app still needed an explicit run_app.py bootstrap for Resources/lib/python3.14. setup.py now extracts the whole _sounddevice_data package beside sounddevice.py at Resources/lib/python3.14/_sounddevice_data/, creates filesystem __init__.py, chmods libportaudio.dylib, and removes the entire _sounddevice_data subtree from python314.zip. run_app.py inserts Resources/lib/python3.14 before importing app modules. Mic Diagnostic now shows _sounddevice_data/sys.path details. Verified simulated app sys.path resolves _sounddevice_data and sounddevice._libname to the filesystem dylib; sd.query_devices(kind='input') returns MacBook Pro麦克风. Tests: 133/133, focused runtime/F042+py2app 21/21, ./init.sh check/lint/test clean."
+      "evidence": "... 133/133 tests, lint clean."
+    },
+    {
+      "id": "F043",
+      "priority": 43,
+      "category": "app",
+      "description": "Trigger Recording is not re-entrant; repeat triggers are safely ignored",
+      "steps": [
+        "Click Trigger Recording while a cycle is in progress",
+        "Verify the second click is ignored (no second thread, no state corruption)",
+        "Verify menu title remains in cycle state, no crash",
+        "Test covers double-trigger idempotency"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F044",
+      "priority": 44,
+      "category": "app",
+      "description": "Each recording cycle logs structured app-events to sessions.jsonl",
+      "steps": [
+        "Trigger one recording cycle",
+        "Verify app-events field in session record contains: trigger, record_start, record_stop/timeout, stt_start, stt_done, claude_start, claude_done, tts_start, tts_done, cycle_done",
+        "Verify timestamps are monotonic"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F045",
+      "priority": 45,
+      "category": "app",
+      "description": "Menu title always resets to 'Trigger Recording' after any outcome",
+      "steps": [
+        "Trigger a cycle that gets empty audio, verify title resets",
+        "Trigger a cycle with STT error, verify title resets",
+        "Trigger a cycle with Claude timeout, verify title resets",
+        "Test covers all error recovery paths"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F046",
+      "priority": 46,
+      "category": "app",
+      "description": "Menu bar shows Last Transcript / Last Summary via menu items",
+      "steps": [
+        "After a successful cycle, menu shows the last transcript and summary",
+        "Clicking the items shows them as read-only info (no action)",
+        "If no transcript exists yet, shows a placeholder",
+        "Test verifies menu items present and updated after cycle"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F047",
+      "priority": 47,
+      "category": "app",
+      "description": "TTS summary is truncated for long Claude output",
+      "steps": [
+        "Produce a very long Claude output (~2000 chars)",
+        "Verify the spoken summary is truncated to a reasonable length",
+        "Verify the full output is still logged to sessions.jsonl",
+        "Test verifies truncation in summarizer"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F048",
+      "priority": 48,
+      "category": "app",
+      "description": "Consecutive rapid triggers do not create concurrent threads or corrupt state",
+      "steps": [
+        "Rapidly click Trigger Recording 3 times",
+        "Verify only one thread runs at a time",
+        "Verify each cycle completes before the next begins",
+        "Test covers concurrency safety"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F049",
+      "priority": 49,
+      "category": "docs",
+      "description": "README documents manual smoke-test steps for the menu bar app",
+      "steps": [
+        "READ Readme",
+        "Verify it describes how to launch the .app from Finder",
+        "Verify it lists expected menu items and their behavior",
+        "Verify it documents known limitations (TCC, PortAudio, TTS truncation)"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F050",
+      "priority": 50,
+      "category": "docs",
+      "description": "agent-progress.md records Phase 7 changes and test results",
+      "steps": [
+        "Read agent-progress.md",
+        "Verify Phase 7 entries exist for F043-F050",
+        "Verify each entry lists verification commands and test counts"
+      ],
+      "passes": false,
+      "evidence": ""
     }
   ]
 }
