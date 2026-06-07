@@ -2745,6 +2745,25 @@ class TestTitleRecovery:
 
 # ── F046: Last Transcript / Last Summary Menu Items ────────
 class TestLastTranscriptSummary:
+    def _patch_successful_recording(self, monkeypatch, transcript="hello"):
+        import voice_claude_agent.app as app_mod
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "DEFAULT_RECORD_SECONDS", 0.01)
+
+        mock_rec = mock.MagicMock()
+        mock_rec.get_audio.return_value = b"x"
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            mock.MagicMock(return_value=mock_rec),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.RecordingTranscriber",
+            mock.MagicMock(return_value=mock.MagicMock(
+                transcribe=mock.MagicMock(return_value=transcript)
+            )),
+        )
+
     def test_menu_items_present(self):
         """Menu should contain 'Last Transcript' and 'Last Summary' items."""
         from voice_claude_agent.app import VoiceClaudeApp
@@ -2767,33 +2786,19 @@ class TestLastTranscriptSummary:
 
     def test_updated_after_successful_cycle(self, tmp_path, monkeypatch):
         """After a successful _record_and_execute, menu items show last values."""
-        import voice_claude_agent.app as app_mod
-
-        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
-        monkeypatch.setattr(app_mod.VoiceClaudeApp, "DEFAULT_RECORD_SECONDS", 0.01)
-
         last_result = tmp_path / "last_result.json"
-        last_result.write_text(json.dumps(
-            {"prompt": "hello", "exit_code": 0, "summary": "Claude says hi"}
-        ), encoding="utf-8")
         monkeypatch.setattr(
             "voice_claude_agent.config.get_last_result_path",
             lambda: last_result,
         )
 
-        mock_rec = mock.MagicMock()
-        mock_rec.get_audio.return_value = b"x"
-        monkeypatch.setattr(
-            "voice_claude_agent.cli._safe_real_recorder",
-            mock.MagicMock(return_value=mock_rec),
-        )
-        monkeypatch.setattr("voice_claude_agent.cli._run_pipeline", mock.MagicMock())
-        monkeypatch.setattr(
-            "voice_claude_agent.stt.RecordingTranscriber",
-            mock.MagicMock(return_value=mock.MagicMock(
-                transcribe=mock.MagicMock(return_value="hello")
-            )),
-        )
+        def fake_pipeline(prompt, input_mode, tts_fake):
+            last_result.write_text(json.dumps(
+                {"prompt": prompt, "exit_code": 0, "summary": "Claude says hi"}
+            ), encoding="utf-8")
+
+        self._patch_successful_recording(monkeypatch, transcript="hello")
+        monkeypatch.setattr("voice_claude_agent.cli._run_pipeline", fake_pipeline)
 
         from voice_claude_agent.app import VoiceClaudeApp
 
@@ -2808,6 +2813,38 @@ class TestLastTranscriptSummary:
         assert app._last_summary == "Claude says hi"
         assert "hello" in app.transcript_item.title
         assert "Claude says hi" in app.summary_item.title
+
+    def test_summary_uses_current_pipeline_result_not_previous_result(self, tmp_path, monkeypatch):
+        """Last Summary should read the result written by the current cycle."""
+        last_result = tmp_path / "last_result.json"
+        last_result.write_text(json.dumps(
+            {"prompt": "old", "exit_code": 0, "summary": "Old summary"}
+        ), encoding="utf-8")
+        monkeypatch.setattr(
+            "voice_claude_agent.config.get_last_result_path",
+            lambda: last_result,
+        )
+
+        def fake_pipeline(prompt, input_mode, tts_fake):
+            last_result.write_text(json.dumps(
+                {"prompt": prompt, "exit_code": 0, "summary": "Fresh summary"}
+            ), encoding="utf-8")
+
+        self._patch_successful_recording(monkeypatch, transcript="current transcript")
+        monkeypatch.setattr("voice_claude_agent.cli._run_pipeline", fake_pipeline)
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(
+            stt_backend="text-input",
+            _alert_patch=lambda **kw: None,
+            _wake_target=lambda: None,
+        )
+        app._record_and_execute()
+
+        assert app._last_transcript == "current transcript"
+        assert app._last_summary == "Fresh summary"
+        assert "Old summary" not in app.summary_item.title
 
     def test_show_alert_on_click(self, monkeypatch):
         """Clicking Last Transcript should show an alert."""

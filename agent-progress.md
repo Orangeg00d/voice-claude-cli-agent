@@ -1585,3 +1585,27 @@
 
 ### Verification
 - ./init.sh check/lint passed, 155/155 tests
+
+## 2026-06-07 11:08 — Codex Review: F046 Current-Cycle Summary
+
+### Finding
+- F046 added the menu items, but `_record_and_execute()` read `last_result.json` before calling `_run_pipeline()`.
+- That meant `Last Summary` could show the previous cycle's summary instead of the current response.
+- The original test pre-wrote `last_result.json`, which masked the stale-summary bug.
+
+### Completed
+- Moved last-result reading to after `_run_pipeline()` completes.
+- Updated the F046 success test so the mocked pipeline writes the current result.
+- Added a regression test proving `Last Summary` uses the fresh current-cycle result, not a pre-existing old summary.
+- Updated F046 evidence to 6 tests.
+
+### Verification
+- Focused F046 tests passed: 6/6.
+- `./init.sh check` passed.
+- `./init.sh lint` passed.
+
+### Files Changed
+- src/voice_claude_agent/app.py
+- tests/test_core.py
+- feature_list.json
+- agent-progress.md

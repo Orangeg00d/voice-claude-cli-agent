@@ -387,6 +387,7 @@ class VoiceClaudeApp(rumps.App):
             self.trigger_item.title = "Running Claude..."
             claude_start = _time.monotonic()
             self._append_runtime_event("claude_start", elapsed=f"{claude_start - cycle_start:.3f}s")
+            _run_pipeline(transcript, input_mode="voice", tts_fake=False)
 
             # Capture summary from last_result.json written by _run_pipeline
             import json as _json
@@ -400,7 +401,6 @@ class VoiceClaudeApp(rumps.App):
             self._last_summary = last_data.get("summary", "")
             self.transcript_item.title = f"Last Transcript: {transcript[:60]}{'...' if len(transcript) > 60 else ''}"
             self.summary_item.title = f"Last Summary: {self._last_summary[:60]}{'...' if len(self._last_summary) > 60 else ''}"
-            _run_pipeline(transcript, input_mode="voice", tts_fake=False)
             self._append_runtime_event(
                 "claude_done",
                 elapsed=f"{_time.monotonic() - cycle_start:.3f}s",

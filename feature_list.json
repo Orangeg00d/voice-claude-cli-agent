@@ -624,7 +624,7 @@
         "Test verifies menu items present and updated after cycle"
       ],
       "passes": true,
-      "evidence": "Added transcript_item and summary_item to VoiceClaudeApp menu. _last_transcript and _last_summary capture values after successful cycle. Menu titles update to show truncated transcript/summary. Click shows rumps.alert dialog. 5 tests: items present, placeholder empty, updated after cycle, alert on click, placeholder alert. 155/155 tests, lint clean."
+      "evidence": "Added transcript_item and summary_item to VoiceClaudeApp menu. _last_transcript and _last_summary capture values after successful cycle, reading last_result.json after the current _run_pipeline completes. Menu titles update to show truncated transcript/summary. Click shows rumps.alert dialog. 6 tests: items present, placeholder empty, updated after cycle, current-cycle summary not stale, alert on click, placeholder alert. 156/156 tests, lint clean."
     },
     {
       "id": "F047",
