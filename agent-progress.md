@@ -1523,3 +1523,28 @@
 
 ### Verification
 - ./init.sh check/lint passed, 144/144 tests
+
+## 2026-06-07 10:22 — Codex Review: F044 Real App-Events Path
+
+### Finding
+- F044 direction was correct, but the first implementation added `write_app_event()` while the real menu app still wrote directly to `agent_state/app-events.log`.
+- The F044 test also generated simulated app events instead of verifying events emitted by `_record_and_execute()`.
+- The feature text mentioned `sessions.jsonl`, but the implemented and intended lifecycle log is `agent_state/app_events.jsonl`.
+
+### Completed
+- Changed `VoiceClaudeApp._append_runtime_event()` to call `logging_store.write_app_event()`.
+- Renamed the low-level recorder stop breadcrumb from `record_stop` to `recorder_stop`, leaving `record_stop` as the structured lifecycle event with `audio_bytes`.
+- Updated the F044 integration test to run a real mocked `_record_and_execute()` cycle and assert the actual `app_events.jsonl` content and event order.
+- Restored the F043 guard-clear assertion after it was accidentally displaced during F044 work.
+- Corrected F044 wording in `feature_list.json` from `sessions.jsonl` to `app_events.jsonl`.
+
+### Verification
+- `./init.sh check` passed.
+- `./init.sh lint` passed.
+- `./init.sh test` passed: 144/144 tests.
+
+### Files Changed
+- src/voice_claude_agent/app.py
+- tests/test_core.py
+- feature_list.json
+- agent-progress.md

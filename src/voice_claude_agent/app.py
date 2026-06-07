@@ -436,24 +436,10 @@ class VoiceClaudeApp(rumps.App):
             self._append_runtime_event(f"record_timeout_cleanup_stop_error {type(e).__name__}: {e}")
 
     def _append_runtime_event(self, message: str, **fields) -> None:
-        import json
-        from datetime import datetime
-
-        from voice_claude_agent.config import get_agent_state_dir
-
         try:
-            state_dir = get_agent_state_dir()
-            state_dir.mkdir(parents=True, exist_ok=True)
-            path = state_dir / "app-events.log"
-            timestamp = datetime.now().isoformat(timespec="seconds")
-            record = {
-                "timestamp": timestamp,
-                "event": message,
-            }
-            if fields:
-                record.update(fields)
-            with path.open("a", encoding="utf-8") as f:
-                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+            from voice_claude_agent.logging_store import write_app_event
+
+            write_app_event(message, **fields)
         except Exception:
             pass
 
@@ -506,7 +492,7 @@ class VoiceClaudeApp(rumps.App):
             time.sleep(0.1)
 
         try:
-            self._append_runtime_event("record_stop")
+            self._append_runtime_event("recorder_stop")
             recorder.stop()
         except Exception as e:
             diag_parts.append(f"recorder.stop: FAILED ({e})")

@@ -589,10 +589,10 @@
       "id": "F044",
       "priority": 44,
       "category": "app",
-      "description": "Each recording cycle logs structured app-events to sessions.jsonl",
+      "description": "Each recording cycle logs structured app-events to app_events.jsonl",
       "steps": [
         "Trigger one recording cycle",
-        "Verify app-events field in session record contains: trigger, record_start, record_stop/timeout, stt_start, stt_done, claude_start, claude_done, tts_start, tts_done, cycle_done",
+        "Verify app_events.jsonl contains: trigger, record_start, record_stop/timeout, stt_start, stt_done, claude_start, claude_done, tts_done, cycle_done",
         "Verify timestamps are monotonic"
       ],
       "passes": true,

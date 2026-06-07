@@ -2479,6 +2479,8 @@ class TestNonReentrantTrigger:
         with pytest.raises(RuntimeError, match="cycle failed"):
             app._run_wake_loop()
 
+        assert app._cycle_in_progress is False
+
 
 # ── F044: Structured App-Events Logging ─────────────────────
 class TestAppEventsLogging:
@@ -2518,27 +2520,13 @@ class TestAppEventsLogging:
             "voice_claude_agent.logging_store.get_last_result_path",
             lambda: tmp_path / "last_result.json",
         )
-        # Use a temp log path for app-events
         events_path = tmp_path / "app_events.jsonl"
-        monkeypatch.setattr(
-            "voice_claude_agent.config.get_app_events_log_path",
-            lambda: events_path,
-        )
-
-        # Also patch the app's internal _append_runtime_event to use our path
         monkeypatch.setattr(
             "voice_claude_agent.logging_store.get_app_events_log_path",
             lambda: events_path,
         )
 
-        # Patch the get_agent_state_dir used by _append_runtime_event
-        monkeypatch.setattr(
-            "voice_claude_agent.config.get_agent_state_dir",
-            lambda: tmp_path,
-        )
-        # Create the app-events.log path (the app writes to a hardcoded name)
         import voice_claude_agent.app as app_mod
-        app_mod._append_runtime_event = lambda self, msg, **kw: None
 
         monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
         monkeypatch.setattr(app_mod.VoiceClaudeApp, "DEFAULT_RECORD_SECONDS", 0.01)
@@ -2573,17 +2561,6 @@ class TestAppEventsLogging:
         )
         app._record_and_execute()
 
-        # Events are written via _append_runtime_event which we mocked out.
-        # Test the app_events.jsonl directly via write_app_event instead,
-        # proving the logging store function works correctly.
-        from voice_claude_agent.logging_store import write_app_event
-
-        # Flush a simulated set of events
-        for evt in ["trigger", "record_start", "record_stop", "stt_start",
-                     "stt_done", "claude_start", "claude_done",
-                     "tts_done", "cycle_done"]:
-            write_app_event(evt)
-
         assert events_path.exists()
         lines = events_path.read_text().strip().split("\n")
         events = [json.loads(line)["event"] for line in lines]
@@ -2604,4 +2581,6 @@ class TestAppEventsLogging:
         assert indexes["stt_done"] < indexes["claude_start"] < indexes["claude_done"]
         assert indexes["claude_done"] < indexes["cycle_done"]
 
-        assert app._cycle_in_progress is False
+        records = [json.loads(line) for line in lines]
+        record_stop = records[events.index("record_stop")]
+        assert record_stop["audio_bytes"] == len(b"test audio data")
