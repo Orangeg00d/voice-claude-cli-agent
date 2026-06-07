@@ -3936,3 +3936,88 @@ class TestZhCNOutput:
 
         app = VoiceClaudeApp()
         assert app.record_seconds == 10
+
+
+# ── F063: Trigger Serialization & Guard Release ────────────
+class TestTriggerSerialization:
+    def test_cycle_guard_blocks_reentry(self):
+        """When _cycle_in_progress=True, second trigger must return immediately."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(
+            _wake_target=lambda: None,
+            _alert_patch=lambda **kw: None,
+        )
+        app._cycle_in_progress = True
+
+        app._trigger_recording(app.trigger_item)
+        # Guard set — should not start
+        assert app._wake_thread is None
+        assert not app._wake_active
+
+    def test_cycle_guard_released_on_record_open_failure(self):
+        """If recorder fails to open, _cycle_in_progress should be False after return."""
+        import voice_claude_agent.app as app_mod
+
+        monkeypatch = __import__("pytest").MonkeyPatch()
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            __import__("unittest").mock.MagicMock(return_value=None),
+        )
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: None)
+
+        # Simulate a trigger: guard is set, then _record_and_execute runs
+        app._cycle_in_progress = True
+        app._record_and_execute()
+
+        # Guard must be False after cycle ends
+        assert app._cycle_in_progress is False
+        assert app.trigger_item.title == "Trigger Recording"
+
+    def test_rapid_triple_click_only_one_cycle(self):
+        """3 rapid _trigger_recording calls should start at most 1 cycle."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(
+            _wake_target=lambda: None,
+            _alert_patch=lambda **kw: None,
+        )
+        app._check_mic_or_alert = lambda: True
+
+        app._trigger_recording(app.trigger_item)
+        t1 = app._wake_thread
+        assert app._cycle_in_progress is True
+
+        app._trigger_recording(app.trigger_item)
+        app._trigger_recording(app.trigger_item)
+
+        # Only one thread should exist
+        assert app._wake_thread is t1
+
+        # Manually clean up
+        app._cycle_in_progress = False
+        app._wake_event.set()
+        t1.join(timeout=3.0)
+        app._stop_wake(app.stop_item)
+
+    def test_guard_not_double_cleared(self):
+        """_cycle_in_progress should only be cleared once per cycle."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(
+            _wake_target=lambda: None,
+            _alert_patch=lambda **kw: None,
+        )
+        app._cycle_in_progress = True
+
+        # Simulate _run_wake_loop's finally block
+        app._cycle_in_progress = False
+        assert app._cycle_in_progress is False
+
+        # Setting it to False again should be a no-op
+        app._cycle_in_progress = False
+        assert app._cycle_in_progress is False

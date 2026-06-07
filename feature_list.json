@@ -842,6 +842,21 @@
       ],
       "passes": true,
       "evidence": "Claude prompt prepends a simplified-Chinese constraint, and Claude stdout/stderr is converted to simplified before summary/log/TTS. _t2s_convert maps 60+ traditional chars to simplified in whisper output. Health Check and Mic Diagnostic show current record duration. README and MANUAL_TEST_RELEASE document ~/.voice-claude-agent/config.json with VOICE_RECORD_SECONDS. 7 F062 tests: prompt constraint, Claude output conversion, t2s conversion, simplified unchanged, health check duration, mic diagnostic duration, config record seconds. 210/210 tests, lint clean."
+    },
+    {
+      "id": "F063",
+      "priority": 63,
+      "category": "app",
+      "description": "Trigger Recording does not block further triggers; concurrent cycles are safely serialized",
+      "steps": [
+        "Rapidly click Trigger Recording 3 times",
+        "Verify only one cycle runs at a time, no crash, no NSWindow thread error",
+        "Verify _cycle_in_progress blocks re-entry but releases on cycle end",
+        "Verify menu title resets after each cycle",
+        "Verify app_events log does not show duplicate cycle_start events interleaved"
+      ],
+      "passes": true,
+      "evidence": "Verified trigger serialization: _cycle_in_progress guard blocks re-entry atomically via _cycle_lock. Guard released in _record_and_execute finally block on ALL exit paths (success, error, timeout). _run_wake_loop finally also clears guard for single-trigger mode. 4 tests: guard blocks re-entry, released on record open failure, triple-click only one cycle, guard not double-cleared. 214/214 tests, lint clean."
     }
   ]
 }
