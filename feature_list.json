@@ -638,7 +638,7 @@
         "Test verifies truncation in summarizer"
       ],
       "passes": true,
-      "evidence": "Rewrote summarizer: MAX_RESULT_CHARS_FOR_READOUT=300, strips code blocks+fences, truncates at sentence boundary, adds menu bar hint. 5 tests: short passthrough, long truncation+note, code block stripping, inline backtick stripping, sentence boundary truncation. TTS gets voice-friendly text; full output preserved in sessions.jsonl. 161/161 tests, lint clean."
+      "evidence": "Rewrote summarizer: MAX_RESULT_CHARS_FOR_READOUT=300, strips code blocks+fences, truncates at sentence boundary, adds menu bar hint. Split persisted summary from spoken_summary: sessions.jsonl now stores full claude_stdout/claude_stderr, full summary, and truncated spoken_summary; last_result.json stores full summary plus spoken_summary. 6 F047 tests cover short passthrough, long truncation+note, code block stripping, inline backtick stripping, sentence boundary truncation, and pipeline full-log/truncated-TTS behavior. 162/162 tests, lint clean."
     },
     {
       "id": "F048",

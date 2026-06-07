@@ -1617,3 +1617,30 @@
 
 ### Verification
 - ./init.sh check/lint passed, 161/161 tests
+
+## 2026-06-07 11:28 — Codex Review: F047 Preserve Full Output
+
+### Finding
+- F047 truncated `summarize()` output, but `_run_pipeline()` used that same value for TTS, `sessions.jsonl`, and `last_result.json`.
+- That meant the spoken text was shorter, but Last Summary and session summary were also truncated.
+- The feature evidence claimed full output was preserved in `sessions.jsonl`, but the session schema did not store Claude stdout/stderr.
+
+### Completed
+- Added `summarize_for_record()` so persisted summaries can remain full while TTS uses the voice-friendly truncated summary.
+- Added `spoken_summary`, `claude_stdout`, and `claude_stderr` to session records.
+- Updated `last_result.json` to keep full `summary` plus truncated `spoken_summary`.
+- Fixed sentence-boundary truncation to scan forward and cut at the last punctuation boundary.
+- Added a pipeline regression test proving long output is spoken in truncated form while full output remains in session and last-result logs.
+
+### Verification
+- Focused summarizer/logging/session/F047 tests passed: 17/17.
+- Full test suite passed: 162/162.
+- `./init.sh check`, `./init.sh lint`, and `python setup.py py2app` passed.
+
+### Files Changed
+- src/voice_claude_agent/summarizer.py
+- src/voice_claude_agent/cli.py
+- src/voice_claude_agent/logging_store.py
+- tests/test_core.py
+- feature_list.json
+- agent-progress.md

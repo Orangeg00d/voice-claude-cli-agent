@@ -30,7 +30,10 @@ def write_session(entry: dict) -> Path:
         "confirmation_received": entry.get("confirmation_received", False),
         "claude_command": entry.get("claude_command", []),
         "exit_code": entry.get("exit_code", -1),
+        "claude_stdout": entry.get("claude_stdout", ""),
+        "claude_stderr": entry.get("claude_stderr", ""),
         "summary": entry.get("summary", ""),
+        "spoken_summary": entry.get("spoken_summary", entry.get("summary", "")),
         "spoken": entry.get("spoken", False),
     }
 

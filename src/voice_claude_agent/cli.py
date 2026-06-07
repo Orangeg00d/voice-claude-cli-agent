@@ -19,7 +19,7 @@ from voice_claude_agent.stt import (
     TextInputTranscriber,
     list_available_backends,
 )
-from voice_claude_agent.summarizer import summarize
+from voice_claude_agent.summarizer import summarize, summarize_for_record
 from voice_claude_agent.tts import MacOSSaySpeaker, FakeSpeaker
 from voice_claude_agent.wake import ManualWakeTrigger
 
@@ -245,7 +245,10 @@ def _run_pipeline(prompt: str, input_mode: str, tts_fake: bool) -> None:
             "confirmation_received": confirmation_received,
             "claude_command": result.command,
             "exit_code": result.exit_code,
+            "claude_stdout": result.stdout,
+            "claude_stderr": result.stderr,
             "summary": "Timed out",
+            "spoken_summary": "Claude CLI 执行超时，请检查任务或重试。",
             "spoken": True,
         })
         return
@@ -254,8 +257,9 @@ def _run_pipeline(prompt: str, input_mode: str, tts_fake: bool) -> None:
     combined = result.stdout
     if result.stderr and result.exit_code != 0:
         combined = result.stderr + "\n" + result.stdout
-    summary = summarize(combined, result.exit_code, result.duration_seconds)
-    click.echo(f"Summary: {summary}")
+    summary = summarize_for_record(combined, result.exit_code, result.duration_seconds)
+    spoken_summary = summarize(combined, result.exit_code, result.duration_seconds)
+    click.echo(f"Summary: {spoken_summary}")
 
     # 5. Log to JSONL
     write_session({
@@ -266,7 +270,10 @@ def _run_pipeline(prompt: str, input_mode: str, tts_fake: bool) -> None:
         "confirmation_received": confirmation_received,
         "claude_command": result.command,
         "exit_code": result.exit_code,
+        "claude_stdout": result.stdout,
+        "claude_stderr": result.stderr,
         "summary": summary,
+        "spoken_summary": spoken_summary,
         "spoken": True,
     })
 
@@ -274,11 +281,12 @@ def _run_pipeline(prompt: str, input_mode: str, tts_fake: bool) -> None:
         "prompt": prompt,
         "exit_code": result.exit_code,
         "summary": summary,
+        "spoken_summary": spoken_summary,
         "risk_level": risk_level.value,
     })
 
     # 6. TTS speak
-    speaker.speak(summary)
+    speaker.speak(spoken_summary)
     if tts_fake:
         assert isinstance(speaker, FakeSpeaker)
         click.echo(f"TTS (fake): {speaker.spoken[-1]}")

@@ -1914,7 +1914,8 @@ class TestSessionLogParity:
         expected_keys = {
             "timestamp", "input_mode", "transcript", "classified_intent",
             "risk_level", "confirmation_required", "confirmation_received",
-            "claude_command", "exit_code", "summary", "spoken",
+            "claude_command", "exit_code", "claude_stdout", "claude_stderr",
+            "summary", "spoken_summary", "spoken",
         }
         assert set(cli_entry.keys()) == expected_keys
         assert set(menu_entry.keys()) == expected_keys
@@ -2911,3 +2912,41 @@ class TestTTSTruncation:
         truncated_part = result.split("。（回复较长")[0] if "。（回复较长" in result else result
         # The truncated part should end at a natural boundary
         assert truncated_part.endswith("。") or truncated_part.endswith("完毕")
+
+    def test_pipeline_speaks_truncated_but_logs_full_output(self, tmp_path, monkeypatch):
+        """F047 should truncate TTS while preserving full output in logs."""
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_sessions_log_path",
+            lambda: tmp_path / "sessions.jsonl",
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_last_result_path",
+            lambda: tmp_path / "last_result.json",
+        )
+
+        long_text = "这是一个很长的 Claude 回复。" * 80
+        monkeypatch.setattr(
+            "voice_claude_agent.cli.run_claude",
+            mock.MagicMock(return_value=ClaudeRunResult(
+                command=["claude", "-p", "long"],
+                exit_code=0,
+                stdout=long_text,
+                stderr="",
+                duration_seconds=0.1,
+                timed_out=False,
+            )),
+        )
+
+        from voice_claude_agent.cli import _run_pipeline
+
+        _run_pipeline("long", input_mode="text", tts_fake=True)
+
+        session = json.loads((tmp_path / "sessions.jsonl").read_text().splitlines()[0])
+        last_result = json.loads((tmp_path / "last_result.json").read_text())
+
+        assert session["claude_stdout"] == long_text
+        assert session["summary"] == long_text
+        assert session["spoken_summary"] != long_text
+        assert "完整内容可在菜单栏 Last Summary 查看" in session["spoken_summary"]
+        assert last_result["summary"] == long_text
+        assert last_result["spoken_summary"] == session["spoken_summary"]

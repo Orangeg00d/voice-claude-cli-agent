@@ -24,11 +24,10 @@ def _truncate_at_sentence(text: str, max_chars: int) -> str:
     if len(text) <= max_chars:
         return text
     chunk = text[:max_chars]
-    # Find last sentence boundary: 。!? ! ? followed by space or line break
-    match = re.search(r"[。！？!?](?:\s|$)", chunk[::-1])
-    if match:
-        cut = max_chars - match.start()
-        return text[:cut].rstrip()
+    # Find the last sentence boundary within the chunk.
+    matches = list(re.finditer(r"[。！？.!?]", chunk))
+    if matches:
+        return chunk[:matches[-1].end()].rstrip()
     # Fallback: truncate at last space
     last_space = chunk.rfind(" ")
     if last_space > max_chars // 2:
@@ -61,3 +60,10 @@ def summarize(result_text: str, exit_code: int, duration_seconds: float) -> str:
 
     truncated = _truncate_at_sentence(clean, MAX_RESULT_CHARS_FOR_READOUT)
     return f"{truncated}。{_TTS_TRUNCATION_NOTE}"
+
+
+def summarize_for_record(result_text: str, exit_code: int, duration_seconds: float) -> str:
+    """Generate the full summary persisted to logs and Last Summary."""
+    if exit_code == 0 and result_text.strip():
+        return result_text.strip()
+    return summarize(result_text, exit_code, duration_seconds)
