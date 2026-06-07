@@ -134,7 +134,10 @@ class TestTTS:
 class TestSummarizer:
     def test_success_with_short_output(self):
         summary = summarize("OK, done.", exit_code=0, duration_seconds=2.5)
-        assert "成功" in summary or "OK" in summary
+        assert summary == "OK, done."
+        assert "Claude CLI 执行成功" not in summary
+        assert "耗时" not in summary
+        assert "完整输出" not in summary
 
     def test_failure_with_nonzero_exit_code(self):
         summary = summarize("Error: file not found", exit_code=1, duration_seconds=0.1)

@@ -1403,6 +1403,28 @@
 - tests/test_core.py
 - agent-progress.md
 
+## 2026-06-07 08:13 — Codex Review: TTS Should Not Read Execution Metadata
+
+### Finding
+- User confirmed Chinese STT/response works, but TTS still begins with `Claude CLI 执行成功，耗时 N 秒。完整输出：...`.
+- This comes from `summarize()` returning execution metadata for successful Claude results.
+
+### Completed
+- Changed successful short Claude output summaries to return only the Claude output text.
+- Changed long successful output prefix from execution metadata to a shorter `回复较长...` preview.
+- Kept failure, timeout, and Claude-not-found messages explicit because those are actionable status messages.
+- Added a regression test ensuring short successful output does not contain `Claude CLI 执行成功`, `耗时`, or `完整输出`.
+
+### Verification
+- `./init.sh check` passed.
+- `./init.sh lint` passed.
+- Focused summarizer/pipeline tests passed: 12/12.
+
+### Files Changed
+- src/voice_claude_agent/summarizer.py
+- tests/test_core.py
+- agent-progress.md
+
 ## 2026-06-06 22:37 — Codex Review: F042 Runtime Bootstrap Correction
 
 ### Finding
