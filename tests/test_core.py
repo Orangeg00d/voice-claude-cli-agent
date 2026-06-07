@@ -2584,3 +2584,96 @@ class TestAppEventsLogging:
         records = [json.loads(line) for line in lines]
         record_stop = records[events.index("record_stop")]
         assert record_stop["audio_bytes"] == len(b"test audio data")
+
+
+# ── F045: Title Recovery After Every Error Path ─────────────
+class TestTitleRecovery:
+    def _make_app(self, **kw):
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        return VoiceClaudeApp(
+            stt_backend="text-input",
+            _alert_patch=lambda **kw: None,
+            _wake_target=lambda: None,
+            **kw,
+        )
+
+    def test_title_reset_after_empty_audio(self, monkeypatch):
+        """After empty audio, trigger_item.title must be 'Trigger Recording'."""
+        import voice_claude_agent.app as app_mod
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "DEFAULT_RECORD_SECONDS", 0.01)
+
+        app = self._make_app()
+        mock_rec = mock.MagicMock()
+        mock_rec.get_audio.return_value = b""
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            mock.MagicMock(return_value=mock_rec),
+        )
+
+        app._record_and_execute()
+        assert app.trigger_item.title == "Trigger Recording"
+
+    def test_title_reset_after_stt_error(self, monkeypatch):
+        """After STT error, trigger_item.title must be 'Trigger Recording'."""
+        import voice_claude_agent.app as app_mod
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "DEFAULT_RECORD_SECONDS", 0.01)
+
+        app = self._make_app()
+        mock_rec = mock.MagicMock()
+        mock_rec.get_audio.return_value = b"x"
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            mock.MagicMock(return_value=mock_rec),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.RecordingTranscriber",
+            mock.MagicMock(return_value=mock.MagicMock(
+                transcribe=mock.MagicMock(return_value="[STT error: test]")
+            )),
+        )
+
+        app._record_and_execute()
+        assert app.trigger_item.title == "Trigger Recording"
+
+    def test_title_reset_after_transcriber_crash(self, monkeypatch):
+        """After transcribe throws RuntimeError, title must be 'Trigger Recording'."""
+        import voice_claude_agent.app as app_mod
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "DEFAULT_RECORD_SECONDS", 0.01)
+
+        app = self._make_app()
+        mock_rec = mock.MagicMock()
+        mock_rec.get_audio.return_value = b"x"
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            mock.MagicMock(return_value=mock_rec),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.RecordingTranscriber",
+            mock.MagicMock(return_value=mock.MagicMock(
+                transcribe=mock.MagicMock(side_effect=RuntimeError("transcriber crash"))
+            )),
+        )
+
+        app._record_and_execute()
+        assert app.trigger_item.title == "Trigger Recording"
+
+    def test_title_reset_after_record_open_failed(self, monkeypatch):
+        """After _open_mic_or_alert returns None, title must reset."""
+        import voice_claude_agent.app as app_mod
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            mock.MagicMock(return_value=None),
+        )
+
+        app = self._make_app()
+        app._record_and_execute()
+        assert app.trigger_item.title == "Trigger Recording"

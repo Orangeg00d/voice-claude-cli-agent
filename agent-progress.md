@@ -1548,3 +1548,12 @@
 - tests/test_core.py
 - feature_list.json
 - agent-progress.md
+
+## 2026-06-07 10:45 — Phase 7: F045 — Title Recovery
+
+### Completed
+- Verified finally block in _record_and_execute resets trigger_item.title on all error paths.
+- 4 tests: empty audio, STT error, transcriber crash, open_mic failed.
+
+### Verification
+- ./init.sh check/lint passed, 148 tests collected
