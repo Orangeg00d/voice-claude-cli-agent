@@ -1750,3 +1750,11 @@
 ### Verification
 - `./init.sh check` passed.
 - `./init.sh lint` passed.
+
+## 2026-06-07 12:30 — Phase 8: F052 — View Logs Menu Item
+
+### Completed
+- Added 'View Logs' menu item. _show_logs reads app_events.jsonl (last 10) + last_result.json. Handles missing files and corrupted JSON. 4 tests.
+
+### Verification
+- ./init.sh check/lint passed, 171/171 tests

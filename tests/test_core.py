@@ -3128,3 +3128,98 @@ class TestConcurrentTriggerSafety:
 
         # Stop
         app._stop_wake(app.stop_item)
+
+
+# ── F052: View Logs Menu Item ───────────────────────────────
+class TestViewLogs:
+    def test_logs_menu_item_present(self):
+        """Menu should contain 'View Logs' item."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        assert app.logs_item is not None
+        assert "Logs" in app.logs_item.title or "logs" in app.logs_item.title.lower()
+
+    def test_no_logs_shows_placeholder(self, tmp_path, monkeypatch):
+        """When no log files exist, _show_logs should show placeholders."""
+        alerts = []
+
+        monkeypatch.setattr(
+            "voice_claude_agent.config.get_agent_state_dir",
+            lambda: tmp_path,
+        )
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._show_logs(app.logs_item)
+
+        assert len(alerts) == 1
+        assert alerts[0]["title"] == "View Logs"
+        msg = alerts[0]["message"]
+        assert "no app_events log yet" in msg or "no app_events" in msg.lower()
+        assert "no last_result.json yet" in msg or "no last_result" in msg.lower()
+
+    def test_logs_with_content_shows_recent_events(self, tmp_path, monkeypatch):
+        """When logs exist, _show_logs should display recent entries."""
+        import json
+
+        alerts = []
+
+        monkeypatch.setattr(
+            "voice_claude_agent.config.get_agent_state_dir",
+            lambda: tmp_path,
+        )
+
+        # Write app_events
+        events_path = tmp_path / "app_events.jsonl"
+        events = []
+        for i in range(15):
+            events.append(json.dumps({
+                "timestamp": f"2026-06-07T10:00:{i:02d}+08:00",
+                "event": f"event_{i}", "elapsed": f"0.{i}s",
+            }))
+        events_path.write_text("\n".join(events) + "\n", encoding="utf-8")
+
+        # Write last_result
+        result_path = tmp_path / "last_result.json"
+        result_path.write_text(json.dumps({
+            "prompt": "hello", "exit_code": 0, "summary": "Claude says hi",
+        }), encoding="utf-8")
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._show_logs(app.logs_item)
+
+        assert len(alerts) == 1
+        msg = alerts[0]["message"]
+        # Should show recent 10 of 15
+        assert "10 of 15" in msg
+        assert "event_14" in msg  # most recent in last 10
+        assert "event_5" in msg  # within last 10 (5-14)
+        assert "event_0" not in msg  # too old, 0-4 excluded
+        # Should show last_result
+        assert "hello" in msg
+        assert "Claude says hi" in msg
+
+    def test_corrupted_json_does_not_crash(self, tmp_path, monkeypatch):
+        """Corrupted log files should show an error, not crash."""
+        alerts = []
+
+        monkeypatch.setattr(
+            "voice_claude_agent.config.get_agent_state_dir",
+            lambda: tmp_path,
+        )
+
+        (tmp_path / "app_events.jsonl").write_text("not valid json\n", encoding="utf-8")
+        (tmp_path / "last_result.json").write_text("{{broken", encoding="utf-8")
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._show_logs(app.logs_item)
+
+        assert len(alerts) == 1
+        msg = alerts[0]["message"]
+        assert "Error reading app_events" in msg or "corrupted" in msg

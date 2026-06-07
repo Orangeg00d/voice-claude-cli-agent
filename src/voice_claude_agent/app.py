@@ -81,6 +81,9 @@ class VoiceClaudeApp(rumps.App):
         )
         self.quit_item = rumps.MenuItem("Quit", callback=self._quit)
 
+        # F052: View Logs
+        self.logs_item = rumps.MenuItem("View Logs", callback=self._show_logs)
+
         self.menu = [
             self.start_item,
             self.stop_item,
@@ -91,6 +94,8 @@ class VoiceClaudeApp(rumps.App):
             None,
             self.transcript_item,
             self.summary_item,
+            None,
+            self.logs_item,
             None,
             self.quit_item,
         ]
@@ -173,6 +178,60 @@ class VoiceClaudeApp(rumps.App):
     def _show_last_summary(self, sender: rumps.MenuItem) -> None:
         text = self._last_summary or "(no summary yet)"
         self._alert(title="Last Summary", message=text)
+
+    # ── F052: View Logs ─────────────────────────────────────
+
+    def _show_logs(self, sender: rumps.MenuItem) -> None:
+        """Show recent app_events and last_result in an alert dialog."""
+        import json
+
+        from voice_claude_agent.config import get_agent_state_dir
+
+        lines = ["=== View Logs ===", ""]
+        state_dir = get_agent_state_dir()
+
+        # ── app_events ──
+        events_path = state_dir / "app_events.jsonl"
+        if events_path.exists():
+            try:
+                raw = events_path.read_text(encoding="utf-8")
+                all_events = [json.loads(line) for line in raw.strip().split("\n") if line]
+                recent = all_events[-10:]
+                lines.append(f"Recent app-events ({len(recent)} of {len(all_events)} total):")
+                for ev in recent:
+                    ts = ev.get("timestamp", "")[-8:]  # HH:MM:SS
+                    evt = ev.get("event", "?")
+                    extra = ""
+                    if "elapsed" in ev:
+                        extra = f" @{ev['elapsed']}"
+                    if "audio_bytes" in ev:
+                        extra += f" bytes={ev['audio_bytes']}"
+                    lines.append(f"  {ts} {evt}{extra}")
+            except Exception as e:
+                lines.append(f"Error reading app_events: {e}")
+        else:
+            lines.append("(no app_events log yet)")
+
+        lines.append("")
+
+        # ── last_result ──
+        result_path = state_dir / "last_result.json"
+        if result_path.exists():
+            try:
+                data = json.loads(result_path.read_text(encoding="utf-8"))
+                lines.append("Last result:")
+                lines.append(f"  prompt: {data.get('prompt', '?')}")
+                lines.append(f"  exit_code: {data.get('exit_code', '?')}")
+                summary = data.get("summary", data.get("spoken_summary", "?"))
+                lines.append(f"  summary: {summary[:200]}")
+            except json.JSONDecodeError:
+                lines.append("(last_result.json is corrupted — not valid JSON)")
+            except Exception as e:
+                lines.append(f"Error reading last_result: {e}")
+        else:
+            lines.append("(no last_result.json yet)")
+
+        self._alert(title="View Logs", message="\n".join(lines))
 
     # ── Mic Diagnostic ───────────────────────────────────────
 

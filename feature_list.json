@@ -705,8 +705,8 @@
         "Click shows recent app_events entries and last_result.json content",
         "If no logs exist, shows placeholder message"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Added 'View Logs' menu item with _show_logs callback. Shows recent 10 app_events (timestamp + event name) and last_result.json (prompt, exit_code, summary). Placeholder when no logs exist. Corrupted JSON shows 'Error reading' message without crashing. 4 tests: menu present, no-logs placeholder, content display (10 of 15 filtering), corrupted JSON. 171/171 tests, lint clean."
     },
     {
       "id": "F053",
