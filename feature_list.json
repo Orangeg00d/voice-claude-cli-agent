@@ -810,8 +810,8 @@
         "Cover log inspection and app exit",
         "Each step has expected behavior and troubleshooting"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "MANUAL_TEST_RELEASE.md created: 9 sections covering fresh install, whisper.cpp setup, first mic authorization, first Trigger Recording, log inspection, multi-round stability, Health Check, quit, and optional .app build. Each section has expected behavior and troubleshooting table."
     }
   ]
 }

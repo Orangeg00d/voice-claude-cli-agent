@@ -1912,3 +1912,11 @@
 
 ### Verification
 - ./init.sh check/lint passed, 193/193 tests
+
+## 2026-06-07 14:20 — Phase 9: F060 — MANUAL_TEST_RELEASE.md
+
+### Completed
+- Created release acceptance test: 9 sections, troubleshooting table. 193/193 tests, lint clean.
+
+### Files Changed
+- MANUAL_TEST_RELEASE.md, feature_list.json, agent-progress.md
