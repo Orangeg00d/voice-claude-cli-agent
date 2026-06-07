@@ -841,7 +841,7 @@
         "Tests: prompt constraint, txt2zh, config record_seconds, diagnostic shows record_seconds"
       ],
       "passes": true,
-      "evidence": "Claude prompt prepends zh-CN constraint. _t2s_convert maps 60+ traditional chars to simplified in whisper output. Health Check shows Record duration. VoiceClaudeApp reads VOICE_RECORD_SECONDS from config.json. 5 tests: prompt constraint, t2s conversion, simplified unchanged, health check duration, config record seconds. 208/208 tests, lint clean."
+      "evidence": "Claude prompt prepends a simplified-Chinese constraint, and Claude stdout/stderr is converted to simplified before summary/log/TTS. _t2s_convert maps 60+ traditional chars to simplified in whisper output. Health Check and Mic Diagnostic show current record duration. README and MANUAL_TEST_RELEASE document ~/.voice-claude-agent/config.json with VOICE_RECORD_SECONDS. 7 F062 tests: prompt constraint, Claude output conversion, t2s conversion, simplified unchanged, health check duration, mic diagnostic duration, config record seconds. 210/210 tests, lint clean."
     }
   ]
 }

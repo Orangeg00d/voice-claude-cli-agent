@@ -3840,6 +3840,37 @@ class TestZhCNOutput:
         call_args = mock_run.call_args[0][0] if mock_run.call_args else ""
         assert "简体中文" in call_args, f"zh-CN constraint missing: {call_args}"
 
+    def test_claude_traditional_output_is_simplified_in_summary(self, monkeypatch):
+        """Claude output should be converted to simplified before summary/log/TTS."""
+        from unittest import mock as _mock
+
+        from voice_claude_agent.cli import _run_pipeline
+
+        sessions = []
+        monkeypatch.setattr(
+            "voice_claude_agent.cli.write_session",
+            lambda payload: sessions.append(payload),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.cli.write_last_result",
+            lambda payload: None,
+        )
+
+        with _mock.patch("voice_claude_agent.cli.run_claude") as mock_run:
+            mock_run.return_value.exit_code = 0
+            mock_run.return_value.stdout = "請問這是什麼時候開始的"
+            mock_run.return_value.stderr = ""
+            mock_run.return_value.timed_out = False
+            mock_run.return_value.duration_seconds = 0.1
+            mock_run.return_value.command = ["claude", "-p", "test"]
+
+            _run_pipeline("test prompt", input_mode="text", tts_fake=True)
+
+        assert sessions
+        assert "請" not in sessions[0]["summary"]
+        assert "请问这是什么时候开始的" in sessions[0]["summary"]
+        assert sessions[0]["spoken_summary"] == sessions[0]["summary"]
+
     def test_t2s_converts_traditional_to_simplified(self):
         """_t2s_convert should convert traditional characters to simplified."""
         from voice_claude_agent.stt import _t2s_convert
@@ -3871,6 +3902,23 @@ class TestZhCNOutput:
         msg = alerts[0]["message"]
         assert "Record duration" in msg
         assert "5s" in msg
+
+    def test_mic_diagnostic_shows_record_duration(self, monkeypatch):
+        """Mic Diagnostic should include the current record duration."""
+        alerts = []
+        import voice_claude_agent.app as app_mod
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setitem(__import__("sys").modules, "_sounddevice_data", None)
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app.record_seconds = 10
+        app._run_mic_diagnostic(app.diagnostic_item)
+
+        assert alerts
+        assert "Record duration: 10s" in alerts[0]["message"]
 
     def test_voice_claude_app_reads_record_seconds_from_config(self, tmp_path, monkeypatch):
         """VoiceClaudeApp should read VOICE_RECORD_SECONDS from config.json."""

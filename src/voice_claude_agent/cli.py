@@ -18,6 +18,7 @@ from voice_claude_agent.stt import (
     FakeTranscriber,
     RecordingTranscriber,
     TextInputTranscriber,
+    _t2s_convert,
     list_available_backends,
 )
 from voice_claude_agent.summarizer import summarize, summarize_for_record
@@ -265,6 +266,7 @@ def _run_pipeline(prompt: str, input_mode: str, tts_fake: bool) -> None:
     combined = result.stdout
     if result.stderr and result.exit_code != 0:
         combined = result.stderr + "\n" + result.stdout
+    combined = _t2s_convert(combined)
     summary = summarize_for_record(combined, result.exit_code, result.duration_seconds)
     spoken_summary = summarize(combined, result.exit_code, result.duration_seconds)
     click.echo(f"Summary: {spoken_summary}")

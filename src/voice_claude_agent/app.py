@@ -283,6 +283,7 @@ class VoiceClaudeApp(rumps.App):
         lines.append("Bundle ID: com.voiceclaude.agent")
         lines.append(f"Python: {platform.python_version()}")
         lines.append(f"Agent state dir: {get_agent_state_dir()}")
+        lines.append(f"Record duration: {self.record_seconds}s")
         lines.append(f"Whisper language: {os.environ.get('WHISPER_CPP_LANGUAGE', 'zh')}")
         lines.append("Python path containing _sounddevice_data:")
         sounddevice_data_paths = [p for p in sys.path if "_sounddevice_data" in p or "python3.14" in p]

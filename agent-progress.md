@@ -1977,3 +1977,24 @@
 
 ### Verification
 - ./init.sh check/lint passed, 208/208 tests
+
+## 2026-06-07 17:05 — Codex Review: F062 Simplified Chinese & Duration
+
+### Finding
+- F062 did not update README or MANUAL_TEST_RELEASE with the local config file duration workflow.
+- Mic Diagnostic did not show `record_seconds`, although the acceptance item required Health Check / Mic Diagnostic visibility.
+- Claude was prompted to answer in simplified Chinese, but returned output was not converted before summary/log/TTS if Claude still returned traditional text.
+
+### Completed
+- Converted Claude stdout/stderr to simplified Chinese before summary, logging, and TTS.
+- Added `Record duration` to Mic Diagnostic.
+- Documented `~/.voice-claude-agent/config.json` with `VOICE_RECORD_SECONDS=10` in README and MANUAL_TEST_RELEASE.
+- Added F062 regression tests for Claude output conversion and Mic Diagnostic duration.
+
+### Verification
+- Focused F062 tests passed: 7/7.
+- `./init.sh check` passed.
+- `./init.sh lint` passed.
+- `./init.sh test -q` passed: 210/210.
+- `./init.sh build-app` passed and rebuilt `dist/VoiceClaudeAgent.app`.
+- `./init.sh install-app` passed and installed `~/Applications/VoiceClaudeAgent.app` with bundle id `com.voiceclaude.agent`.

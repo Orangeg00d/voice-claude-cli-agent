@@ -30,6 +30,17 @@ voice-claude-agent wake                      # 唤醒循环，Enter 触发，Ctr
 VOICE_RECORD_SECONDS=3 voice-claude-agent app
 launchctl setenv VOICE_RECORD_SECONDS 3      # Finder 双击 .app 前设置 GUI 环境
 
+# 或写入本地配置文件，Finder 启动的 .app 也会读取
+mkdir -p ~/.voice-claude-agent
+cat > ~/.voice-claude-agent/config.json <<'JSON'
+{
+  "VOICE_RECORD_SECONDS": "10",
+  "VOICE_STT_BACKEND": "whisper-cli",
+  "WHISPER_CPP_MODEL": "/path/to/ggml-base.bin",
+  "WHISPER_CPP_LANGUAGE": "zh"
+}
+JSON
+
 # 开发
 ./init.sh test     # 运行测试
 ./init.sh lint     # ruff 检查
@@ -38,7 +49,7 @@ launchctl setenv VOICE_RECORD_SECONDS 3      # Finder 双击 .app 前设置 GUI 
 
 ## v0.1.0 Release
 
-Phases 1-9 已完成，共 60 项验收 (F001-F060) 全部通过，198 个测试，lint clean。Phase 9 完成了 Release Hardening（安装/配置/健康检查）。
+Phases 1-10 已完成，共 62 项验收 (F001-F062) 全部通过，210 个测试，lint clean。Phase 10 完成了真实使用验收中的稳定性与中文体验修正。
 
 核心能力：
 - CLI 文本/语音命令执行，高风险动作二次确认
@@ -178,7 +189,7 @@ voice-claude-agent wake
 
 ## 开发状态
 
-v0.1.0 Release — F001-F060 (Phase 1-9) 全部通过。198 个测试。详情见 `feature_list.json`、`RELEASE_NOTES.md`。
+v0.1.0 Release — F001-F062 (Phase 1-10) 全部通过。210 个测试。详情见 `feature_list.json`、`RELEASE_NOTES.md`。
 
 ## Manual Smoke Test（手动验收）
 
@@ -199,7 +210,7 @@ open dist/VoiceClaudeAgent.app
 | `Start Wake` | 开始后台语音唤醒循环 | 标题变为 `Start Wake (running)`，菜单图标不变 |
 | `Stop Wake` | 停止唤醒循环 | 标题恢复为 `Stop Wake`，麦克风释放 |
 | `Trigger Recording` | 单次录音 → STT → Claude → TTS | 状态栏依次显示：`Recording...` → `Transcribing...` → `Running Claude...` → `Done ✓`（1.5s 后恢复） |
-| `Mic Diagnostic` | 显示麦克风权限和设备详情 | 弹出诊断窗口，含 bundle ID、输入设备、PortAudio 状态 |
+| `Mic Diagnostic` | 显示麦克风权限和设备详情 | 弹出诊断窗口，含 bundle ID、录音时长、输入设备、PortAudio 状态 |
 | `Mic Status` | 当前麦克风权限 | `Mic: Accessible` 或 `Mic: Denied` |
 | `Last Transcript` | 上一次识别的语音文本 | 点击弹出 rumps 对话框 |
 | `Last Summary` | 上一次 Claude 回答的完整摘要 | 点击弹出完整文本（不会被截断） |

@@ -39,6 +39,26 @@ whisper-cli -m $WHISPER_CPP_MODEL -h | head -5
 - [ ] `WHISPER_CPP_MODEL` 指向的模型文件存在且可以读取
 - [ ] `whisper-cli -h` 输出帮助信息
 
+## 2.1 配置录音时长
+
+默认录音时长为 5 秒。需要更长录音时，可写入本地配置文件：
+
+```bash
+mkdir -p ~/.voice-claude-agent
+cat > ~/.voice-claude-agent/config.json <<JSON
+{
+  "VOICE_RECORD_SECONDS": "10",
+  "VOICE_STT_BACKEND": "whisper-cli",
+  "WHISPER_CPP_MODEL": "$WHISPER_CPP_MODEL",
+  "WHISPER_CPP_LANGUAGE": "zh"
+}
+JSON
+```
+
+### 验收标准
+- [ ] 重启 App 后，`Health Check` 显示 `Record duration — 10s`
+- [ ] `Mic Diagnostic` 显示 `Record duration: 10s`
+
 ## 3. 首次麦克风授权
 
 ```bash
