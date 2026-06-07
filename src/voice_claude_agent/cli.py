@@ -213,7 +213,12 @@ def run_text(prompt: str):
     _run_pipeline(prompt, input_mode="text", tts_fake=False)
 
 
-def _run_pipeline(prompt: str, input_mode: str, tts_fake: bool) -> None:
+def _run_pipeline(
+    prompt: str,
+    input_mode: str,
+    tts_fake: bool,
+    confirmation_override: bool | None = None,
+) -> None:
     speaker = FakeSpeaker() if tts_fake else MacOSSaySpeaker()
 
     # 1. Risk classification
@@ -224,13 +229,20 @@ def _run_pipeline(prompt: str, input_mode: str, tts_fake: bool) -> None:
     confirmation_required = requires_confirmation(risk_level)
     confirmation_received = False
     if confirmation_required:
-        from voice_claude_agent.confirmation import ask_confirmation
-
-        if not ask_confirmation(prompt):
+        if confirmation_override is True:
+            confirmation_received = True
+        elif confirmation_override is False:
             click.echo("Action rejected. Aborting.")
             speaker.speak("高风险动作已被拒绝，未执行。")
             return
-        confirmation_received = True
+        else:
+            from voice_claude_agent.confirmation import ask_confirmation
+
+            if not ask_confirmation(prompt):
+                click.echo("Action rejected. Aborting.")
+                speaker.speak("高风险动作已被拒绝，未执行。")
+                return
+            confirmation_received = True
 
     # 3. Execute Claude CLI
     # F062: prepend zh-CN constraint

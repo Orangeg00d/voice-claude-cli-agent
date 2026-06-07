@@ -80,17 +80,18 @@ Voice Claude Agent 是一个 macOS 本地语音 Agent。用户通过菜单栏点
 - `~/.voice-claude-agent/config.json` 本地配置
 - MANUAL_TEST_RELEASE.md 发布验收手册
 
-### 真实使用修正 (F061-F063)
+### 真实使用修正 (F061-F064)
 - 后台线程 alert 主线程调度，避免 NSWindow 跨线程崩溃
 - 简体中文输出约束与繁转简兜底
 - Health Check / Mic Diagnostic 显示当前录音时长
 - 本地配置文件录音时长文档
 - Trigger Recording 连续点击保护，确保同一时间只运行一个录音执行周期
+- 高风险动作菜单栏语音确认：说“同意/确认/继续”执行，说“取消/不要/拒绝”中止
 
 ## 测试
 
 - **测试框架**: pytest
-- **测试数量**: 214
+- **测试数量**: 223
 - **测试覆盖**: CLI 管道、录音、STT、风险分类、菜单栏生命周期、并发安全、日志格式
 
 ## 依赖
@@ -113,7 +114,6 @@ Voice Claude Agent 是一个 macOS 本地语音 Agent。用户通过菜单栏点
 ## 已知限制
 
 - **非语音唤醒词**: 触发方式为手动点击菜单栏按钮，无真实唤醒词检测
-- **菜单栏语音确认**: 高风险动作目前仍需后续 F064 支持“语音说同意/取消”的确认流程
 - **TCC 权限**: py2app 构建的 .app 可能需要 Finder 双击启动才能触发 macOS 麦克风权限对话框
 - **Python 3.14 兼容**: py2app 在 setuptools ≥ 82 上需要 monkeypatch
 
@@ -121,5 +121,5 @@ Voice Claude Agent 是一个 macOS 本地语音 Agent。用户通过菜单栏点
 
 ### v0.1.0 (2026-06-07)
 - Initial release with complete Phase 1-10 feature set
-- 214 passing tests
+- 223 passing tests
 - Standalone .app build support via py2app

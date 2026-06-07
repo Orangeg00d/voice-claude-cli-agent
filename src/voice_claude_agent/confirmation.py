@@ -39,13 +39,20 @@ def confirm_or_reject(
 # ── F064: Voice-based confirmation keywords ────────────────
 
 _CONFIRM_ACCEPT: set[str] = {
-    "同意", "确认", "继续", "可以", "好", "行", "是的", "是", "对",
+    "同意", "确认", "继续", "可以", "好的", "好", "行", "是的", "是", "对",
     "yes", "ok", "y", "go", "do it", "proceed", "confirm",
 }
 _CONFIRM_REJECT: set[str] = {
-    "取消", "不要", "拒绝", "不行", "不", "否",
+    "取消", "不要", "不用", "拒绝", "不行", "不好", "不是", "停止", "不", "否",
     "no", "cancel", "n", "abort", "stop",
 }
+
+
+def _contains_confirmation_keyword(clean: str, keyword: str) -> bool:
+    """Match single-character Chinese keywords only as the full transcript."""
+    if len(keyword) == 1:
+        return clean == keyword
+    return keyword in clean
 
 
 def is_voice_confirm(transcript: str) -> bool | None:
@@ -56,9 +63,9 @@ def is_voice_confirm(transcript: str) -> bool | None:
     clean = transcript.strip().lower()
     # Check reject first (longer, more specific)
     for kw in sorted(_CONFIRM_REJECT, key=len, reverse=True):
-        if kw in clean:
+        if _contains_confirmation_keyword(clean, kw):
             return False
     for kw in sorted(_CONFIRM_ACCEPT, key=len, reverse=True):
-        if kw in clean:
+        if _contains_confirmation_keyword(clean, kw):
             return True
     return None

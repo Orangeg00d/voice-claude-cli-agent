@@ -865,14 +865,14 @@
       "description": "Voice confirmation for risky actions in the menu-bar voice flow",
       "steps": [
         "When a voice command is classified as external/destructive, menu app asks for confirmation instead of blocking on CLI input",
-        "Store the pending command and enter an awaiting_confirmation state",
+        "Hold the pending command during the same recording cycle while capturing confirmation audio",
         "Next voice transcript of yes/confirm/同意/确认/继续 proceeds with the original command",
         "Next voice transcript of no/cancel/取消/不要 rejects the original command",
         "Timeout or unrelated transcript cancels safely or prompts again with clear TTS/menu feedback",
         "Tests cover approve, reject, timeout/unrelated, and no Claude run before approval"
       ],
       "passes": true,
-      "evidence": "Voice confirmation flow in _record_and_execute: after STT, if classify_risk returns EXTERNAL_OR_DESTRUCTIVE, TTS asks user to confirm, then records confirmation audio, transcribes it, and checks is_voice_confirm(). Agree keywords (同意/确认/继续 etc.) proceed, reject (取消/不要/拒绝 etc.) abort, unclear aborts for safety. Low-risk skips. is_voice_confirm added to confirmation.py with 中英双语 keyword sets, reject checked first to avoid false positives. 5 tests: agree, reject, unclear, high-risk flow, low-risk skip. 219 tests collected, lint clean."
+      "evidence": "Voice confirmation flow in _record_and_execute: after STT, if classify_risk returns EXTERNAL_OR_DESTRUCTIVE, TTS asks user to confirm, then records confirmation audio, transcribes it, and checks is_voice_confirm(). Agree keywords (同意/确认/继续 etc.) proceed; reject (取消/不要/拒绝 etc.) aborts; unclear input aborts for safety. Accepted voice confirmation calls _run_pipeline(..., confirmation_override=True) so the background menu app does not block on CLI input. Low-risk passes confirmation_override=None. is_voice_confirm uses bilingual keyword sets with exact matching for single-character Chinese keywords to avoid false positives like '不错'. 9 F064 tests: agree, reject, unclear, single-character matching, high-risk accepted flow, low-risk skip, spoken rejection skip, unclear skip, and pipeline confirmation override. 223/223 tests, lint clean."
     }
   ]
 }

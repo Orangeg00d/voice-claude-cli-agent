@@ -2854,7 +2854,7 @@ class TestLastTranscriptSummary:
             lambda: last_result,
         )
 
-        def fake_pipeline(prompt, input_mode, tts_fake):
+        def fake_pipeline(prompt, input_mode, tts_fake, confirmation_override=None):
             last_result.write_text(json.dumps(
                 {"prompt": prompt, "exit_code": 0, "summary": "Claude says hi"}
             ), encoding="utf-8")
@@ -2887,7 +2887,7 @@ class TestLastTranscriptSummary:
             lambda: last_result,
         )
 
-        def fake_pipeline(prompt, input_mode, tts_fake):
+        def fake_pipeline(prompt, input_mode, tts_fake, confirmation_override=None):
             last_result.write_text(json.dumps(
                 {"prompt": prompt, "exit_code": 0, "summary": "Fresh summary"}
             ), encoding="utf-8")
@@ -4049,6 +4049,17 @@ class TestVoiceConfirmation:
 
         assert is_voice_confirm("今天天气如何") is None
         assert is_voice_confirm("") is None
+        assert is_voice_confirm("今天天气不错") is None
+
+    def test_is_voice_confirm_single_character_keywords_are_exact(self):
+        """Single-character Chinese keywords should not match inside unrelated text."""
+        from voice_claude_agent.confirmation import is_voice_confirm
+
+        assert is_voice_confirm("好") is True
+        assert is_voice_confirm("不") is False
+        assert is_voice_confirm("不是") is False
+        assert is_voice_confirm("这个方案不好") is False
+        assert is_voice_confirm("今天天气不错") is None
 
     def test_high_risk_triggers_confirmation_flow(self, tmp_path, monkeypatch):
         """When transcript is high-risk, _record_and_execute should trigger confirmation."""
@@ -4068,12 +4079,21 @@ class TestVoiceConfirmation:
 
         # First recording: a high-risk prompt
         mock_rec = __import__("unittest").mock.MagicMock()
-        mock_rec.get_audio.side_effect = [b"audio1", b"audio2"]
         monkeypatch.setattr(
             "voice_claude_agent.cli._safe_real_recorder",
             __import__("unittest").mock.MagicMock(return_value=mock_rec),
         )
-        monkeypatch.setattr("voice_claude_agent.cli._run_pipeline", __import__("unittest").mock.MagicMock())
+        record_mock = __import__("unittest").mock.MagicMock(
+            side_effect=[(b"audio1", "ok"), (b"audio2", "ok")]
+        )
+        monkeypatch.setattr(app, "_record_with_timeout", record_mock)
+        pipeline_mock = __import__("unittest").mock.MagicMock()
+        monkeypatch.setattr("voice_claude_agent.cli._run_pipeline", pipeline_mock)
+        speaker_mock = __import__("unittest").mock.MagicMock()
+        monkeypatch.setattr(
+            "voice_claude_agent.tts.MacOSSaySpeaker",
+            __import__("unittest").mock.MagicMock(return_value=speaker_mock),
+        )
 
         # STT returns high-risk transcript, then confirmation
         transcribe_calls = ["git push origin main --force", "同意"]
@@ -4096,6 +4116,13 @@ class TestVoiceConfirmation:
 
         # After execution, risk confirmation should have been accepted
         assert app.trigger_item.title in ("Trigger Recording", "Done ✓")
+        pipeline_mock.assert_called_once_with(
+            "git push origin main --force",
+            input_mode="voice",
+            tts_fake=False,
+            confirmation_override=True,
+        )
+        speaker_mock.speak.assert_called_once()
 
     def test_low_risk_skips_confirmation(self, tmp_path, monkeypatch):
         """Low-risk transcripts should skip voice confirmation."""
@@ -4114,12 +4141,14 @@ class TestVoiceConfirmation:
         )
 
         mock_rec = __import__("unittest").mock.MagicMock()
-        mock_rec.get_audio.return_value = b"audio"
         monkeypatch.setattr(
             "voice_claude_agent.cli._safe_real_recorder",
             __import__("unittest").mock.MagicMock(return_value=mock_rec),
         )
-        monkeypatch.setattr("voice_claude_agent.cli._run_pipeline", __import__("unittest").mock.MagicMock())
+        record_mock = __import__("unittest").mock.MagicMock(return_value=(b"audio", "ok"))
+        monkeypatch.setattr(app, "_record_with_timeout", record_mock)
+        pipeline_mock = __import__("unittest").mock.MagicMock()
+        monkeypatch.setattr("voice_claude_agent.cli._run_pipeline", pipeline_mock)
 
         # Low-risk transcript
         monkeypatch.setattr(
@@ -4141,3 +4170,163 @@ class TestVoiceConfirmation:
 
         # Should complete normally
         assert app.trigger_item.title in ("Trigger Recording", "Done ✓")
+        pipeline_mock.assert_called_once_with(
+            "请解释这段代码",
+            input_mode="voice",
+            tts_fake=False,
+            confirmation_override=None,
+        )
+
+    def test_high_risk_reject_skips_pipeline(self, tmp_path, monkeypatch):
+        """A spoken rejection should abort before Claude runs."""
+        import voice_claude_agent.app as app_mod
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "DEFAULT_RECORD_SECONDS", 0)
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "RECORD_WORKER_GRACE_SECONDS", 0)
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(
+            stt_backend="text-input",
+            _alert_patch=lambda **kw: None,
+            _wake_target=lambda: None,
+        )
+
+        mock_rec = __import__("unittest").mock.MagicMock()
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            __import__("unittest").mock.MagicMock(return_value=mock_rec),
+        )
+        record_mock = __import__("unittest").mock.MagicMock(
+            side_effect=[(b"audio1", "ok"), (b"audio2", "ok")]
+        )
+        monkeypatch.setattr(app, "_record_with_timeout", record_mock)
+        pipeline_mock = __import__("unittest").mock.MagicMock()
+        monkeypatch.setattr("voice_claude_agent.cli._run_pipeline", pipeline_mock)
+        speaker_mock = __import__("unittest").mock.MagicMock()
+        monkeypatch.setattr(
+            "voice_claude_agent.tts.MacOSSaySpeaker",
+            __import__("unittest").mock.MagicMock(return_value=speaker_mock),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.RecordingTranscriber",
+            __import__("unittest").mock.MagicMock(
+                return_value=__import__("unittest").mock.MagicMock(
+                    transcribe=__import__("unittest").mock.MagicMock(
+                        side_effect=["git push origin main --force", "取消"]
+                    )
+                )
+            ),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.config.get_app_events_log_path",
+            lambda: tmp_path / "app_events.jsonl",
+        )
+
+        app.record_seconds = 0
+        app._record_and_execute()
+
+        pipeline_mock.assert_not_called()
+        speaker_mock.speak.assert_any_call("高风险动作已被拒绝，未执行。")
+
+    def test_high_risk_unclear_confirmation_skips_pipeline(self, tmp_path, monkeypatch):
+        """An unclear confirmation transcript should abort before Claude runs."""
+        import voice_claude_agent.app as app_mod
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "DEFAULT_RECORD_SECONDS", 0)
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "RECORD_WORKER_GRACE_SECONDS", 0)
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        alerts = []
+        app = VoiceClaudeApp(
+            stt_backend="text-input",
+            _alert_patch=lambda **kw: alerts.append(kw),
+            _wake_target=lambda: None,
+        )
+
+        mock_rec = __import__("unittest").mock.MagicMock()
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            __import__("unittest").mock.MagicMock(return_value=mock_rec),
+        )
+        monkeypatch.setattr(
+            app,
+            "_record_with_timeout",
+            __import__("unittest").mock.MagicMock(
+                side_effect=[(b"audio1", "ok"), (b"audio2", "ok")]
+            ),
+        )
+        pipeline_mock = __import__("unittest").mock.MagicMock()
+        monkeypatch.setattr("voice_claude_agent.cli._run_pipeline", pipeline_mock)
+        monkeypatch.setattr(
+            "voice_claude_agent.tts.MacOSSaySpeaker",
+            __import__("unittest").mock.MagicMock(
+                return_value=__import__("unittest").mock.MagicMock()
+            ),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.RecordingTranscriber",
+            __import__("unittest").mock.MagicMock(
+                return_value=__import__("unittest").mock.MagicMock(
+                    transcribe=__import__("unittest").mock.MagicMock(
+                        side_effect=["git push origin main --force", "今天天气不错"]
+                    )
+                )
+            ),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.config.get_app_events_log_path",
+            lambda: tmp_path / "app_events.jsonl",
+        )
+
+        app.record_seconds = 0
+        app._record_and_execute()
+
+        pipeline_mock.assert_not_called()
+        assert app.mic_status_item.title == "Mic: Confirmation unclear"
+        assert alerts and alerts[-1]["title"] == "Confirmation Unclear"
+
+    def test_run_pipeline_confirmation_override_skips_cli_input(self, tmp_path, monkeypatch):
+        """A voice-confirmed high-risk action should not ask for CLI input again."""
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_sessions_log_path",
+            lambda: tmp_path / "sessions.jsonl",
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_last_result_path",
+            lambda: tmp_path / "last_result.json",
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.confirmation.ask_confirmation",
+            __import__("unittest").mock.MagicMock(side_effect=AssertionError("should not ask")),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.cli.run_claude",
+            __import__("unittest").mock.MagicMock(
+                return_value=ClaudeRunResult(
+                    command=["claude", "-p", "test"],
+                    exit_code=0,
+                    stdout="完成",
+                    stderr="",
+                    duration_seconds=0.1,
+                    timed_out=False,
+                )
+            ),
+        )
+
+        from voice_claude_agent.cli import _run_pipeline
+
+        _run_pipeline(
+            "git push origin main --force",
+            input_mode="voice",
+            tts_fake=True,
+            confirmation_override=True,
+        )
+
+        records = (tmp_path / "sessions.jsonl").read_text(encoding="utf-8").strip().splitlines()
+        session = json.loads(records[-1])
+        assert session["confirmation_required"] is True
+        assert session["confirmation_received"] is True

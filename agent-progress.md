@@ -2031,3 +2031,23 @@
 
 ### Verification
 - ./init.sh check/lint passed, 219 tests collected
+
+## 2026-06-07 18:25 — Codex Review: F064 Voice Confirmation
+
+### Finding
+- Claude's F064 implementation asked for spoken confirmation, but after the user said "同意" it still called `_run_pipeline()` without a confirmation override. For high-risk prompts, `_run_pipeline()` would then call the old CLI `input()` confirmation in the menu app background path, risking a stuck cycle.
+- The first F064 app tests were weak because they set record duration to zero and only asserted the final menu title, so they did not prove Claude execution/skip behavior.
+- `is_voice_confirm()` matched single-character Chinese keywords by substring, so unrelated speech like "今天天气不错" was rejected because it contains "不".
+- README and RELEASE_NOTES still showed F001-F063 / 214-test status and described menu-bar voice confirmation as pending.
+
+### Completed
+- Added `confirmation_override` to `_run_pipeline()` and passed `confirmation_override=True` after spoken approval in the menu app.
+- Strengthened F064 tests to assert approved high-risk actions call Claude with the override, low-risk actions skip confirmation, spoken rejection does not run Claude, unclear confirmation does not run Claude, and `_run_pipeline()` no longer asks CLI input after voice approval.
+- Hardened Chinese keyword matching so single-character keywords only match the full transcript; multi-character keywords still support substring matching.
+- Updated README, RELEASE_NOTES, and F064 evidence to F001-F064 / 223 tests.
+
+### Verification
+- F064 focused tests passed: 9/9.
+- `./init.sh check` passed.
+- `./init.sh lint` passed.
+- `./init.sh test -q` passed: 223/223.
