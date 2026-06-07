@@ -4,6 +4,7 @@ Wraps the voice agent wake loop in a rumps-based system tray application.
 Reuses cli.py's pipeline functions for recording, STT, Claude execution, and TTS.
 """
 
+import os
 import threading
 import time
 
@@ -160,6 +161,7 @@ class VoiceClaudeApp(rumps.App):
         lines.append("Bundle ID: com.voiceclaude.agent")
         lines.append(f"Python: {platform.python_version()}")
         lines.append(f"Agent state dir: {get_agent_state_dir()}")
+        lines.append(f"Whisper language: {os.environ.get('WHISPER_CPP_LANGUAGE', 'zh')}")
         lines.append("Python path containing _sounddevice_data:")
         sounddevice_data_paths = [p for p in sys.path if "_sounddevice_data" in p or "python3.14" in p]
         if sounddevice_data_paths:

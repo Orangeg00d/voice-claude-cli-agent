@@ -1374,6 +1374,35 @@
 - tests/test_core.py
 - agent-progress.md
 
+## 2026-06-07 08:05 — Codex Review: Whisper Default Language Was English
+
+### Finding
+- User reported the app answered in English after a successful voice interaction.
+- Logs showed the root cause was STT, not Claude:
+  - `stt_done transcript='Can you come back to me now?'`
+  - session transcript: `Can you come back to me now?`
+  - Claude therefore answered in English.
+- Homebrew `whisper-cli --help` confirmed its default spoken language is `en`.
+
+### Completed
+- Added `_resolve_whisper_language()` with project default `zh`.
+- Updated whisper.cpp invocation to pass `-l <language>`; default is `-l zh`.
+- Added `WHISPER_CPP_LANGUAGE` override support for future multilingual testing (`auto`, `en`, `ja`, etc.).
+- Added UTF-8 replacement decoding to whisper subprocess output.
+- Added `Whisper language` to Mic Diagnostic.
+- Added tests for default `zh` and env override.
+
+### Verification
+- `./init.sh check` passed.
+- `./init.sh lint` passed.
+- Focused whisper/diagnostic tests passed: 15/15.
+
+### Files Changed
+- src/voice_claude_agent/stt.py
+- src/voice_claude_agent/app.py
+- tests/test_core.py
+- agent-progress.md
+
 ## 2026-06-06 22:37 — Codex Review: F042 Runtime Bootstrap Correction
 
 ### Finding

@@ -1173,6 +1173,48 @@ class TestWhisperCliBackend:
         assert "hello world" in result
         assert "STT error" not in result
 
+    def test_whisper_cli_defaults_to_chinese_language(self, tmp_path, monkeypatch):
+        """whisper-cli should default to Chinese instead of English."""
+        model = tmp_path / "model.bin"
+        model.write_bytes(b"model")
+        monkeypatch.setitem(os.environ, "WHISPER_CPP_MODEL", str(model))
+        monkeypatch.delenv("WHISPER_CPP_LANGUAGE", raising=False)
+        monkeypatch.setattr(
+            "voice_claude_agent.stt._find_whisper_cpp_binary",
+            lambda: "/usr/local/bin/whisper-cli",
+        )
+        monkeypatch.setattr("voice_claude_agent.stt._is_python_whisper", lambda p: False)
+
+        fake_proc = mock.MagicMock(returncode=0, stdout="你好", stderr="")
+        with mock.patch("voice_claude_agent.stt.subprocess.run", return_value=fake_proc) as run_mock:
+            result = RecordingTranscriber(backend="whisper-cli").transcribe(b"\x00" * 32000)
+
+        assert result == "你好"
+        command = run_mock.call_args.args[0]
+        assert "-l" in command
+        assert command[command.index("-l") + 1] == "zh"
+        assert run_mock.call_args.kwargs["encoding"] == "utf-8"
+        assert run_mock.call_args.kwargs["errors"] == "replace"
+
+    def test_whisper_cli_language_env_override(self, tmp_path, monkeypatch):
+        """WHISPER_CPP_LANGUAGE should override the default spoken language."""
+        model = tmp_path / "model.bin"
+        model.write_bytes(b"model")
+        monkeypatch.setitem(os.environ, "WHISPER_CPP_MODEL", str(model))
+        monkeypatch.setitem(os.environ, "WHISPER_CPP_LANGUAGE", "auto")
+        monkeypatch.setattr(
+            "voice_claude_agent.stt._find_whisper_cpp_binary",
+            lambda: "/usr/local/bin/whisper-cli",
+        )
+        monkeypatch.setattr("voice_claude_agent.stt._is_python_whisper", lambda p: False)
+
+        fake_proc = mock.MagicMock(returncode=0, stdout="hello", stderr="")
+        with mock.patch("voice_claude_agent.stt.subprocess.run", return_value=fake_proc) as run_mock:
+            RecordingTranscriber(backend="whisper-cli").transcribe(b"\x00" * 32000)
+
+        command = run_mock.call_args.args[0]
+        assert command[command.index("-l") + 1] == "auto"
+
     def test_list_backends_excludes_python_whisper(self, monkeypatch):
         """list_available_backends should NOT include whisper-cli when only Python whisper exists."""
         import shutil as _shutil

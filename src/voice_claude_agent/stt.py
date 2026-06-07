@@ -148,6 +148,11 @@ def _resolve_whisper_model() -> tuple[str | None, str]:
     return model, ""
 
 
+def _resolve_whisper_language() -> str:
+    """Resolve whisper.cpp spoken language. Default to Chinese for this app."""
+    return os.environ.get("WHISPER_CPP_LANGUAGE", "zh").strip() or "zh"
+
+
 def _transcribe_whisper_cli(audio_data: bytes) -> str:
     """Transcribe via a local whisper.cpp CLI binary.
 
@@ -179,11 +184,24 @@ def _transcribe_whisper_cli(audio_data: bytes) -> str:
         tmp_path = f.name
 
     try:
-        # whisper.cpp CLI: <binary> -m <model> -f <wav> -nt --no-timestamps
+        language = _resolve_whisper_language()
+        # whisper.cpp CLI: <binary> -m <model> -f <wav> -l <lang> -nt --no-timestamps
         proc = subprocess.run(
-            [binary, "-m", model, "-f", tmp_path, "-nt", "--no-timestamps"],
+            [
+                binary,
+                "-m",
+                model,
+                "-f",
+                tmp_path,
+                "-l",
+                language,
+                "-nt",
+                "--no-timestamps",
+            ],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=120,
         )
         # whisper.cpp writes transcript to stdout; stderr has debug/model info
