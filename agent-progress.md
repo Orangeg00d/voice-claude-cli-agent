@@ -2141,3 +2141,25 @@
 
 ### Verification
 - ./init.sh check/lint passed, 229/229 tests
+
+## 2026-06-07 20:20 — Codex Review: F068 Settings UI
+
+### Finding
+- F068 added Settings..., but Reset Settings existed only as a method and was not reachable from the menu.
+- Resetting config deleted the file but did not restore the running app's `record_seconds` or `stt_backend` defaults.
+- Health Check and Mic Diagnostic did not show the config path/current backend, despite the acceptance requirement.
+- README/RELEASE/Developer materials still reported 223/229-era status inconsistently, and there was no Phase 14 manual test document.
+
+### Completed
+- Added a visible `Reset Settings` menu item.
+- Changed `_reload_from_config({})` to restore runtime defaults.
+- Made Settings prefill editable `KEY=value` lines and allow blank values to remove keys.
+- Added config path/backend/model/language visibility to Mic Diagnostic and config path/backend visibility to Health Check.
+- Added MANUAL_TEST_PHASE14.md and updated README, RELEASE_NOTES, DEVELOPER_PROGRAM_APPLICATION.md, and F068 evidence.
+- Added 5 additional F068 regression tests, bringing F068 coverage to 11 tests.
+
+### Verification
+- F068 focused tests passed: 11/11.
+- `./init.sh check` passed.
+- `./init.sh lint` passed.
+- `./init.sh test -q` passed: 234/234.

@@ -11,7 +11,13 @@ Voice Claude Agent 是一个 macOS 本地语音 Agent。用户通过菜单栏点
 - **Python**: 3.11+
 - **构建日期**: 2026-06-07
 
-## 功能清单 (67 项验收全部通过)
+## 当前 main 状态
+
+- **验收项**: 68/68 passed (F001-F068)
+- **测试数量**: 234
+- **最新阶段**: Phase 14 — Settings UI
+
+## v0.1.0 功能清单 (67 项验收全部通过)
 
 ### 核心链路 (F001-F012)
 - Claude CLI 可用性检查
@@ -104,10 +110,17 @@ Voice Claude Agent 是一个 macOS 本地语音 Agent。用户通过菜单栏点
 - GITHUB_RELEASE_DRAFT.md v0.1.0 发布草稿
 - REPOSITORY_METADATA.md GitHub description、topics、release checklist 建议
 
+### Unreleased: Settings UI (F068)
+- 菜单栏新增 Settings... 与 Reset Settings
+- Settings 支持查看/编辑 `VOICE_RECORD_SECONDS`、`VOICE_STT_BACKEND`、`WHISPER_CPP_MODEL`、`WHISPER_CPP_LANGUAGE`
+- 保存后运行中的 App 立即应用 `record_seconds` 和 `stt_backend`
+- Health Check / Mic Diagnostic 显示配置路径和当前后端
+
 ## 测试
 
 - **测试框架**: pytest
-- **测试数量**: 223
+- **当前测试数量**: 234
+- **v0.1.0 发布测试数量**: 223
 - **测试覆盖**: CLI 管道、录音、STT、风险分类、菜单栏生命周期、并发安全、日志格式
 
 ## 依赖

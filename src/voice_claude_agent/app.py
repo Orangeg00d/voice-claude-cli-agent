@@ -4,7 +4,6 @@ Wraps the voice agent wake loop in a rumps-based system tray application.
 Reuses cli.py's pipeline functions for recording, STT, Claude execution, and TTS.
 """
 
-import os
 import threading
 import time
 
@@ -13,7 +12,9 @@ import rumps
 from voice_claude_agent.config import (
     check_mic_permission,
     get_agent_state_dir,
+    get_config_path,
     get_config_value,
+    load_config,
 )
 
 # Silence rumps debug output during tests
@@ -104,6 +105,9 @@ class VoiceClaudeApp(rumps.App):
 
         # F068: Settings
         self.settings_item = rumps.MenuItem("Settings...", callback=self._show_settings)
+        self.reset_settings_item = rumps.MenuItem(
+            "Reset Settings", callback=self._show_reset_settings
+        )
 
         self.menu = [
             self.start_item,
@@ -114,6 +118,7 @@ class VoiceClaudeApp(rumps.App):
             self.mic_status_item,
             None,
             self.settings_item,
+            self.reset_settings_item,
             None,
             self.transcript_item,
             self.summary_item,
@@ -135,29 +140,32 @@ class VoiceClaudeApp(rumps.App):
     def _show_settings(self, sender: rumps.MenuItem) -> None:
         """Display a settings dialog chain: view → edit → save."""
         import json
-        from pathlib import Path
 
-        cfg_path = Path.home() / ".voice-claude-agent" / "config.json"
-        cfg = {}
-        if cfg_path.exists():
-            try:
-                cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
-            except Exception:
-                cfg = {}
+        cfg_path = get_config_path()
+        cfg = load_config()
 
         # Step 1: show current config
+        editable = "\n".join(
+            f"{key}={cfg.get(key, '')}"
+            for key in (
+                "VOICE_RECORD_SECONDS",
+                "VOICE_STT_BACKEND",
+                "WHISPER_CPP_MODEL",
+                "WHISPER_CPP_LANGUAGE",
+            )
+        )
         current = (
             f"Config path: {cfg_path}\n\n"
             f"VOICE_RECORD_SECONDS: {cfg.get('VOICE_RECORD_SECONDS', '')}\n"
             f"VOICE_STT_BACKEND: {cfg.get('VOICE_STT_BACKEND', '')}\n"
             f"WHISPER_CPP_MODEL: {cfg.get('WHISPER_CPP_MODEL', '')}\n"
             f"WHISPER_CPP_LANGUAGE: {cfg.get('WHISPER_CPP_LANGUAGE', '')}\n\n"
-            "Enter new values below each key (blank = keep current):"
+            "Edit as KEY=value lines. Blank values remove that key."
         )
         response = rumps.Window(
             message=current,
             title="Settings — View",
-            default_text="",
+            default_text=editable,
             dimensions=(400, 200),
         ).run()
 
@@ -174,8 +182,6 @@ class VoiceClaudeApp(rumps.App):
             key, _, val = line.partition("=")
             key = key.strip()
             val = val.strip()
-            if not val:
-                continue  # blank means keep current
             if key not in ("VOICE_RECORD_SECONDS", "VOICE_STT_BACKEND",
                            "WHISPER_CPP_MODEL", "WHISPER_CPP_LANGUAGE"):
                 continue
@@ -208,6 +214,7 @@ class VoiceClaudeApp(rumps.App):
 
         # Step 3: save
         merged = {**cfg, **new_cfg}
+        merged = {k: v for k, v in merged.items() if v}
         cfg_path.parent.mkdir(parents=True, exist_ok=True)
         cfg_path.write_text(json.dumps(merged, ensure_ascii=False, indent=2) + "\n")
 
@@ -221,9 +228,7 @@ class VoiceClaudeApp(rumps.App):
 
     def _show_reset_settings(self, sender: rumps.MenuItem) -> None:
         """Reset config.json to defaults."""
-        from pathlib import Path
-
-        cfg_path = Path.home() / ".voice-claude-agent" / "config.json"
+        cfg_path = get_config_path()
         if cfg_path.exists():
             cfg_path.unlink()
         self._reload_from_config({})
@@ -235,6 +240,7 @@ class VoiceClaudeApp(rumps.App):
     def _reload_from_config(self, cfg: dict) -> None:
         """Apply config dict values to the running app instance."""
         # record_seconds
+        self.record_seconds = self.DEFAULT_RECORD_SECONDS
         if "VOICE_RECORD_SECONDS" in cfg:
             try:
                 v = int(cfg["VOICE_RECORD_SECONDS"])
@@ -243,6 +249,7 @@ class VoiceClaudeApp(rumps.App):
             except (ValueError, TypeError):
                 pass
         # stt_backend
+        self.stt_backend = "text-input"
         if "VOICE_STT_BACKEND" in cfg and cfg["VOICE_STT_BACKEND"] in self._VALID_BACKENDS:
             self.stt_backend = cfg["VOICE_STT_BACKEND"]
 
@@ -406,8 +413,11 @@ class VoiceClaudeApp(rumps.App):
         lines.append("Bundle ID: com.voiceclaude.agent")
         lines.append(f"Python: {platform.python_version()}")
         lines.append(f"Agent state dir: {get_agent_state_dir()}")
+        lines.append(f"Config path: {get_config_path()}")
+        lines.append(f"STT backend: {self.stt_backend}")
         lines.append(f"Record duration: {self.record_seconds}s")
-        lines.append(f"Whisper language: {os.environ.get('WHISPER_CPP_LANGUAGE', 'zh')}")
+        lines.append(f"Whisper model: {get_config_value('WHISPER_CPP_MODEL', '(not set)')}")
+        lines.append(f"Whisper language: {get_config_value('WHISPER_CPP_LANGUAGE', 'zh')}")
         lines.append("Python path containing _sounddevice_data:")
         sounddevice_data_paths = [p for p in sys.path if "_sounddevice_data" in p or "python3.14" in p]
         if sounddevice_data_paths:
@@ -528,6 +538,16 @@ class VoiceClaudeApp(rumps.App):
         # F062: Record duration
         lines.append(self._check_item(
             "Record duration", True, f"{self.record_seconds}s", ""))
+        lines.append("")
+
+        cfg = load_config()
+        lines.append(self._check_item(
+            "Config file",
+            True,
+            f"{get_config_path()} ({len(cfg)} setting{'s' if len(cfg) != 1 else ''})",
+            "",
+        ))
+        lines.append(self._check_item("STT backend", True, self.stt_backend, ""))
         lines.append("")
 
         all_ok = all([claude, wb, m, hm, po, sd, sk])

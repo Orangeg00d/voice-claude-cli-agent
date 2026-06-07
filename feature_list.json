@@ -933,7 +933,7 @@
         "Tests: read config, save valid, reject invalid, reset, post-save reload"
       ],
       "passes": true,
-      "evidence": "Added Settings... menu item with rumps.Window dialog: view config from ~/.voice-claude-agent/config.json, edit (key=value per line), validate (record_seconds positive int, stt_backend in valid set), save+reload immediately via _reload_from_config(). Reset button clears config. 6 tests: menu present, reload record_seconds, reload stt_backend, reject invalid backend, reject negative, reject zero. 229/229 tests, lint clean."
+      "evidence": "Added Settings... and Reset Settings menu items with rumps.Window dialog: view config from ~/.voice-claude-agent/config.json, edit (key=value per line), validate (record_seconds positive int, stt_backend in valid set), save+reload immediately via _reload_from_config(). Reset Settings deletes config.json and restores runtime defaults. Health Check and Mic Diagnostic show config path/current backend. MANUAL_TEST_PHASE14.md documents manual acceptance. 11 F068 tests cover menu, save+reload, reset, validation, Health Check config path, and Mic Diagnostic config/backend. 234/234 tests, lint clean."
     }
   ]
 }

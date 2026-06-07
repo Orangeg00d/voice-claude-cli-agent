@@ -34,13 +34,13 @@ and the results are read aloud via macOS Text-to-Speech.
 | TTS | macOS `say` | Native, zero-config |
 | Menu bar UI | rumps + PyObjC | Lightweight macOS system tray |
 | Packaging | py2app | Native .app bundle |
-| Testing | pytest (223 tests) | Full pipeline + UI + concurrency coverage |
+| Testing | pytest (234 tests) | Full pipeline + UI + concurrency coverage |
 
 ## Project Status
 
 - **Version**: v0.1.0
-- **Features**: 67 acceptance items (F001-F067), all passing
-- **Tests**: 223 (pytest), passing with `./init.sh test`
+- **Features**: 68 acceptance items (F001-F068), all passing on current `main`
+- **Tests**: 234 (pytest), passing with `./init.sh test`
 - **Lint**: ruff clean
 - **Code**: ~6000 lines (src + tests), 20+ source modules
 
@@ -78,4 +78,4 @@ See [PRIVACY.md](PRIVACY.md) for full details. Summary:
 
 - Source: https://github.com/Orangeg00d/voice-claude-cli-agent
 - License: MIT License — see [LICENSE](LICENSE)
-- Documentation: README.md, RELEASE_NOTES.md, PRIVACY.md, SECURITY.md, CONTRIBUTING.md, TOOLS_AND_DEPS.md, GITHUB_RELEASE_DRAFT.md, REPOSITORY_METADATA.md, MANUAL_TEST_RELEASE.md, MANUAL_TEST_PHASE11.md
+- Documentation: README.md, RELEASE_NOTES.md, PRIVACY.md, SECURITY.md, CONTRIBUTING.md, TOOLS_AND_DEPS.md, GITHUB_RELEASE_DRAFT.md, REPOSITORY_METADATA.md, MANUAL_TEST_RELEASE.md, MANUAL_TEST_PHASE11.md, MANUAL_TEST_PHASE14.md

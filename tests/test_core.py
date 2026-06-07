@@ -4341,6 +4341,40 @@ class TestSettingsUI:
         app = VoiceClaudeApp()
         assert app.settings_item is not None
         assert "Settings" in app.settings_item.title
+        assert app.reset_settings_item is not None
+        assert "Reset Settings" in app.reset_settings_item.title
+
+    def test_show_settings_saves_valid_config_and_reloads(self, tmp_path, monkeypatch):
+        """Settings dialog should save valid KEY=value lines and reload the app."""
+        import json
+        from unittest import mock
+
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        cfg_file = tmp_path / "config.json"
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+
+        response = mock.MagicMock()
+        response.clicked = True
+        response.text = "VOICE_RECORD_SECONDS=12\nVOICE_STT_BACKEND=apple-speech\n"
+        monkeypatch.setattr(
+            app_mod.rumps,
+            "Window",
+            mock.MagicMock(return_value=mock.MagicMock(run=mock.MagicMock(return_value=response))),
+        )
+
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._show_settings(app.settings_item)
+
+        saved = json.loads(cfg_file.read_text(encoding="utf-8"))
+        assert saved["VOICE_RECORD_SECONDS"] == "12"
+        assert saved["VOICE_STT_BACKEND"] == "apple-speech"
+        assert app.record_seconds == 12
+        assert app.stt_backend == "apple-speech"
+        assert alerts[-1]["title"] == "Settings Saved"
 
     def test_reload_from_config_updates_record_seconds(self):
         """_reload_from_config should update record_seconds immediately."""
@@ -4383,3 +4417,63 @@ class TestSettingsUI:
         orig = app.record_seconds
         app._reload_from_config({"VOICE_RECORD_SECONDS": "0"})
         assert app.record_seconds == orig
+
+    def test_reload_from_empty_config_resets_runtime_defaults(self):
+        """Resetting config should restore running app defaults."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(stt_backend="text-input", _alert_patch=lambda **kw: None)
+        app.stt_backend = "whisper-cli"
+        app.record_seconds = 20
+        app._reload_from_config({})
+        assert app.record_seconds == app.DEFAULT_RECORD_SECONDS
+        assert app.stt_backend == "text-input"
+
+    def test_reset_settings_removes_config_file_and_reloads_defaults(self, tmp_path, monkeypatch):
+        """Reset Settings should delete config.json and apply defaults immediately."""
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text('{"VOICE_RECORD_SECONDS": "20"}', encoding="utf-8")
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+
+        app = VoiceClaudeApp(stt_backend="text-input", _alert_patch=lambda **kw: None)
+        app.stt_backend = "whisper-cli"
+        app.record_seconds = 20
+        app._show_reset_settings(app.reset_settings_item)
+
+        assert not cfg_file.exists()
+        assert app.record_seconds == app.DEFAULT_RECORD_SECONDS
+        assert app.stt_backend == "text-input"
+
+    def test_health_check_includes_config_path(self, tmp_path, monkeypatch):
+        """Health Check should show the local config path."""
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        cfg_file = tmp_path / "config.json"
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+        monkeypatch.setattr(app_mod, "load_config", lambda: {"VOICE_RECORD_SECONDS": "9"})
+
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._run_health_check(app.health_item)
+
+        assert str(cfg_file) in alerts[-1]["message"]
+        assert "Config file" in alerts[-1]["message"]
+
+    def test_mic_diagnostic_includes_config_path_and_backend(self, tmp_path, monkeypatch):
+        """Mic Diagnostic should show current config path and STT backend."""
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        cfg_file = tmp_path / "config.json"
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+
+        alerts = []
+        app = VoiceClaudeApp(stt_backend="apple-speech", _alert_patch=lambda **kw: alerts.append(kw))
+        app._run_mic_diagnostic(app.diagnostic_item)
+
+        assert str(cfg_file) in alerts[-1]["message"]
+        assert "STT backend: apple-speech" in alerts[-1]["message"]
