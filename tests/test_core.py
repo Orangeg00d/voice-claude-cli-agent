@@ -1663,6 +1663,34 @@ class TestAppSTTBackendPassthrough:
 
         assert calls == [("init", "apple-speech"), ("run", None)]
 
+    def test_app_config_sets_stt_backend_without_cli_override(self, tmp_path, monkeypatch):
+        """config.json should set the app STT backend when no CLI/backend arg is provided."""
+        import json
+
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({"VOICE_STT_BACKEND": "apple-speech"}))
+        monkeypatch.setattr("voice_claude_agent.config.get_config_path", lambda: cfg_file)
+        monkeypatch.delenv("VOICE_STT_BACKEND", raising=False)
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: None)
+        assert app.stt_backend == "apple-speech"
+
+    def test_explicit_app_backend_overrides_config_json(self, tmp_path, monkeypatch):
+        """Explicit app backend should override config.json."""
+        import json
+
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({"VOICE_STT_BACKEND": "apple-speech"}))
+        monkeypatch.setattr("voice_claude_agent.config.get_config_path", lambda: cfg_file)
+        monkeypatch.delenv("VOICE_STT_BACKEND", raising=False)
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(stt_backend="whisper-cli", _alert_patch=lambda **kw: None)
+        assert app.stt_backend == "whisper-cli"
+
 
 # ── F036: Mic Permission Denial UX ──────────────────────────
 class TestMicDenialUX:
@@ -3588,3 +3616,55 @@ class TestConfigFile:
 
         app = VoiceClaudeApp()
         assert app.record_seconds == 7
+
+    def test_get_config_value_uses_env_over_config(self, tmp_path, monkeypatch):
+        """get_config_value should use env var > config.json > default priority."""
+        import json
+
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({"WHISPER_CPP_LANGUAGE": "en"}))
+        monkeypatch.setattr(
+            "voice_claude_agent.config.get_config_path",
+            lambda: cfg_file,
+        )
+        monkeypatch.setenv("WHISPER_CPP_LANGUAGE", "auto")
+
+        from voice_claude_agent.config import get_config_value
+
+        assert get_config_value("WHISPER_CPP_LANGUAGE", "zh") == "auto"
+
+    def test_whisper_model_resolves_from_config_json(self, tmp_path, monkeypatch):
+        """WHISPER_CPP_MODEL should resolve from config.json when env is absent."""
+        import json
+
+        model = tmp_path / "ggml-base.bin"
+        model.write_bytes(b"fake model")
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({"WHISPER_CPP_MODEL": str(model)}))
+        monkeypatch.setattr(
+            "voice_claude_agent.config.get_config_path",
+            lambda: cfg_file,
+        )
+        monkeypatch.delenv("WHISPER_CPP_MODEL", raising=False)
+
+        from voice_claude_agent.stt import _resolve_whisper_model
+
+        resolved, err = _resolve_whisper_model()
+        assert resolved == str(model)
+        assert err == ""
+
+    def test_whisper_language_resolves_from_config_json(self, tmp_path, monkeypatch):
+        """WHISPER_CPP_LANGUAGE should resolve from config.json when env is absent."""
+        import json
+
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({"WHISPER_CPP_LANGUAGE": "auto"}))
+        monkeypatch.setattr(
+            "voice_claude_agent.config.get_config_path",
+            lambda: cfg_file,
+        )
+        monkeypatch.delenv("WHISPER_CPP_LANGUAGE", raising=False)
+
+        from voice_claude_agent.stt import _resolve_whisper_language
+
+        assert _resolve_whisper_language() == "auto"

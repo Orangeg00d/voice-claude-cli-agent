@@ -38,7 +38,7 @@ launchctl setenv VOICE_RECORD_SECONDS 3      # Finder 双击 .app 前设置 GUI 
 
 ## v0.1.0 Release
 
-Phases 1-8 已完成，共 55 项验收 (F001-F055) 全部通过，184 个测试，lint clean。当前 Phase 9 聚焦 Release Hardening（安装/配置/健康检查）。
+Phases 1-9 已完成，共 60 项验收 (F001-F060) 全部通过，198 个测试，lint clean。Phase 9 完成了 Release Hardening（安装/配置/健康检查）。
 
 核心能力：
 - CLI 文本/语音命令执行，高风险动作二次确认
@@ -178,7 +178,7 @@ voice-claude-agent wake
 
 ## 开发状态
 
-v0.1.0 Release — F001-F055 (Phase 1-8) 全部通过。184 个测试。当前 Phase 9 (Release Hardening)。详情见 `feature_list.json`、`RELEASE_NOTES.md`。
+v0.1.0 Release — F001-F060 (Phase 1-9) 全部通过。198 个测试。详情见 `feature_list.json`、`RELEASE_NOTES.md`。
 
 ## Manual Smoke Test（手动验收）
 

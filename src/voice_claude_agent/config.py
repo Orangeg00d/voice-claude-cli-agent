@@ -1,5 +1,6 @@
 """Configuration management."""
 
+import json
 import os
 import shutil
 from pathlib import Path
@@ -88,6 +89,14 @@ def check_apple_speech_available() -> bool:
     return shutil.which("say") is not None
 
 
+CONFIG_KEYS = {
+    "VOICE_RECORD_SECONDS",
+    "VOICE_STT_BACKEND",
+    "WHISPER_CPP_MODEL",
+    "WHISPER_CPP_LANGUAGE",
+}
+
+
 # ── F059: Local config file ─────────────────────────────────
 
 def get_config_path() -> Path:
@@ -104,17 +113,25 @@ def load_config() -> dict:
     if not config_path.exists():
         return {}
     try:
-        data = __import__("json").loads(config_path.read_text(encoding="utf-8"))
+        data = json.loads(config_path.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
             return {}
     except Exception:
         return {}
 
-    allowed = {
-        "VOICE_RECORD_SECONDS", "VOICE_STT_BACKEND",
-        "WHISPER_CPP_MODEL", "WHISPER_CPP_LANGUAGE",
-    }
-    return {k: v for k, v in data.items() if k in allowed and v is not None}
+    return {k: v for k, v in data.items() if k in CONFIG_KEYS and v is not None}
+
+
+def get_config_value(key: str, default: str = "") -> str:
+    """Resolve one config value with env var > config.json > default priority."""
+    env_value = os.environ.get(key, "").strip()
+    if env_value:
+        return env_value
+
+    value = load_config().get(key)
+    if value is None:
+        return default
+    return str(value).strip() or default
 
 
 DEFAULT_TIMEOUT_SECONDS = 300

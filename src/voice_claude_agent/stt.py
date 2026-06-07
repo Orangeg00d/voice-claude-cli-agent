@@ -4,11 +4,12 @@ Phase 4 — real STT backends: text-input (dev), whisper-cli (local),
 and apple-speech (macOS NSSpeechRecognizer via osascript).
 """
 
-import os
 import subprocess
 import tempfile
 from pathlib import Path
 from typing import Protocol
+
+from voice_claude_agent.config import get_config_value
 
 
 class Transcriber(Protocol):
@@ -126,7 +127,7 @@ def _resolve_whisper_model() -> tuple[str | None, str]:
 
     Priority: WHISPER_CPP_MODEL env var. Returns (None, error) if not set.
     """
-    model = os.environ.get("WHISPER_CPP_MODEL", "").strip()
+    model = get_config_value("WHISPER_CPP_MODEL")
     if not model:
         return None, (
             "[STT error: WHISPER_CPP_MODEL environment variable is not set. "
@@ -150,7 +151,7 @@ def _resolve_whisper_model() -> tuple[str | None, str]:
 
 def _resolve_whisper_language() -> str:
     """Resolve whisper.cpp spoken language. Default to Chinese for this app."""
-    return os.environ.get("WHISPER_CPP_LANGUAGE", "zh").strip() or "zh"
+    return get_config_value("WHISPER_CPP_LANGUAGE", "zh") or "zh"
 
 
 def _transcribe_whisper_cli(audio_data: bytes) -> str:

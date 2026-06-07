@@ -8,6 +8,7 @@ from voice_claude_agent.config import (
     check_mic_permission,
     find_claude_executable,
     get_agent_state_dir,
+    get_config_value,
 )
 from voice_claude_agent.claude_runner import run_claude
 from voice_claude_agent.logging_store import write_session, write_last_result
@@ -24,6 +25,11 @@ from voice_claude_agent.tts import MacOSSaySpeaker, FakeSpeaker
 from voice_claude_agent.wake import ManualWakeTrigger
 
 _STT_BACKEND_HELP = "STT backend: text-input (dev), whisper-cli, or apple-speech (macOS)"
+
+
+def _resolve_stt_backend(option_value: str | None, default: str = "text-input") -> str:
+    """Resolve STT backend with CLI option > env var > config.json > default priority."""
+    return option_value or get_config_value("VOICE_STT_BACKEND", default)
 
 
 def _check_dependencies() -> dict:
@@ -294,10 +300,8 @@ def _run_pipeline(prompt: str, input_mode: str, tts_fake: bool) -> None:
 
 @main.command()
 @click.option("--duration", "-d", default=5, help="Max recording duration in seconds.")
-@click.option(
-    "--stt-backend", default="text-input", help=_STT_BACKEND_HELP,
-)
-def record(duration: int, stt_backend: str):
+@click.option("--stt-backend", default=None, help=_STT_BACKEND_HELP)
+def record(duration: int, stt_backend: str | None):
     """Record audio from the microphone (push-to-talk) and print transcription.
 
     Press Enter to start recording. Press Enter again to stop.
@@ -309,6 +313,7 @@ def record(duration: int, stt_backend: str):
     if recorder is None:
         return
 
+    stt_backend = _resolve_stt_backend(stt_backend)
     transcriber = RecordingTranscriber(backend=stt_backend)
     click.echo(f"STT backend: {stt_backend}")
 
@@ -326,10 +331,8 @@ def record(duration: int, stt_backend: str):
 @main.command()
 @click.option("--duration", "-d", default=10, help="Max recording duration in seconds.")
 @click.option("--fake", is_flag=True, help="Use fake recorder for testing.")
-@click.option(
-    "--stt-backend", default="text-input", help=_STT_BACKEND_HELP,
-)
-def voice(duration: int, fake: bool, stt_backend: str):
+@click.option("--stt-backend", default=None, help=_STT_BACKEND_HELP)
+def voice(duration: int, fake: bool, stt_backend: str | None):
     """Record voice, transcribe, run Claude CLI, and speak the result."""
     if fake:
         recorder = FakeRecorder(b"test audio data")
@@ -342,6 +345,7 @@ def voice(duration: int, fake: bool, stt_backend: str):
         if real is None:
             return
         recorder = real
+        stt_backend = _resolve_stt_backend(stt_backend)
         transcriber = RecordingTranscriber(backend=stt_backend)
         click.echo(f"STT backend: {stt_backend}")
 
@@ -384,10 +388,8 @@ def demo_voice(stub_text: str):
 @main.command()
 @click.option("--fake", is_flag=True, help="Use fake recorder/STT for testing.")
 @click.option("--once", is_flag=True, help="Run one iteration and exit (no loop).")
-@click.option(
-    "--stt-backend", default="text-input", help=_STT_BACKEND_HELP,
-)
-def wake(fake: bool, once: bool, stt_backend: str):
+@click.option("--stt-backend", default=None, help=_STT_BACKEND_HELP)
+def wake(fake: bool, once: bool, stt_backend: str | None):
     """Wake loop: wait for trigger → record → STT → Claude CLI → TTS.
 
     Runs in a loop until Ctrl+C. In --fake mode, uses a FakeRecorder
@@ -406,6 +408,7 @@ def wake(fake: bool, once: bool, stt_backend: str):
         if real is None:
             return
         recorder = real
+        stt_backend = _resolve_stt_backend(stt_backend)
         transcriber = RecordingTranscriber(backend=stt_backend)
         click.echo(f"STT backend: {stt_backend}")
 
@@ -482,14 +485,13 @@ def wake(fake: bool, once: bool, stt_backend: str):
 
 
 @main.command()
-@click.option(
-    "--stt-backend", default="text-input", help=_STT_BACKEND_HELP,
-)
-def app(stt_backend: str):
+@click.option("--stt-backend", default=None, help=_STT_BACKEND_HELP)
+def app(stt_backend: str | None):
     """Launch the macOS menu bar app (rumps-based system tray)."""
     from voice_claude_agent.app import launch_app
 
     click.echo("Launching Voice Claude Agent menu bar app...")
+    stt_backend = _resolve_stt_backend(stt_backend)
     click.echo(f"STT backend: {stt_backend}")
     click.echo("Look for the 🎤 icon in your menu bar.")
     click.echo("Press Ctrl+C in this terminal to quit.")

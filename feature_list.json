@@ -759,7 +759,7 @@
         "Structure for GitHub landing page readability"
       ],
       "passes": true,
-      "evidence": "README updated: removed stale Phase 4/7 references, added v0.1.0 Release section with phase summary, updated test count to 184, 6-point core capability list. 184 tests collected, lint clean."
+      "evidence": "README updated: removed stale Phase 4/7 references, added v0.1.0 Release section with phase summary, updated through Phase 9/F060, 6-point core capability list. 198/198 tests, lint clean."
     },
     {
       "id": "F057",
@@ -772,7 +772,7 @@
         "Both commands print clear success/failure messages"
       ],
       "passes": true,
-      "evidence": "init.sh now has build-app (python setup.py py2app), install-app (copy to ~/Applications/), and both listed in usage. 184 tests, lint clean."
+      "evidence": "init.sh now has build-app (python setup.py py2app), install-app (copy to ~/Applications/), and both listed in usage. Codex verified build-app/install-app after Phase 9 review. 198/198 tests, lint clean."
     },
     {
       "id": "F058",
@@ -785,7 +785,7 @@
         "Show PASS/FAIL for each check with actionable fix hints"
       ],
       "passes": true,
-      "evidence": "Added Health Check menu item with _check_item helper. Checks 7 items: Claude CLI, whisper-cli, model, mic, PortAudio, agent_state, macOS say. Shows PASS/FAIL per item with fix hints. 4 tests: menu present, PASS format, FAIL format+fix hint, all sections. 188 tests collected, lint clean."
+      "evidence": "Added Health Check menu item with _check_item helper. Checks 7 items: Claude CLI, whisper-cli, model, mic, PortAudio, agent_state, macOS say. Shows PASS/FAIL per item with fix hints. 4 tests: menu present, PASS format, FAIL format+fix hint, all sections. 198/198 tests, lint clean."
     },
     {
       "id": "F059",
@@ -798,7 +798,7 @@
         "Env vars still take highest priority"
       ],
       "passes": true,
-      "evidence": "Added load_config() reading ~/.voice-claude-agent/config.json. Supports VOICE_RECORD_SECONDS, VOICE_STT_BACKEND, WHISPER_CPP_MODEL, WHISPER_CPP_LANGUAGE. Priority: env var > config.json > default. VoiceClaudeApp uses config.json for record_seconds. 5 tests: no file, valid, corrupted, env override, config without env. 193/193 tests, lint clean."
+      "evidence": "Added load_config() and get_config_value() reading ~/.voice-claude-agent/config.json. Supports VOICE_RECORD_SECONDS, VOICE_STT_BACKEND, WHISPER_CPP_MODEL, WHISPER_CPP_LANGUAGE. Priority: explicit CLI/app arg > env var > config.json > default where applicable. VoiceClaudeApp uses config.json for record_seconds and STT backend; stt.py resolves whisper model/language from config. 10 F059 tests cover no file, valid file, corrupted JSON, env override, config record seconds, config STT backend, explicit backend override, config value priority, model path, and language. 198/198 tests, lint clean."
     },
     {
       "id": "F060",
@@ -811,7 +811,7 @@
         "Each step has expected behavior and troubleshooting"
       ],
       "passes": true,
-      "evidence": "MANUAL_TEST_RELEASE.md created: 9 sections covering fresh install, whisper.cpp setup, first mic authorization, first Trigger Recording, log inspection, multi-round stability, Health Check, quit, and optional .app build. Each section has expected behavior and troubleshooting table."
+      "evidence": "MANUAL_TEST_RELEASE.md created: 9 sections covering fresh install, whisper.cpp setup, first mic authorization, first Trigger Recording, log inspection, multi-round stability, Health Check, quit, and optional .app build. Each section has expected behavior and troubleshooting table. 198/198 tests, lint clean."
     }
   ]
 }

@@ -46,8 +46,9 @@ def main():
     _bootstrap_py2app_runtime_path()
     _bootstrap_state_dir()
     from voice_claude_agent.app import launch_app
+    from voice_claude_agent.config import get_config_value
 
-    stt_backend = os.environ.get("VOICE_STT_BACKEND", "whisper-cli")
+    stt_backend = get_config_value("VOICE_STT_BACKEND", "whisper-cli")
     launch_app(stt_backend=stt_backend)
 
 

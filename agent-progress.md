@@ -1920,3 +1920,24 @@
 
 ### Files Changed
 - MANUAL_TEST_RELEASE.md, feature_list.json, agent-progress.md
+
+## 2026-06-07 15:45 — Codex Review: Phase 9 Completion
+
+### Finding
+- Claude implemented F056-F060 in one uninterrupted run. Commits were split by feature, but this bypassed the intended Codex review between features.
+- F059 was marked passed while only `VOICE_RECORD_SECONDS` was actually applied. `VOICE_STT_BACKEND`, `WHISPER_CPP_MODEL`, and `WHISPER_CPP_LANGUAGE` were loaded from JSON but not used by the app/STT path.
+- README, RELEASE_NOTES, and feature evidence had stale Phase 8 / 184-test or 193-test status after Phase 9 completion.
+
+### Completed
+- Added `get_config_value()` with env var > config.json > default priority.
+- Wired config values into app STT backend selection, CLI STT backend defaults, run_app.py, whisper model resolution, and whisper language resolution.
+- Added regression coverage for config-driven STT backend, explicit backend override, config-driven whisper model path, and config-driven whisper language.
+- Updated README, RELEASE_NOTES, and F056-F060 evidence to Phase 9 / F060 / 198-test status.
+
+### Verification
+- Focused F059/STT tests passed: 26/26.
+- `./init.sh check` passed.
+- `./init.sh lint` passed.
+- `./init.sh test` passed: 198/198.
+- `./init.sh build-app` passed and rebuilt `dist/VoiceClaudeAgent.app`.
+- `./init.sh install-app` passed and installed `~/Applications/VoiceClaudeAgent.app` with bundle id `com.voiceclaude.agent`.
