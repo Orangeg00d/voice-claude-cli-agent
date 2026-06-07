@@ -745,8 +745,8 @@
         "Create PRIVACY.md explaining local-only audio processing",
         "Ensure README links to release docs"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "RELEASE_NOTES.md + PRIVACY.md created. README links both. 182/182 tests."
     }
   ]
 }

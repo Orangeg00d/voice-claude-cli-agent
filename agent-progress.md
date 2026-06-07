@@ -1839,3 +1839,13 @@
 - `./init.sh check` passed.
 - `./init.sh lint` passed.
 - `./init.sh test` passed: 184/184.
+
+## 2026-06-07 13:20 — Phase 8: F055 — Release Notes & Privacy
+
+### Completed
+- RELEASE_NOTES.md: v0.1.0, 55 features across 8 phases, changelog, dependencies, known limitations.
+- PRIVACY.md: local-only processing, data paths, mic permissions, no network, open-source.
+- README links both docs. All 55 features pass. 182/182 tests. Project complete.
+
+### Verification
+- ./init.sh check/lint passed, 182/182 tests

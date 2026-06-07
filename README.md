@@ -156,6 +156,8 @@ voice-claude-agent wake
 - `CLAUDE.md`：Claude Desktop / Claude CLI 的工作规则。
 - `CODEX_REVIEW_GUIDE.md`：Codex 审核和验收规则。
 - `CLAUDE_CLI_TASK_ORCHESTRATION.md`：Codex 如何编排 Claude CLI 执行小任务。
+- `RELEASE_NOTES.md`：版本发布说明与功能清单。
+- `PRIVACY.md`：隐私声明与数据处理说明。
 - `MANUAL_TEST_PHASE8.md`：菜单栏 App 真实手动验收手册。
 
 ## 已确认方向
