@@ -32,6 +32,14 @@ def find_claude_executable() -> str | None:
     return shutil.which("claude")
 
 
+def _portaudio_failure_detail(error: Exception) -> str:
+    return (
+        f"PortAudio unavailable — sounddevice library load failed: {error}. "
+        "If this happens inside the .app bundle, rebuild with python setup.py py2app "
+        "so libportaudio.dylib is extracted to the real filesystem."
+    )
+
+
 def check_mic_permission() -> tuple[bool, str]:
     """Check if macOS microphone permission has been granted.
 
@@ -61,7 +69,7 @@ def check_mic_permission() -> tuple[bool, str]:
     except ImportError as e:
         msg = str(e).lower()
         if "_sounddevice_data" in msg or "libportaudio" in msg or "portaudio" in msg:
-            return False, f"PortAudio unavailable — sounddevice library load failed: {e}"
+            return False, _portaudio_failure_detail(e)
         return False, "sounddevice not installed — cannot verify microphone"
     except Exception as e:
         msg = str(e).lower()
@@ -69,9 +77,9 @@ def check_mic_permission() -> tuple[bool, str]:
             return False, f"Microphone permission denied: {e}"
         # Detect PortAudio dynamic library load failures
         if "cannot load library" in msg and "libportaudio" in msg:
-            return False, f"PortAudio unavailable — sounddevice library load failed: {e}"
+            return False, _portaudio_failure_detail(e)
         if "portaudio" in msg:
-            return False, f"PortAudio error — sounddevice library load failed: {e}"
+            return False, _portaudio_failure_detail(e)
         return True, f"Microphone check passed with warning: {e}"
 
 

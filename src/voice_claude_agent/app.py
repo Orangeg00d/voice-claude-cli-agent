@@ -456,7 +456,15 @@ class VoiceClaudeApp(rumps.App):
 
             if transcript.startswith("[STT error:"):
                 self.mic_status_item.title = "Mic: STT Error"
-                self._alert(title="STT Error", message=transcript)
+                self._alert(
+                    title="STT Error",
+                    message=(
+                        f"{transcript}\n\n"
+                        "Try switching STT backend, for example set "
+                        "VOICE_STT_BACKEND=text-input for debugging or "
+                        "VOICE_STT_BACKEND=whisper-cli after installing whisper.cpp."
+                    ),
+                )
                 return
 
             self.trigger_item.title = "Running Claude..."

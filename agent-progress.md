@@ -1821,3 +1821,21 @@
 
 ### Verification
 - ./init.sh check/lint passed, 182/182 tests
+
+## 2026-06-07 14:52 — Codex Review: F054 Actionable Messages
+
+### Finding
+- F054 was marked passed, but the new tests did not directly cover two acceptance steps: STT backend-switch guidance and PortAudio/py2app rebuild guidance.
+- One test used a manually-created `pytest.MonkeyPatch()` without cleanup.
+
+### Completed
+- STT error alerts now append a backend-switch hint mentioning `VOICE_STT_BACKEND`, `text-input`, and `whisper-cli`.
+- PortAudio load failures now mention rebuilding the `.app` with `python setup.py py2app` so `libportaudio.dylib` is extracted to the real filesystem.
+- Added tests for STT backend-switch guidance and PortAudio py2app guidance.
+- Replaced manual MonkeyPatch usage with the pytest fixture.
+
+### Verification
+- Focused F054-related tests passed: 9/9.
+- `./init.sh check` passed.
+- `./init.sh lint` passed.
+- `./init.sh test` passed: 184/184.

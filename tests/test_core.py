@@ -3367,12 +3367,11 @@ class TestActionableErrors:
         assert len(no_audio) >= 1
         assert "Input device" in no_audio[0]["message"]
 
-    def test_recording_failed_has_microphone_hint(self):
+    def test_recording_failed_has_microphone_hint(self, monkeypatch):
         """Recording Failed alert should mention Microphone path."""
         import voice_claude_agent.app as app_mod
 
         alerts = []
-        monkeypatch = __import__("pytest").MonkeyPatch()
         monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
         monkeypatch.setattr(
             "voice_claude_agent.cli._safe_real_recorder",
@@ -3388,6 +3387,42 @@ class TestActionableErrors:
         assert len(failed) >= 1
         assert "Microphone" in failed[0]["message"]
 
+    def test_stt_error_mentions_backend_switch_hint(self, monkeypatch):
+        """STT Error alert should suggest switching/configuring STT backends."""
+        import voice_claude_agent.app as app_mod
+
+        alerts = []
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "DEFAULT_RECORD_SECONDS", 0.01)
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(
+            stt_backend="whisper-cli",
+            _alert_patch=lambda **kw: alerts.append(kw),
+        )
+
+        mock_rec = mock.MagicMock()
+        mock_rec.get_audio.return_value = b"audio"
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            mock.MagicMock(return_value=mock_rec),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.RecordingTranscriber",
+            mock.MagicMock(return_value=mock.MagicMock(
+                transcribe=mock.MagicMock(return_value="[STT error: model missing]")
+            )),
+        )
+
+        app._record_and_execute()
+
+        stt_alerts = [a for a in alerts if a["title"] == "STT Error"]
+        assert len(stt_alerts) == 1
+        assert "VOICE_STT_BACKEND" in stt_alerts[0]["message"]
+        assert "text-input" in stt_alerts[0]["message"]
+        assert "whisper-cli" in stt_alerts[0]["message"]
+
     def test_summarizer_timeout_has_actionable_hint(self):
         """Timeout summary should mention check or retry."""
         from voice_claude_agent.summarizer import summarize
@@ -3402,3 +3437,21 @@ class TestActionableErrors:
 
         result = summarize("", exit_code=-2, duration_seconds=0)
         assert "安装" in result or "install" in result.lower()
+
+    def test_portaudio_failure_mentions_py2app_rebuild(self, monkeypatch):
+        """PortAudio dylib failures should mention rebuilding the .app bundle."""
+        from voice_claude_agent.config import check_mic_permission
+
+        monkeypatch.setattr("platform.system", lambda: "Darwin")
+
+        def _raise(*args, **kwargs):
+            raise OSError("cannot load library '/tmp/libportaudio.dylib'")
+
+        monkeypatch.setattr("sounddevice.InputStream", _raise)
+
+        has_mic, detail = check_mic_permission()
+
+        assert has_mic is False
+        assert "PortAudio" in detail
+        assert "libportaudio.dylib" in detail
+        assert "python setup.py py2app" in detail

@@ -733,7 +733,7 @@
         "PortAudio dylib fail → message includes py2app build hint"
       ],
       "passes": true,
-      "evidence": "5 tests verify actionable messages: mic denied → System Settings path, no audio → Input device diagnostic, recording failed → Microphone hint, timeout → retry/check suggestion, CLI not found → install hint. All error paths in app.py have user-facing guidance. 182/182 tests, lint clean."
+      "evidence": "7 F054 tests verify actionable messages: mic denied → System Settings path, no audio → Input device diagnostic, recording failed → Microphone hint, STT error → VOICE_STT_BACKEND/text-input/whisper-cli switch hint, timeout → retry/check suggestion, CLI not found → install hint, PortAudio dylib failure → python setup.py py2app/libportaudio.dylib rebuild hint. 184/184 tests, lint clean."
     },
     {
       "id": "F055",
