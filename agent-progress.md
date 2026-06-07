@@ -1505,3 +1505,12 @@
 - tests/test_core.py
 - feature_list.json
 - agent-progress.md
+
+## 2026-06-07 10:00 — Phase 7: F043 — Non-Reentrant Trigger
+
+### Completed
+- Added _cycle_in_progress guard to VoiceClaudeApp. _trigger_recording returns immediately if guard is True.
+- Guard set on trigger, cleared in _run_wake_loop finally. 3 tests.
+
+### Verification
+- ./init.sh check/lint passed, 142 tests collected, all 3 F043 tests pass

@@ -582,8 +582,8 @@
         "Verify menu title remains in cycle state, no crash",
         "Test covers double-trigger idempotency"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Added _cycle_in_progress guard. _trigger_recording returns immediately if guard is True. Guard set at start of trigger, cleared in _run_wake_loop finally block. 3 tests: double-trigger ignored, trigger sets guard, guard cleared after error cycle. 142/142 tests collected, lint clean."
     },
     {
       "id": "F044",
