@@ -2247,9 +2247,20 @@ class TestMicDiagnostic:
                     titles.add(str(t))
         assert "Mic Diagnostic" in titles
 
-    def test_diagnostic_includes_bundle_and_device_info(self):
+    def test_diagnostic_includes_bundle_and_device_info(self, monkeypatch):
         """_run_mic_diagnostic alert should include bundle ID and device info."""
+        import voice_claude_agent.app as app_mod
+
         alerts = []
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "mock microphone accessible"))
+        monkeypatch.setattr(
+            "sounddevice.query_devices",
+            lambda kind=None: {
+                "name": "Mock Microphone",
+                "max_input_channels": 1,
+                "default_samplerate": 48000.0,
+            },
+        )
 
         from voice_claude_agent.app import VoiceClaudeApp
 
@@ -2295,9 +2306,20 @@ class TestMicDiagnostic:
         assert "recorder.start" in msg
         assert "recorder.stop" in msg
 
-    def test_diagnostic_includes_tcc_troubleshooting(self):
+    def test_diagnostic_includes_tcc_troubleshooting(self, monkeypatch):
         """_run_mic_diagnostic should include TCC/gatekeeper troubleshooting tips."""
+        import voice_claude_agent.app as app_mod
+
         alerts = []
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "mock microphone accessible"))
+        monkeypatch.setattr(
+            "sounddevice.query_devices",
+            lambda kind=None: {
+                "name": "Mock Microphone",
+                "max_input_channels": 1,
+                "default_samplerate": 48000.0,
+            },
+        )
 
         from voice_claude_agent.app import VoiceClaudeApp
 
@@ -3197,6 +3219,8 @@ class TestViewLogs:
         # Should show recent 10 of 15
         assert "10 of 15" in msg
         assert "event_14" in msg  # most recent in last 10
+        assert "10:00:14 event_14" in msg
+        assert "+08:00 event_14" not in msg
         assert "event_5" in msg  # within last 10 (5-14)
         assert "event_0" not in msg  # too old, 0-4 excluded
         # Should show last_result

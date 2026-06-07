@@ -1758,3 +1758,23 @@
 
 ### Verification
 - ./init.sh check/lint passed, 171/171 tests
+
+## 2026-06-07 13:45 — Codex Review: F052 View Logs
+
+### Finding
+- F052 implementation correctly added the menu item and log alert.
+- Timestamp rendering used `timestamp[-8:]`, which displayed `+08:00` for ISO timestamps instead of `HH:MM:SS`.
+- Full-suite tests could hang in Mic Diagnostic because those tests queried real sounddevice input devices.
+
+### Completed
+- Fixed View Logs timestamp formatting to display `HH:MM:SS`.
+- Added a regression assertion that `event_14` displays as `10:00:14 event_14`, not `+08:00 event_14`.
+- Isolated Mic Diagnostic tests from real sounddevice hardware by mocking `sounddevice.query_devices` and mic permission.
+- Rebuilt `dist/VoiceClaudeAgent.app`.
+
+### Verification
+- Focused Mic Diagnostic/View Logs tests passed: 9/9.
+- `./init.sh check` passed.
+- `./init.sh lint` passed.
+- `./init.sh test` passed: 171/171.
+- `python setup.py py2app` passed.

@@ -199,7 +199,9 @@ class VoiceClaudeApp(rumps.App):
                 recent = all_events[-10:]
                 lines.append(f"Recent app-events ({len(recent)} of {len(all_events)} total):")
                 for ev in recent:
-                    ts = ev.get("timestamp", "")[-8:]  # HH:MM:SS
+                    timestamp = str(ev.get("timestamp", ""))
+                    ts = timestamp.split("T", 1)[1] if "T" in timestamp else timestamp
+                    ts = ts.split("+", 1)[0].split("Z", 1)[0][:8]
                     evt = ev.get("event", "?")
                     extra = ""
                     if "elapsed" in ev:
