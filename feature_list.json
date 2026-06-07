@@ -887,7 +887,7 @@
         "Run check/lint/test"
       ],
       "passes": true,
-      "evidence": "Release audit complete. RELEASE_NOTES updated: F001-F064, 223 tests, v0.1.0. README updated with MANUAL_TEST_PHASE11.md and DEVELOPER_PROGRAM_APPLICATION.md links. New docs created: DEVELOPER_PROGRAM_APPLICATION.md (project summary, tech stack, privacy, roadmap), MANUAL_TEST_PHASE11.md (6 acceptance scenarios: Health Check, Mic Diagnostic, normal voice, high-risk reject, high-risk agree, View Logs). No runtime code changes. 223 tests collected, lint clean, check clean."
+      "evidence": "Release audit complete. README and RELEASE_NOTES updated to F001-F065, Phase 1-11, 65 acceptance items, 223 tests, v0.1.0. README links MANUAL_TEST_PHASE11.md and DEVELOPER_PROGRAM_APPLICATION.md. New docs created: DEVELOPER_PROGRAM_APPLICATION.md (project summary, tech stack, privacy, roadmap, GitHub URL, license status), MANUAL_TEST_PHASE11.md (6 acceptance scenarios: Health Check, Mic Diagnostic, normal voice, high-risk reject, high-risk agree, View Logs). No runtime code changes in F065. 223/223 tests, lint clean, check clean."
     }
   ]
 }

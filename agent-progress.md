@@ -2063,3 +2063,21 @@
 
 ### Verification
 - ./init.sh check/lint passed, 223 tests collected
+
+## 2026-06-07 18:55 — Codex Review: F065 Release Readiness
+
+### Finding
+- F065 was added correctly and limited to docs/progress, but README still reported Phase 1-10 / F001-F064 / 64 items.
+- RELEASE_NOTES still said "62 acceptance items" and the changelog still said Phase 1-10.
+- DEVELOPER_PROGRAM_APPLICATION.md still reported 64 features and contained placeholder source/license fields.
+
+### Completed
+- Updated README to Phase 1-11 / F001-F065 / 65 items / 223 tests.
+- Updated RELEASE_NOTES to 65 acceptance items and added the F065 release readiness audit section.
+- Replaced developer application placeholders with the GitHub URL and explicit license status.
+- Updated F065 evidence to reflect the corrected release state.
+
+### Verification
+- `./init.sh check` passed.
+- `./init.sh lint` passed.
+- `./init.sh test -q` passed: 223/223.

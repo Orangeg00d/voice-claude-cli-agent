@@ -11,7 +11,7 @@ Voice Claude Agent 是一个 macOS 本地语音 Agent。用户通过菜单栏点
 - **Python**: 3.11+
 - **构建日期**: 2026-06-07
 
-## 功能清单 (62 项验收全部通过)
+## 功能清单 (65 项验收全部通过)
 
 ### 核心链路 (F001-F012)
 - Claude CLI 可用性检查
@@ -88,6 +88,11 @@ Voice Claude Agent 是一个 macOS 本地语音 Agent。用户通过菜单栏点
 - Trigger Recording 连续点击保护，确保同一时间只运行一个录音执行周期
 - 高风险动作菜单栏语音确认：说“同意/确认/继续”执行，说“取消/不要/拒绝”中止
 
+### 发布就绪审计 (F065)
+- DEVELOPER_PROGRAM_APPLICATION.md 开发者计划申请材料
+- MANUAL_TEST_PHASE11.md 最终人工验收手册
+- README / RELEASE_NOTES / PRIVACY / 手工验收文档一致性审计
+
 ## 测试
 
 - **测试框架**: pytest
@@ -120,6 +125,6 @@ Voice Claude Agent 是一个 macOS 本地语音 Agent。用户通过菜单栏点
 ## Changelog
 
 ### v0.1.0 (2026-06-07)
-- Initial release with complete Phase 1-10 feature set
+- Initial release with complete Phase 1-11 feature set
 - 223 passing tests
 - Standalone .app build support via py2app
