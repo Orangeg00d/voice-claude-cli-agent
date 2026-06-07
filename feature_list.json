@@ -771,8 +771,8 @@
         "./init.sh install-app copies .app to ~/Applications/",
         "Both commands print clear success/failure messages"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "init.sh now has build-app (python setup.py py2app), install-app (copy to ~/Applications/), and both listed in usage. 184 tests, lint clean."
     },
     {
       "id": "F058",

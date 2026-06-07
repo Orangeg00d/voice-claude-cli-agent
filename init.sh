@@ -132,23 +132,58 @@ do_format() {
   fi
 }
 
+# ── build-app ────────────────────────────────────────────
+do_build_app() {
+  if [ ! -f "setup.py" ]; then
+    say_err "setup.py not found — cannot build .app"
+    exit 1
+  fi
+  say_ok "Building VoiceClaudeAgent.app ..."
+  "$PYTHON" setup.py py2app
+  if [ -d "dist/VoiceClaudeAgent.app" ]; then
+    say_ok "Build complete: dist/VoiceClaudeAgent.app"
+  else
+    say_err "Build failed — dist/VoiceClaudeAgent.app not found"
+    exit 1
+  fi
+}
+
+# ── install-app ───────────────────────────────────────────
+do_install_app() {
+  local target="$HOME/Applications/VoiceClaudeAgent.app"
+  if [ ! -d "dist/VoiceClaudeAgent.app" ]; then
+    say_err "dist/VoiceClaudeAgent.app not found — run './init.sh build-app' first"
+    exit 1
+  fi
+  mkdir -p "$HOME/Applications"
+  if [ -d "$target" ]; then
+    rm -rf "$target"
+  fi
+  cp -R dist/VoiceClaudeAgent.app "$target"
+  say_ok "Installed to $target"
+}
+
 # ── dispatch ─────────────────────────────────────────────
 case "${1:-}" in
-  install)   do_install ;;
-  check)     do_check ;;
-  test)      shift; do_test "$@" ;;
-  demo-text) do_demo_text "${2:-}" ;;
-  lint)      shift; do_lint "$@" ;;
-  format)    shift; do_format "$@" ;;
+  install)     do_install ;;
+  check)       do_check ;;
+  test)        shift; do_test "$@" ;;
+  demo-text)   do_demo_text "${2:-}" ;;
+  lint)        shift; do_lint "$@" ;;
+  format)      shift; do_format "$@" ;;
+  build-app)   do_build_app ;;
+  install-app) do_install_app ;;
   *)
-    echo "Usage: $0 {install|check|test|demo-text|lint|format}"
+    echo "Usage: $0 {install|check|test|demo-text|lint|format|build-app|install-app}"
     echo ""
-    echo "  install    Install package in editable mode"
-    echo "  check      Check all dependencies"
-    echo "  test       Run pytest"
-    echo "  demo-text  Run the full demo-text pipeline"
-    echo "  lint       Run ruff linter"
-    echo "  format     Run ruff formatter"
+    echo "  install     Install package in editable mode"
+    echo "  check       Check all dependencies"
+    echo "  test        Run pytest"
+    echo "  demo-text   Run the full demo-text pipeline"
+    echo "  lint        Run ruff linter"
+    echo "  format      Run ruff formatter"
+    echo "  build-app   Build .app bundle via py2app"
+    echo "  install-app Copy .app to ~/Applications/"
     exit 1
     ;;
 esac

@@ -1888,3 +1888,11 @@
 
 ### Files Changed
 - README.md, feature_list.json, agent-progress.md
+
+## 2026-06-07 13:50 — Phase 9: F057 — init.sh build-app / install-app
+
+### Completed
+- Added do_build_app and do_install_app to init.sh. Usage text updated. 184 tests.
+
+### Verification
+- ./init.sh test passed, lint clean
