@@ -665,8 +665,8 @@
         "Verify it lists expected menu items and their behavior",
         "Verify it documents known limitations (TCC, PortAudio, TTS truncation)"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "README Manual Smoke Test section added: launch instructions (voice-claude-agent app / open dist/...app), 8-item menu behavior table, 4 known limitations (TCC, PortAudio, TTS truncation, no wake word). All F049 steps verified."
     },
     {
       "id": "F050",

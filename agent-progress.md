@@ -1669,3 +1669,11 @@
 - Focused F047/F048 tests passed: 11/11.
 - `./init.sh check`, `./init.sh lint`, and full `./init.sh test` passed: 167/167.
 - `python setup.py py2app` passed.
+
+## 2026-06-07 11:45 — Phase 7: F049 — README Smoke Test Docs
+
+### Completed
+- Added Manual Smoke Test section: launch, 8 menu items, 4 known limitations.
+
+### Verification
+- ./init.sh check/lint passed

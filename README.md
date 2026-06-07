@@ -167,4 +167,36 @@ voice-claude-agent wake
 
 ## 开发状态
 
-Phase 1-4 已完成。F001-F021 全部通过。55 个测试。详见 `feature_list.json`、`agent-progress.md`。
+Phase 1-7 已完成。F001-F048 全部通过。详情见 `feature_list.json`。
+
+## Manual Smoke Test（手动验收）
+
+### 启动菜单栏 App
+
+```bash
+# 终端模式
+voice-claude-agent app
+
+# 或直接双击 .app（需先构建）
+open dist/VoiceClaudeAgent.app
+```
+
+### 预期行为
+
+| 菜单项 | 功能 | 预期 |
+|--------|------|------|
+| `Start Wake` | 开始后台语音唤醒循环 | 标题变为 `Start Wake (running)`，菜单图标不变 |
+| `Stop Wake` | 停止唤醒循环 | 标题恢复为 `Stop Wake`，麦克风释放 |
+| `Trigger Recording` | 单次录音 → STT → Claude → TTS | 状态栏依次显示：`Recording...` → `Transcribing...` → `Running Claude...` → `Done ✓`（1.5s 后恢复） |
+| `Mic Diagnostic` | 显示麦克风权限和设备详情 | 弹出诊断窗口，含 bundle ID、输入设备、PortAudio 状态 |
+| `Mic Status` | 当前麦克风权限 | `Mic: Accessible` 或 `Mic: Denied` |
+| `Last Transcript` | 上一次识别的语音文本 | 点击弹出 rumps 对话框 |
+| `Last Summary` | 上一次 Claude 回答的完整摘要 | 点击弹出完整文本（不会被截断） |
+| `Quit` | 退出 | 先停止 wake loop |
+
+### 已知限制
+
+- **TCC / 麦克风权限**：`dist/VoiceClaudeAgent.app` 包含 `NSMicrophoneUsageDescription`，需要被 macOS 识别。首次启动如有权限问题，运行 `tccutil reset Microphone com.voiceclaude.agent` 后在 Finder 中重新打开。
+- **PortAudio 动态库**：py2app 构建脚本会自动把 `libportaudio.dylib` 提取到文件系统。如遇 `PortAudio unavailable` 错误，请确认已运行 `python setup.py py2app`（非 `-A` 别名模式）。
+- **TTS 截断**：长回答只播报前半部分 + "完整内容可在菜单栏 Last Summary 查看"，完整文本保留在 `sessions.jsonl` 和 `Last Summary`。
+- **非语音唤醒词**：当前触发方式为手动点击 Trigger Recording 或 Start Wake，不支持真实语音唤醒词。
