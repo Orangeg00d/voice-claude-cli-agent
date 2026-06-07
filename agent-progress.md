@@ -1425,6 +1425,28 @@
 - tests/test_core.py
 - agent-progress.md
 
+## 2026-06-07 08:19 — Codex Review: Menu Recording Must Recover From Hangs
+
+### Finding
+- User reported Trigger Recording can stay stuck in recording and not auto-terminate.
+- Existing code recorded for a fixed duration on the wake loop thread, but if the sounddevice recorder path blocked inside start/stop, the menu title could remain stuck at `Recording...`.
+
+### Completed
+- Added a hard timeout wrapper around the menu app recording path.
+- Recording now runs in a daemon worker; the wake loop waits only `DEFAULT_RECORD_SECONDS + RECORD_WORKER_GRACE_SECONDS`.
+- On timeout, the app writes `record_timeout`, attempts best-effort recorder cleanup in another daemon thread, returns empty audio with a diagnostic, and restores the menu title through the existing `finally` path.
+- Added a regression test simulating a hung recorder and asserting the menu app recovers quickly.
+
+### Verification
+- `./init.sh check` passed.
+- `./init.sh lint` passed.
+- `./init.sh test` passed: 139/139 tests.
+
+### Files Changed
+- src/voice_claude_agent/app.py
+- tests/test_core.py
+- agent-progress.md
+
 ## 2026-06-06 22:37 — Codex Review: F042 Runtime Bootstrap Correction
 
 ### Finding

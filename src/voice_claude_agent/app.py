@@ -30,6 +30,7 @@ class VoiceClaudeApp(rumps.App):
     """
 
     DEFAULT_RECORD_SECONDS = 5
+    RECORD_WORKER_GRACE_SECONDS = 3
 
     def __init__(
         self,
@@ -307,7 +308,7 @@ class VoiceClaudeApp(rumps.App):
 
             self.trigger_item.title = "Recording..."
             self._append_runtime_event("record_start")
-            audio, diag = self._record_fixed_duration_with_diag(recorder)
+            audio, diag = self._record_with_timeout(recorder)
             self._append_runtime_event(f"record_done bytes={len(audio)}")
             if not audio:
                 self.mic_status_item.title = "Mic: No audio captured"
@@ -352,6 +353,53 @@ class VoiceClaudeApp(rumps.App):
         finally:
             if self.trigger_item.title not in {"Done ✓", "Trigger Recording"}:
                 self.trigger_item.title = "Trigger Recording"
+
+    def _record_with_timeout(self, recorder) -> tuple[bytes, str]:
+        """Run the recorder path with a hard timeout so the menu app can recover."""
+        result: list[tuple[bytes, str]] = []
+        error: list[BaseException] = []
+
+        def _target() -> None:
+            try:
+                result.append(self._record_fixed_duration_with_diag(recorder))
+            except BaseException as e:
+                error.append(e)
+
+        worker = threading.Thread(target=_target, daemon=True, name="record-worker")
+        worker.start()
+        timeout = self.DEFAULT_RECORD_SECONDS + self.RECORD_WORKER_GRACE_SECONDS
+        worker.join(timeout=timeout)
+
+        if worker.is_alive():
+            self._append_runtime_event(f"record_timeout after={timeout:.1f}s")
+            self._wake_event.set()
+            threading.Thread(
+                target=self._best_effort_stop_recorder,
+                args=(recorder,),
+                daemon=True,
+                name="record-stop-cleanup",
+            ).start()
+            return (
+                b"",
+                (
+                    f"Recording timed out after {timeout:.1f}s and was interrupted.\n"
+                    "The menu app recovered, but the audio backend may need an app restart "
+                    "if the microphone remains busy."
+                ),
+            )
+
+        if error:
+            raise error[0]
+        if result:
+            return result[0]
+        return b"", "Recording ended without producing a result."
+
+    def _best_effort_stop_recorder(self, recorder) -> None:
+        try:
+            recorder.stop()
+            self._append_runtime_event("record_timeout_cleanup_stop_ok")
+        except Exception as e:
+            self._append_runtime_event(f"record_timeout_cleanup_stop_error {type(e).__name__}: {e}")
 
     def _append_runtime_event(self, message: str) -> None:
         from datetime import datetime

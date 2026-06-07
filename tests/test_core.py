@@ -2017,6 +2017,36 @@ class TestNonInteractiveRecording:
         assert alerts[0]["title"] == "No Audio"
         assert "No audio" in alerts[0]["message"]
 
+    def test_record_timeout_recovers_when_recorder_hangs(self, monkeypatch):
+        """A hung recorder must not leave the menu app stuck in Recording."""
+        import time
+
+        import voice_claude_agent.app as app_mod
+
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "DEFAULT_RECORD_SECONDS", 0.01)
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "RECORD_WORKER_GRACE_SECONDS", 0.01)
+
+        class HangingRecorder:
+            def start(self):
+                time.sleep(1.0)
+
+            def stop(self):
+                return None
+
+            def get_audio(self):
+                return b""
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: None)
+        started_at = time.monotonic()
+        audio, diag = app._record_with_timeout(HangingRecorder())
+
+        assert time.monotonic() - started_at < 0.5
+        assert audio == b""
+        assert "Recording timed out" in diag
+        assert app._wake_event.is_set()
+
     def test_stt_error_shows_alert(self, monkeypatch):
         """When STT returns [STT error: ...], an alert should be shown."""
         import voice_claude_agent.app as app_mod
