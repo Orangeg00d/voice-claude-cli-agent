@@ -680,6 +680,73 @@
       ],
       "passes": true,
       "evidence": "agent-progress.md has Phase 7 entries for F039-F050 plus Codex review entries. Entries list verification commands and test counts, including F043-F049 review corrections and F050 audit completion. 167/167 tests, lint clean, check clean."
+    },
+    {
+      "id": "F051",
+      "priority": 51,
+      "category": "docs",
+      "description": "MANUAL_TEST_PHASE8.md documents real-world manual smoke-test steps",
+      "steps": [
+        "Create MANUAL_TEST_PHASE8.md with step-by-step manual verification",
+        "Cover: launch from Finder, Trigger Recording, Last Transcript/Summary, Mic Diagnostic",
+        "Cover: TCC permission reset, whisper-cli model verification, PortAudio check",
+        "Cover: known issues and troubleshooting"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F052",
+      "priority": 52,
+      "category": "app",
+      "description": "Menu bar has 'View Logs' item showing recent app_events and last_result",
+      "steps": [
+        "Add 'View Logs' menu item",
+        "Click shows recent app_events entries and last_result.json content",
+        "If no logs exist, shows placeholder message"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F053",
+      "priority": 53,
+      "category": "app",
+      "description": "Recording duration configurable via VOICE_RECORD_SECONDS env var",
+      "steps": [
+        "Set VOICE_RECORD_SECONDS=3",
+        "Verify recording lasts ~3 seconds instead of default 5",
+        "README documents the env var"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F054",
+      "priority": 54,
+      "category": "ux",
+      "description": "Common failure scenarios have actionable error messages",
+      "steps": [
+        "mic denied → message includes System Settings path",
+        "STT error → message includes backend switch hint",
+        "Claude timeout → message includes retry suggestion",
+        "PortAudio dylib fail → message includes py2app build hint"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F055",
+      "priority": 55,
+      "category": "release",
+      "description": "Release notes, privacy statement, and GitHub-ready project materials",
+      "steps": [
+        "Create RELEASE_NOTES.md summarizing project version, features, and changelog",
+        "Create PRIVACY.md explaining local-only audio processing",
+        "Ensure README links to release docs"
+      ],
+      "passes": false,
+      "evidence": ""
     }
   ]
 }
