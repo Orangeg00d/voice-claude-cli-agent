@@ -39,7 +39,7 @@ and the results are read aloud via macOS Text-to-Speech.
 ## Project Status
 
 - **Version**: v0.1.0
-- **Features**: 65 acceptance items (F001-F065), all passing
+- **Features**: 66 acceptance items (F001-F066), all passing
 - **Tests**: 223 (pytest), passing with `./init.sh test`
 - **Lint**: ruff clean
 - **Code**: ~6000 lines (src + tests), 20+ source modules
@@ -78,4 +78,4 @@ See [PRIVACY.md](PRIVACY.md) for full details. Summary:
 
 - Source: https://github.com/Orangeg00d/voice-claude-cli-agent
 - License: MIT License — see [LICENSE](LICENSE)
-- Documentation: README.md, RELEASE_NOTES.md, PRIVACY.md, MANUAL_TEST_RELEASE.md, MANUAL_TEST_PHASE11.md
+- Documentation: README.md, RELEASE_NOTES.md, PRIVACY.md, SECURITY.md, CONTRIBUTING.md, TOOLS_AND_DEPS.md, MANUAL_TEST_RELEASE.md, MANUAL_TEST_PHASE11.md

@@ -902,7 +902,7 @@
         "No runtime code changes"
       ],
       "passes": true,
-      "evidence": "Created MIT LICENSE (2026 Orangeg00d). Created SECURITY.md (vulnerability reporting, supported versions, no-telemetry statement). Created CONTRIBUTING.md (Claude+Codex dual-agent workflow, single feature per round, test requirements). Updated README with open-source section. Updated DEVELOPER_PROGRAM_APPLICATION.md license status. No runtime code changes. 223 tests collected, lint clean, check clean."
+      "evidence": "Created MIT LICENSE (2026 Orangeg00d). Created SECURITY.md (vulnerability reporting, supported versions, no-telemetry statement). Created CONTRIBUTING.md (Claude+Codex dual-agent workflow, single feature per round, test requirements). Added TOOLS_AND_DEPS.md dependency/tool index. Updated README, RELEASE_NOTES, and DEVELOPER_PROGRAM_APPLICATION.md to F001-F066, Phase 1-12, 66 acceptance items, MIT license, and repository metadata docs. No runtime code changes. 223/223 tests, lint clean, check clean."
     }
   ]
 }

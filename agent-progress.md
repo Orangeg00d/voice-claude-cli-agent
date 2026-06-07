@@ -2089,3 +2089,21 @@
 
 ### Verification
 - ./init.sh check/lint passed, 223 tests collected
+
+## 2026-06-07 19:20 — Codex Review: F066 Repository Metadata
+
+### Finding
+- F066 correctly added MIT licensing, SECURITY.md, CONTRIBUTING.md, and did not change runtime code.
+- Claude also added TOOLS_AND_DEPS.md in a follow-up docs commit, which is useful but was not reflected in README, RELEASE_NOTES, or F066 evidence.
+- README, RELEASE_NOTES, and DEVELOPER_PROGRAM_APPLICATION.md still reported Phase 1-11 / F001-F065 / 65 items after F066.
+
+### Completed
+- Updated README to Phase 1-12 / F001-F066 / 66 items and linked SECURITY.md, CONTRIBUTING.md, and TOOLS_AND_DEPS.md.
+- Updated RELEASE_NOTES with the F066 repository metadata section.
+- Updated DEVELOPER_PROGRAM_APPLICATION.md to 66 acceptance items and complete documentation links.
+- Updated F066 evidence to include TOOLS_AND_DEPS.md and the corrected release state.
+
+### Verification
+- `./init.sh check` passed.
+- `./init.sh lint` passed.
+- `./init.sh test -q` passed: 223/223.
