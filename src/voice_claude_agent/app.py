@@ -172,6 +172,21 @@ class VoiceClaudeApp(rumps.App):
     def _rumps_alert(title: str, message: str) -> None:
         rumps.alert(title=title, message=message)
 
+    def _alert_on_main(self, title: str, message: str) -> None:
+        """Dispatch alert to the main thread. Safe to call from any thread.
+
+        rumps.alert / NSWindow must only be instantiated on the main thread.
+        When called from a background thread (e.g. wake loop), this uses
+        rumps.Timer to schedule the alert on the next main-loop tick.
+        In tests, _alert_patch is used directly (no rumps involved).
+        """
+        import threading as _threading
+        if _threading.current_thread() is _threading.main_thread():
+            self._alert(title=title, message=message)
+        else:
+            # Schedule on main thread via rumps.Timer
+            rumps.Timer(lambda: self._alert(title=title, message=message), 0).start()
+
     def _check_mic_or_alert(self) -> bool:
         has_mic, detail = check_mic_permission()
         if not has_mic:
@@ -502,7 +517,7 @@ class VoiceClaudeApp(rumps.App):
             )
             if not audio:
                 self.mic_status_item.title = "Mic: No audio captured"
-                self._alert(
+                self._alert_on_main(
                     title="No Audio",
                     message=(
                         "No audio was captured. Check your microphone connection.\n\n"
@@ -525,7 +540,7 @@ class VoiceClaudeApp(rumps.App):
 
             if not transcript.strip():
                 self.mic_status_item.title = "Mic: Empty transcript"
-                self._alert(
+                self._alert_on_main(
                     title="No Speech Detected",
                     message="No speech was detected in the recording.",
                 )
@@ -533,7 +548,7 @@ class VoiceClaudeApp(rumps.App):
 
             if transcript.startswith("[STT error:"):
                 self.mic_status_item.title = "Mic: STT Error"
-                self._alert(
+                self._alert_on_main(
                     title="STT Error",
                     message=(
                         f"{transcript}\n\n"
@@ -579,10 +594,11 @@ class VoiceClaudeApp(rumps.App):
         except Exception as e:
             self.mic_status_item.title = "Mic: Runtime error"
             self._append_runtime_event(f"record_cycle_error {type(e).__name__}: {e}")
-            self._alert(title="Recording Runtime Error", message=str(e))
+            self._alert_on_main(title="Recording Runtime Error", message=str(e))
         finally:
             if self.trigger_item.title not in {"Done ✓", "Trigger Recording"}:
                 self.trigger_item.title = "Trigger Recording"
+            self._cycle_in_progress = False  # F061: always clear guard on cycle end
 
     def _record_with_timeout(self, recorder) -> tuple[bytes, str]:
         """Run the recorder path with a hard timeout so the menu app can recover."""

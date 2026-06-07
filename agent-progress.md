@@ -1941,3 +1941,11 @@
 - `./init.sh test` passed: 198/198.
 - `./init.sh build-app` passed and rebuilt `dist/VoiceClaudeAgent.app`.
 - `./init.sh install-app` passed and installed `~/Applications/VoiceClaudeAgent.app` with bundle id `com.voiceclaude.agent`.
+
+## 2026-06-07 14:30 — Phase 10: F061 — Main Thread Alert Dispatch
+
+### Completed
+- Added _alert_on_main dispatching via rumps.Timer for background threads. All _record_and_execute alerts use safe path. Record timeout clears _cycle_in_progress in finally. 4 tests. 202/202 tests, lint clean.
+
+### Verification
+- ./init.sh check/lint passed, 202/202 tests

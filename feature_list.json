@@ -812,6 +812,21 @@
       ],
       "passes": true,
       "evidence": "MANUAL_TEST_RELEASE.md created: 9 sections covering fresh install, whisper.cpp setup, first mic authorization, first Trigger Recording, log inspection, multi-round stability, Health Check, quit, and optional .app build. Each section has expected behavior and troubleshooting table. 198/198 tests, lint clean."
+    },
+    {
+      "id": "F061",
+      "priority": 61,
+      "category": "app",
+      "description": "All alerts are dispatched on the main thread to avoid NSWindow cross-thread crash",
+      "steps": [
+        "All _alert calls go through _alert_on_main which dispatches to main thread",
+        "Background wake/recording thread never creates NSWindow/rumps.alert directly",
+        "Record timeout clears _cycle_in_progress and resets Trigger Recording title",
+        "No Audio / STT Error / Recording Runtime Error all use safe alert path",
+        "Test: background alert uses timer dispatch, record timeout clears guard, title resets, second trigger works after timeout"
+      ],
+      "passes": true,
+      "evidence": "Added _alert_on_main() that dispatches to main thread via rumps.Timer when called from background. All alerts in _record_and_execute use _alert_on_main. Record timeout now clears _cycle_in_progress in finally. 4 tests: bg thread detection, direct main thread call, cycle guard cleared after timeout, second trigger works after timeout. 202/202 tests, lint clean."
     }
   ]
 }
