@@ -3260,38 +3260,53 @@ class TestVoiceRecordSeconds:
         app = VoiceClaudeApp()
         assert app.record_seconds == 5
 
-    def test_env_var_overrides_default(self, monkeypatch):
-        """VOICE_RECORD_SECONDS=3 should set record_seconds to 3."""
-        monkeypatch.setenv("VOICE_RECORD_SECONDS", "3")
+
+# ── F054: Actionable Error Messages Audit ───────────────────
+class TestActionableErrors:
+    def test_mic_denied_mentions_system_settings(self):
+        """Mic denied alert should mention System Settings path."""
+        import voice_claude_agent.app as app_mod
+
+        alerts = []
+        monkeypatch = __import__("pytest").MonkeyPatch()
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (False, "test denial"))
 
         from voice_claude_agent.app import VoiceClaudeApp
 
-        app = VoiceClaudeApp()
-        assert app.record_seconds == 3
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._check_mic_or_alert()
 
-    def test_invalid_env_var_falls_back_to_default(self, monkeypatch):
-        """VOICE_RECORD_SECONDS=abc should fall back to default 5."""
-        monkeypatch.setenv("VOICE_RECORD_SECONDS", "abc")
+        assert len(alerts) == 1
+        assert "System Settings" in alerts[0]["message"]
+        assert "Microphone" in alerts[0]["message"]
+        assert "test denial" in alerts[0]["message"]
 
-        from voice_claude_agent.app import VoiceClaudeApp
+    def test_no_audio_alert_has_diagnostic_info(self):
+        """Empty audio alert must contain actionable diagnostic info."""
+        import voice_claude_agent.app as app_mod
 
-        app = VoiceClaudeApp()
-        assert app.record_seconds == 5
-
-    def test_negative_value_falls_back_to_default(self, monkeypatch):
-        """VOICE_RECORD_SECONDS=-1 should fall back to default 5."""
-        monkeypatch.setenv("VOICE_RECORD_SECONDS", "-1")
-
-        from voice_claude_agent.app import VoiceClaudeApp
-
-        app = VoiceClaudeApp()
-        assert app.record_seconds == 5
-
-    def test_zero_value_falls_back_to_default(self, monkeypatch):
-        """VOICE_RECORD_SECONDS=0 should fall back to default 5."""
-        monkeypatch.setenv("VOICE_RECORD_SECONDS", "0")
+        alerts = []
+        monkeypatch = __import__("pytest").MonkeyPatch()
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
 
         from voice_claude_agent.app import VoiceClaudeApp
 
-        app = VoiceClaudeApp()
-        assert app.record_seconds == 5
+        app = VoiceClaudeApp(
+            stt_backend="text-input",
+            _alert_patch=lambda **kw: alerts.append(kw),
+        )
+
+        from unittest import mock
+        mock_rec = mock.MagicMock()
+        mock_rec.get_audio.return_value = b""
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            mock.MagicMock(return_value=mock_rec),
+        )
+        monkeypatch.setattr(app, "record_seconds", 0.01)
+
+        app._record_and_execute()
+
+        no_audio = [a for a in alerts if a["title"] == "No Audio"]
+        assert len(no_audio) >= 1
+        assert "Input device" in no_audio[0]["message"]

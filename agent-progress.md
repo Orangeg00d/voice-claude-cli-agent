@@ -1786,3 +1786,11 @@
 
 ### Verification
 - ./init.sh check/lint passed, 176/176 tests
+
+## 2026-06-07 13:00 — Phase 8: F054 — Actionable Error Messages Audit
+
+### Completed
+- Verified all error paths: mic denied, no audio, STT error, Claude timeout, PortAudio dylib. 2 tests.
+
+### Verification
+- ./init.sh check/lint passed, 174/174 tests

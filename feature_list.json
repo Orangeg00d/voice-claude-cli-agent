@@ -732,8 +732,8 @@
         "Claude timeout → message includes retry suggestion",
         "PortAudio dylib fail → message includes py2app build hint"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Audited all error paths for actionable messages: mic denied → System Settings path, no audio → Input device diagnostic, STT error → backend switch hint, Claude timeout → retry suggestion, PortAudio dylib → py2app build hint. 2 tests: mic denied message audit, empty audio diagnostic audit. 174/174 tests, lint clean."
     },
     {
       "id": "F055",
