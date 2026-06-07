@@ -2107,3 +2107,11 @@
 - `./init.sh check` passed.
 - `./init.sh lint` passed.
 - `./init.sh test -q` passed: 223/223.
+
+## 2026-06-07 15:45 — Phase 13: F067 — GitHub Release Metadata
+
+### Completed
+- Added badges to README. Created GITHUB_RELEASE_DRAFT.md and REPOSITORY_METADATA.md. No runtime code changes. No tag or release created yet. 223 tests collected, lint clean, check clean.
+
+### Verification
+- ./init.sh check/lint passed, 223 tests collected

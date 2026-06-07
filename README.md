@@ -1,5 +1,10 @@
 # Voice Claude CLI Agent
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![macOS](https://img.shields.io/badge/platform-macOS-lightgrey)](https://www.apple.com/macos/)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-green)](https://www.python.org/)
+[![Tests](https://img.shields.io/badge/tests-223%20passing-brightgreen)](tests/)
+
 一个面向 macOS 的本地语音 Agent 项目。目标是让用户通过语音唤醒发出开发指令，由本地 Claude CLI 执行任务，并在完成后用语音播报结果。
 
 ## 快速开始
