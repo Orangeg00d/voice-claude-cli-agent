@@ -1865,3 +1865,13 @@
 - `./init.sh check` passed.
 - `./init.sh lint` passed.
 - `./init.sh test` passed: 184/184.
+
+## 2026-06-07 13:30 — Phase 9: Plan — Release Hardening Features (F056-F060)
+
+### Planned
+- F056: README cleanup for v0.1.0 release.
+- F057: ./init.sh build-app / install-app commands.
+- F058: App Health Check menu item.
+- F059: ~/.voice-claude-agent/config.json local config.
+- F060: MANUAL_TEST_RELEASE.md fresh-install walkthrough.
+- All passes=false. Implementation one feature per round.

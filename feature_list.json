@@ -747,6 +747,71 @@
       ],
       "passes": true,
       "evidence": "RELEASE_NOTES.md + PRIVACY.md created. README links both. Codex corrected privacy wording to distinguish local audio/STT/TTS/logs from Claude CLI transcript/prompt network processing. 184/184 tests, lint clean."
+    },
+    {
+      "id": "F056",
+      "priority": 56,
+      "category": "docs",
+      "description": "README updated to reflect v0.1.0 / Phase 8 complete",
+      "steps": [
+        "Remove stale Phase 4/Phase 7 status references",
+        "Replace with v0.1.0 release overview",
+        "Structure for GitHub landing page readability"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F057",
+      "priority": 57,
+      "category": "packaging",
+      "description": "./init.sh build-app and ./init.sh install-app commands",
+      "steps": [
+        "./init.sh build-app runs python setup.py py2app",
+        "./init.sh install-app copies .app to ~/Applications/",
+        "Both commands print clear success/failure messages"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F058",
+      "priority": 58,
+      "category": "app",
+      "description": "App Health Check menu item with actionable status",
+      "steps": [
+        "Add Health Check menu item to VoiceClaudeApp",
+        "Check Claude CLI, whisper-cli binary, model path, mic permission, PortAudio, agent_state",
+        "Show PASS/FAIL for each check with actionable fix hints"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F059",
+      "priority": 59,
+      "category": "app",
+      "description": "Local config file ~/.voice-claude-agent/config.json",
+      "steps": [
+        "Support ~/.voice-claude-agent/config.json for persistent settings",
+        "Override VOICE_RECORD_SECONDS, VOICE_STT_BACKEND, WHISPER_CPP_MODEL, WHISPER_CPP_LANGUAGE",
+        "Env vars still take highest priority"
+      ],
+      "passes": false,
+      "evidence": ""
+    },
+    {
+      "id": "F060",
+      "priority": 60,
+      "category": "docs",
+      "description": "MANUAL_TEST_RELEASE.md: fresh install to first-use walkthrough",
+      "steps": [
+        "Cover fresh install, first mic authorization, recording, STT, Claude reply",
+        "Cover log inspection and app exit",
+        "Each step has expected behavior and troubleshooting"
+      ],
+      "passes": false,
+      "evidence": ""
     }
   ]
 }
