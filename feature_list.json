@@ -693,7 +693,7 @@
         "Cover: known issues and troubleshooting"
       ],
       "passes": true,
-      "evidence": "MANUAL_TEST_PHASE8.md created: 8 sections covering launch, Trigger Recording cycle, Mic Diagnostic, TCC/mic permission, whisper-cli verification, multi-round stability, log inspection, and known issues table. Includes step-by-step instructions with expected behavior and troubleshooting for each scenario."
+      "evidence": "MANUAL_TEST_PHASE8.md created: 8 sections covering launch, Trigger Recording cycle, Mic Diagnostic, TCC/mic permission, whisper-cli verification, multi-round stability, log inspection, and known issues. Codex corrected log inspection to use agent_state/app_events.jsonl and added Finder .app launch guidance for launchctl setenv WHISPER_CPP_MODEL/WHISPER_CPP_LANGUAGE. README links to the manual. check/lint clean."
     },
     {
       "id": "F052",

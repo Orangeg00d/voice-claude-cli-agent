@@ -1733,3 +1733,20 @@
 
 ### Verification
 - ./init.sh check/lint passed
+
+## 2026-06-07 13:12 — Codex Review: F051 Manual Test Accuracy
+
+### Finding
+- F051 covered the requested manual smoke-test areas.
+- The log inspection step used the old `agent_state/app-events.log` path; the current structured lifecycle log is `agent_state/app_events.jsonl`.
+- Finder-launched `.app` instances may not inherit terminal `export WHISPER_CPP_MODEL=...`, so the manual needed GUI environment setup guidance.
+
+### Completed
+- Corrected the app-events log path in `MANUAL_TEST_PHASE8.md`.
+- Added `launchctl setenv WHISPER_CPP_MODEL` and `WHISPER_CPP_LANGUAGE` guidance for Finder `.app` launches.
+- Added README link to the Phase 8 manual test guide.
+- Updated F051 evidence; F052-F055 remain `passes=false`.
+
+### Verification
+- `./init.sh check` passed.
+- `./init.sh lint` passed.

@@ -9,6 +9,12 @@
    ```bash
    export WHISPER_CPP_MODEL=/path/to/ggml-base.bin
    ```
+   如果从 Finder 双击 `.app` 启动，macOS 不一定继承终端里的 `export`。请先写入 GUI 会话环境：
+   ```bash
+   launchctl setenv WHISPER_CPP_MODEL /path/to/ggml-base.bin
+   launchctl setenv WHISPER_CPP_LANGUAGE zh
+   ```
+   然后重新打开 `dist/VoiceClaudeAgent.app`。
 3. 已安装项目依赖：`./init.sh install`
 4. 已运行测试：`./init.sh test`（167/167 通过）
 5. 如需 .app 构建：`python setup.py py2app`
@@ -121,7 +127,7 @@ open dist/VoiceClaudeAgent.app
 ### 步骤
 1. 查看 app-events 日志：
    ```bash
-   cat agent_state/app-events.log | tail -20
+   cat agent_state/app_events.jsonl | tail -20
    ```
 2. 查看会话日志：
    ```bash
@@ -133,7 +139,7 @@ open dist/VoiceClaudeAgent.app
    ```
 
 ### 验收标准
-- [ ] app-events.log 包含 trigger / record_start / record_stop / stt_start / stt_done / claude_start / claude_done / tts_done / cycle_done
+- [ ] app_events.jsonl 包含 trigger / record_start / record_stop / stt_start / stt_done / claude_start / claude_done / tts_done / cycle_done
 - [ ] sessions.jsonl 每行是合法 JSON
 - [ ] last_result.json 包含 prompt / exit_code / summary
 
@@ -142,7 +148,7 @@ open dist/VoiceClaudeAgent.app
 | 问题 | 原因 | 解决方案 |
 |------|------|----------|
 | App 不出现在麦克风权限列表 | TCC 不注册 CLI/bundle | `tccutil reset` + Finder 双击打开 |
-| STT 返回空或错误 | whisper-cli 或模型问题 | 检查 `WHISPER_CPP_MODEL`，终端测试 whisper-cli |
+| STT 返回空或错误 | whisper-cli 或模型问题 | 检查 `WHISPER_CPP_MODEL`，终端测试 whisper-cli；Finder 启动时用 `launchctl setenv` 写入 GUI 环境 |
 | 录音返回空音频 | 麦克风权限或设备问题 | 运行 Mic Diagnostic，检查系统设置 |
 | 大回答 TTS 朗读太长 | Summary 超出语音合理长度 | 已自动截断，完整内容在 Last Summary |
 | py2app bundle 闪退 | PortAudio 动态库问题 | 重新 `python setup.py py2app` |
