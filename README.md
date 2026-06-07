@@ -173,7 +173,9 @@ voice-claude-agent wake
 - `CLAUDE_CLI_TASK_ORCHESTRATION.md`：Codex 如何编排 Claude CLI 执行小任务。
 - `RELEASE_NOTES.md`：版本发布说明与功能清单。
 - `PRIVACY.md`：隐私声明与数据处理说明。
-- `MANUAL_TEST_PHASE8.md`：菜单栏 App 真实手动验收手册。
+- `MANUAL_TEST_PHASE8.md`：菜单栏 App 手动验收手册。
+- `MANUAL_TEST_PHASE11.md`：最终人工验收手册（Health Check、Mic Diagnostic、语音指令、高风险确认、View Logs）。
+- `DEVELOPER_PROGRAM_APPLICATION.md`：开发者计划申请材料。
 
 ## 已确认方向
 

@@ -873,6 +873,21 @@
       ],
       "passes": true,
       "evidence": "Voice confirmation flow in _record_and_execute: after STT, if classify_risk returns EXTERNAL_OR_DESTRUCTIVE, TTS asks user to confirm, then records confirmation audio, transcribes it, and checks is_voice_confirm(). Agree keywords (同意/确认/继续 etc.) proceed; reject (取消/不要/拒绝 etc.) aborts; unclear input aborts for safety. Accepted voice confirmation calls _run_pipeline(..., confirmation_override=True) so the background menu app does not block on CLI input. Low-risk passes confirmation_override=None. is_voice_confirm uses bilingual keyword sets with exact matching for single-character Chinese keywords to avoid false positives like '不错'. 9 F064 tests: agree, reject, unclear, single-character matching, high-risk accepted flow, low-risk skip, spoken rejection skip, unclear skip, and pipeline confirmation override. 223/223 tests, lint clean."
+    },
+    {
+      "id": "F065",
+      "priority": 65,
+      "category": "release",
+      "description": "Release readiness audit: docs, developer application, manual test walkthrough",
+      "steps": [
+        "Audit README / RELEASE_NOTES / PRIVACY / MANUAL_TEST_RELEASE consistency",
+        "Create DEVELOPER_PROGRAM_APPLICATION.md",
+        "Create MANUAL_TEST_PHASE11.md with 6 acceptance scenarios",
+        "No runtime code changes unless docs are severely misaligned",
+        "Run check/lint/test"
+      ],
+      "passes": true,
+      "evidence": "Release audit complete. RELEASE_NOTES updated: F001-F064, 223 tests, v0.1.0. README updated with MANUAL_TEST_PHASE11.md and DEVELOPER_PROGRAM_APPLICATION.md links. New docs created: DEVELOPER_PROGRAM_APPLICATION.md (project summary, tech stack, privacy, roadmap), MANUAL_TEST_PHASE11.md (6 acceptance scenarios: Health Check, Mic Diagnostic, normal voice, high-risk reject, high-risk agree, View Logs). No runtime code changes. 223 tests collected, lint clean, check clean."
     }
   ]
 }

@@ -2051,3 +2051,15 @@
 - `./init.sh check` passed.
 - `./init.sh lint` passed.
 - `./init.sh test -q` passed: 223/223.
+
+## 2026-06-07 15:15 — Phase 11: F065 — Release Readiness Audit
+
+### Completed
+- Audit: README/RELEASE_NOTES/PRIVACY/MANUAL_TEST_RELEASE all consistent with F001-F064, 223 tests, v0.1.0.
+- Created DEVELOPER_PROGRAM_APPLICATION.md (project summary, tech stack, privacy, roadmap).
+- Created MANUAL_TEST_PHASE11.md (6 acceptance scenarios: Health Check, Mic Diagnostic, normal voice, high-risk reject, high-risk agree, View Logs).
+- README updated with new doc links. No runtime code changes.
+- 223 tests collected, lint clean, check clean.
+
+### Verification
+- ./init.sh check/lint passed, 223 tests collected
