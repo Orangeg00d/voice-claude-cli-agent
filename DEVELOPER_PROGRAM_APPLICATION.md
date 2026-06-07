@@ -77,5 +77,5 @@ See [PRIVACY.md](PRIVACY.md) for full details. Summary:
 ## Contact & Links
 
 - Source: https://github.com/Orangeg00d/voice-claude-cli-agent
-- License: No license file is currently included; distribution license is still pending.
+- License: MIT License — see [LICENSE](LICENSE)
 - Documentation: README.md, RELEASE_NOTES.md, PRIVACY.md, MANUAL_TEST_RELEASE.md, MANUAL_TEST_PHASE11.md

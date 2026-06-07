@@ -177,6 +177,10 @@ voice-claude-agent wake
 - `MANUAL_TEST_PHASE11.md`：最终人工验收手册（Health Check、Mic Diagnostic、语音指令、高风险确认、View Logs）。
 - `DEVELOPER_PROGRAM_APPLICATION.md`：开发者计划申请材料。
 
+## 开源许可
+
+MIT License — 详见 [LICENSE](LICENSE)。欢迎通过 [CONTRIBUTING.md](CONTRIBUTING.md) 了解协同开发模式和提交流程。
+
 ## 已确认方向
 
 - 平台：macOS。

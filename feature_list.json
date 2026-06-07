@@ -888,6 +888,21 @@
       ],
       "passes": true,
       "evidence": "Release audit complete. README and RELEASE_NOTES updated to F001-F065, Phase 1-11, 65 acceptance items, 223 tests, v0.1.0. README links MANUAL_TEST_PHASE11.md and DEVELOPER_PROGRAM_APPLICATION.md. New docs created: DEVELOPER_PROGRAM_APPLICATION.md (project summary, tech stack, privacy, roadmap, GitHub URL, license status), MANUAL_TEST_PHASE11.md (6 acceptance scenarios: Health Check, Mic Diagnostic, normal voice, high-risk reject, high-risk agree, View Logs). No runtime code changes in F065. 223/223 tests, lint clean, check clean."
+    },
+    {
+      "id": "F066",
+      "priority": 66,
+      "category": "release",
+      "description": "License (MIT), SECURITY.md, CONTRIBUTING.md, and repo metadata",
+      "steps": [
+        "Add MIT LICENSE file with current year",
+        "Add SECURITY.md with reporting instructions",
+        "Add CONTRIBUTING.md explaining Claude+Codex workflow",
+        "Update README and DEVELOPER_PROGRAM_APPLICATION.md license status",
+        "No runtime code changes"
+      ],
+      "passes": true,
+      "evidence": "Created MIT LICENSE (2026 Orangeg00d). Created SECURITY.md (vulnerability reporting, supported versions, no-telemetry statement). Created CONTRIBUTING.md (Claude+Codex dual-agent workflow, single feature per round, test requirements). Updated README with open-source section. Updated DEVELOPER_PROGRAM_APPLICATION.md license status. No runtime code changes. 223 tests collected, lint clean, check clean."
     }
   ]
 }

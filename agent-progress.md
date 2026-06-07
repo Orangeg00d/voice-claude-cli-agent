@@ -2081,3 +2081,11 @@
 - `./init.sh check` passed.
 - `./init.sh lint` passed.
 - `./init.sh test -q` passed: 223/223.
+
+## 2026-06-07 15:30 — Phase 12: F066 — License & Repository Metadata
+
+### Completed
+- Created MIT LICENSE, SECURITY.md, CONTRIBUTING.md. Updated README and DEVELOPER_PROGRAM_APPLICATION.md. No runtime code changes. 223 tests collected, lint clean, check clean.
+
+### Verification
+- ./init.sh check/lint passed, 223 tests collected
