@@ -692,8 +692,8 @@
         "Cover: TCC permission reset, whisper-cli model verification, PortAudio check",
         "Cover: known issues and troubleshooting"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "MANUAL_TEST_PHASE8.md created: 8 sections covering launch, Trigger Recording cycle, Mic Diagnostic, TCC/mic permission, whisper-cli verification, multi-round stability, log inspection, and known issues table. Includes step-by-step instructions with expected behavior and troubleshooting for each scenario."
     },
     {
       "id": "F052",

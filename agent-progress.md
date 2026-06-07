@@ -1725,3 +1725,11 @@
 - `./init.sh check` passed.
 - `./init.sh lint` passed.
 - `./init.sh test` passed: 167/167.
+
+## 2026-06-07 12:15 — Phase 8: F051 — MANUAL_TEST_PHASE8.md
+
+### Completed
+- Created MANUAL_TEST_PHASE8.md: 8 sections covering launch, Trigger Recording, Mic Diagnostic, TCC, whisper-cli, multi-round stability, log inspection, known issues.
+
+### Verification
+- ./init.sh check/lint passed
