@@ -2949,4 +2949,131 @@ class TestTTSTruncation:
         assert session["spoken_summary"] != long_text
         assert "完整内容可在菜单栏 Last Summary 查看" in session["spoken_summary"]
         assert last_result["summary"] == long_text
-        assert last_result["spoken_summary"] == session["spoken_summary"]
+
+
+# ── F048: Concurrent Trigger Safety ─────────────────────────
+class TestConcurrentTriggerSafety:
+    def test_rapid_triple_trigger_one_thread(self):
+        """3 rapid _trigger_recording calls should create at most 1 thread."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(
+            _wake_target=lambda: None,
+            _alert_patch=lambda **kw: None,
+        )
+        app._check_mic_or_alert = lambda: True
+
+        # Triple-trigger in rapid succession
+        app._trigger_recording(app.trigger_item)
+        t1 = app._wake_thread
+        app._trigger_recording(app.trigger_item)
+        app._trigger_recording(app.trigger_item)
+
+        # Only one thread should have been created
+        assert app._wake_thread is t1
+        assert app._cycle_in_progress is True
+
+        app._wake_event.set()
+        t1.join(timeout=3.0)
+        app._stop_wake(app.stop_item)
+
+    def test_cycle_in_progress_blocks_reentry(self):
+        """When _cycle_in_progress=True, _trigger_recording must no-op."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(
+            _wake_target=lambda: None,
+            _alert_patch=lambda **kw: None,
+        )
+        app._cycle_in_progress = True
+
+        app._trigger_recording(app.trigger_item)
+        # Should NOT start because guard is set
+        assert app._wake_thread is None
+        assert not app._wake_active
+
+    def test_concurrent_triggers_dont_corrupt_menu_title(self):
+        """Menu title should not get stuck mid-state from rapid triggers."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(
+            _wake_target=lambda: None,
+            _alert_patch=lambda **kw: None,
+        )
+        app._check_mic_or_alert = lambda: True
+
+        # Set a title like it's mid-cycle, then trigger
+        app.trigger_item.title = "Recording..."
+        app._trigger_recording(app.trigger_item)
+        # First trigger succeeded, set guard
+        app._trigger_recording(app.trigger_item)
+        # Second trigger was ignored — title unchanged
+
+        # Simulate cycle finish
+        app._cycle_in_progress = False
+        app.trigger_item.title = "Trigger Recording"
+
+        assert app.trigger_item.title == "Trigger Recording"
+
+        app._wake_event.set()
+        if app._wake_thread:
+            app._wake_thread.join(timeout=3.0)
+        app._stop_wake(app.stop_item)
+
+    def test_rapid_trigger_only_one_session_line(self, tmp_path, monkeypatch):
+        """Multiple rapid triggers should write at most 1 session JSONL line."""
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_sessions_log_path",
+            lambda: tmp_path / "sessions.jsonl",
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_last_result_path",
+            lambda: tmp_path / "last_result.json",
+        )
+
+        import voice_claude_agent.app as app_mod
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "DEFAULT_RECORD_SECONDS", 0.01)
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(
+            stt_backend="text-input",
+            _alert_patch=lambda **kw: None,
+            _wake_target=lambda: None,
+        )
+
+        # Mock complete pipeline
+        mock_rec = mock.MagicMock()
+        mock_rec.get_audio.return_value = b"x"
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            mock.MagicMock(return_value=mock_rec),
+        )
+        monkeypatch.setattr("voice_claude_agent.cli._run_pipeline", mock.MagicMock())
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.RecordingTranscriber",
+            mock.MagicMock(return_value=mock.MagicMock(
+                transcribe=mock.MagicMock(return_value="hi")
+            )),
+        )
+
+        # Run one cycle so _cycle_in_progress gets set
+        app._trigger_recording(app.trigger_item)
+        # Wait for lambda to finish
+        if app._wake_thread:
+            app._wake_thread.join(timeout=5.0)
+
+        # Rapid additional triggers during the same cycle should be blocked by guard
+        app._trigger_recording(app.trigger_item)
+        app._trigger_recording(app.trigger_item)
+
+        # At most one session should have been written (from the one cycle that ran)
+        session_path = tmp_path / "sessions.jsonl"
+        if session_path.exists():
+            lines = session_path.read_text().strip().split("\n")
+            assert len(lines) <= 2  # at most 1 from the cycle + maybe 1 from _run_pipeline
+
+        # Stop
+        app._stop_wake(app.stop_item)

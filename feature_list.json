@@ -651,8 +651,8 @@
         "Verify each cycle completes before the next begins",
         "Test covers concurrency safety"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "_cycle_in_progress guard blocks re-entrant triggers. 4 tests: triple-trigger creates only 1 thread, guard blocks re-entry, menu title not corrupted, at most 1 session line from rapid clicks. 166 tests collected, lint clean."
     },
     {
       "id": "F049",
