@@ -3673,15 +3673,22 @@ class TestConfigFile:
 # ── F061: Main Thread Alert Dispatch ───────────────────────
 class TestMainThreadAlert:
     def test_alert_on_main_detects_background_thread(self, monkeypatch):
-        """When called from a background thread, _alert_on_main uses rumps.Timer."""
+        """When called from a background thread, _alert_on_main uses callAfter."""
         import threading
 
+        from PyObjCTools import AppHelper
         from voice_claude_agent.app import VoiceClaudeApp
 
         app = VoiceClaudeApp(_alert_patch=lambda **kw: None)
 
-        calls = []
-        monkeypatch.setattr(app, "_alert", lambda **kw: calls.append(kw))
+        direct_calls = []
+        scheduled_calls = []
+        monkeypatch.setattr(app, "_alert", lambda **kw: direct_calls.append(kw))
+        monkeypatch.setattr(
+            AppHelper,
+            "callAfter",
+            lambda func, *args, **kw: scheduled_calls.append((func, args, kw)),
+        )
 
         # Simulate background thread call
         def _bg_call():
@@ -3691,10 +3698,12 @@ class TestMainThreadAlert:
         t.start()
         t.join(timeout=3.0)
 
-        # The Timer(lambda, 0) should have fired by now in the real main thread.
-        # In a pytest context, there's no rumps event loop, so the Timer won't actually
-        # fire. But we can verify _alert_on_main detected the non-main thread:
-        assert True  # test that it doesn't crash
+        assert direct_calls == []
+        assert len(scheduled_calls) == 1
+        func, args, kwargs = scheduled_calls[0]
+        assert func is app._alert
+        assert args == ()
+        assert kwargs == {"title": "BG Test", "message": "from bg thread"}
 
     def test_alert_on_main_calls_directly_on_main_thread(self):
         """When on the main thread, _alert_on_main should call _alert directly."""
@@ -3706,6 +3715,25 @@ class TestMainThreadAlert:
 
         assert len(calls) == 1
         assert calls[0]["title"] == "Test"
+
+    def test_open_mic_failure_alert_uses_main_thread_safe_path(self, monkeypatch):
+        """Recording Failed alert should route through _alert_on_main."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: None)
+        safe_alerts = []
+        monkeypatch.setattr(app, "_alert_on_main", lambda **kw: safe_alerts.append(kw))
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            lambda: None,
+        )
+
+        recorder = app._open_mic_or_alert()
+
+        assert recorder is None
+        assert app.trigger_item.title == "Trigger Recording"
+        assert len(safe_alerts) == 1
+        assert safe_alerts[0]["title"] == "Recording Failed"
 
     def test_cycle_guard_cleared_after_record_timeout(self, monkeypatch):
         """After _record_and_execute with timeout, _cycle_in_progress must be False."""

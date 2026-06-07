@@ -1949,3 +1949,23 @@
 
 ### Verification
 - ./init.sh check/lint passed, 202/202 tests
+
+## 2026-06-07 16:25 — Codex Review: F061 Alert Dispatch
+
+### Finding
+- Claude used `rumps.Timer(..., 0)` from background threads, but rumps adds the timer to the current thread run loop, so it does not reliably guarantee Cocoa main-thread alert creation.
+- The new background-thread test contained only `assert True`, so it did not verify dispatch behavior.
+- `_open_mic_or_alert()` still called `_alert` directly for the Recording Failed path.
+
+### Completed
+- Replaced background dispatch with `PyObjCTools.AppHelper.callAfter`, which posts the alert callback to the Cocoa main loop.
+- Routed every `VoiceClaudeApp` alert call site through `_alert_on_main()`.
+- Added regression coverage proving background calls schedule through `callAfter` without directly calling `_alert`, and Recording Failed uses the safe alert path.
+
+### Verification
+- Focused F061/menu error tests passed: 22/22.
+- `./init.sh check` passed.
+- `./init.sh lint` passed.
+- `./init.sh test -q` passed: 203/203.
+- `./init.sh build-app` passed and rebuilt `dist/VoiceClaudeAgent.app`.
+- `./init.sh install-app` passed and installed `~/Applications/VoiceClaudeAgent.app` with bundle id `com.voiceclaude.agent`.

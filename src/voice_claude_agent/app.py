@@ -133,7 +133,7 @@ class VoiceClaudeApp(rumps.App):
         binary = _find_whisper_cpp_binary()
         if not binary:
             self.mic_status_item.title = "STT: whisper-cli not installed"
-            self._alert(
+            self._alert_on_main(
                 title="STT Backend Unavailable",
                 message=(
                     "whisper-cli is the default STT backend, "
@@ -146,7 +146,7 @@ class VoiceClaudeApp(rumps.App):
         model, model_err = _resolve_whisper_model()
         if model is None:
             self.mic_status_item.title = "STT: model not found"
-            self._alert(
+            self._alert_on_main(
                 title="Whisper Model Not Found",
                 message=(
                     f"{model_err}\n\n"
@@ -177,21 +177,22 @@ class VoiceClaudeApp(rumps.App):
 
         rumps.alert / NSWindow must only be instantiated on the main thread.
         When called from a background thread (e.g. wake loop), this uses
-        rumps.Timer to schedule the alert on the next main-loop tick.
+        PyObjC's AppHelper.callAfter to schedule the alert on the Cocoa main loop.
         In tests, _alert_patch is used directly (no rumps involved).
         """
         import threading as _threading
         if _threading.current_thread() is _threading.main_thread():
             self._alert(title=title, message=message)
         else:
-            # Schedule on main thread via rumps.Timer
-            rumps.Timer(lambda: self._alert(title=title, message=message), 0).start()
+            from PyObjCTools import AppHelper
+
+            AppHelper.callAfter(self._alert, title=title, message=message)
 
     def _check_mic_or_alert(self) -> bool:
         has_mic, detail = check_mic_permission()
         if not has_mic:
             self.mic_status_item.title = "Mic: Denied"
-            self._alert(
+            self._alert_on_main(
                 title="Microphone Not Available",
                 message=(
                     f"Cannot start recording: {detail}\n\n"
@@ -207,11 +208,11 @@ class VoiceClaudeApp(rumps.App):
 
     def _show_last_transcript(self, sender: rumps.MenuItem) -> None:
         text = self._last_transcript or "(no transcript yet)"
-        self._alert(title="Last Transcript", message=text)
+        self._alert_on_main(title="Last Transcript", message=text)
 
     def _show_last_summary(self, sender: rumps.MenuItem) -> None:
         text = self._last_summary or "(no summary yet)"
-        self._alert(title="Last Summary", message=text)
+        self._alert_on_main(title="Last Summary", message=text)
 
     # ── F052: View Logs ─────────────────────────────────────
 
@@ -267,7 +268,7 @@ class VoiceClaudeApp(rumps.App):
         else:
             lines.append("(no last_result.json yet)")
 
-        self._alert(title="View Logs", message="\n".join(lines))
+        self._alert_on_main(title="View Logs", message="\n".join(lines))
 
     # ── Mic Diagnostic ───────────────────────────────────────
 
@@ -333,7 +334,7 @@ class VoiceClaudeApp(rumps.App):
         lines.append("- Running directly from dist/ or Terminal may not register TCC")
         lines.append("- Use: 'tccutil reset Microphone com.voiceclaude.agent' to reset permissions")
 
-        self._alert(title="Mic Diagnostic", message="\n".join(lines))
+        self._alert_on_main(title="Mic Diagnostic", message="\n".join(lines))
 
     # ─
     # ── F058: Health Check ──────────────────────────────────
@@ -402,7 +403,7 @@ class VoiceClaudeApp(rumps.App):
         
         all_ok = all([claude, wb, m, hm, po, sd, sk])
         lines.append("Overall: " + ("ALL CHECKS PASSED" if all_ok else "SOME CHECKS FAILED — see hints above"))
-        self._alert(title="Health Check", message="\n".join(lines))
+        self._alert_on_main(title="Health Check", message="\n".join(lines))
 
     # ── Menu title sync ──────────────────────────────────────
 
@@ -665,7 +666,7 @@ class VoiceClaudeApp(rumps.App):
         if recorder is None:
             self.mic_status_item.title = "Mic: Error"
             self.trigger_item.title = "Trigger Recording"
-            self._alert(
+            self._alert_on_main(
                 title="Recording Failed",
                 message=(
                     "Could not access the microphone.\n\n"

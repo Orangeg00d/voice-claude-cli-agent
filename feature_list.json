@@ -826,7 +826,7 @@
         "Test: background alert uses timer dispatch, record timeout clears guard, title resets, second trigger works after timeout"
       ],
       "passes": true,
-      "evidence": "Added _alert_on_main() that dispatches to main thread via rumps.Timer when called from background. All alerts in _record_and_execute use _alert_on_main. Record timeout now clears _cycle_in_progress in finally. 4 tests: bg thread detection, direct main thread call, cycle guard cleared after timeout, second trigger works after timeout. 202/202 tests, lint clean."
+      "evidence": "Added _alert_on_main() that dispatches background-thread alerts to the Cocoa main loop via PyObjCTools.AppHelper.callAfter. All VoiceClaudeApp alert call sites route through _alert_on_main, including Recording Failed. Record timeout clears _cycle_in_progress in finally. 5 F061 tests: background callAfter dispatch without direct alert, direct main-thread call, Recording Failed safe path, cycle guard cleared after timeout, second trigger works after timeout. 203/203 tests, lint clean."
     }
   ]
 }
