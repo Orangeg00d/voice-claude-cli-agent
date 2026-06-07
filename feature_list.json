@@ -652,7 +652,7 @@
         "Test covers concurrency safety"
       ],
       "passes": true,
-      "evidence": "_cycle_in_progress guard blocks re-entrant triggers. 4 tests: triple-trigger creates only 1 thread, guard blocks re-entry, menu title not corrupted, at most 1 session line from rapid clicks. 166 tests collected, lint clean."
+      "evidence": "_cycle_in_progress guard is now protected by threading.Lock so concurrent trigger calls atomically allow only one cycle. 5 F048 tests cover simultaneous threaded triggers starting one cycle, triple-trigger creating one thread, guard blocking re-entry, menu title not corrupted, and at most one session line from rapid clicks. 167/167 tests, lint clean, py2app passed."
     },
     {
       "id": "F049",

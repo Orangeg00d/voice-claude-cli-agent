@@ -1652,3 +1652,20 @@
 
 ### Verification
 - ./init.sh check/lint passed, 166 tests collected
+
+## 2026-06-07 12:25 — Codex Review: F048 Atomic Trigger Guard
+
+### Finding
+- Claude's F048 change added sequential trigger tests, but the app still used a plain `_cycle_in_progress` boolean without a lock.
+- That guarded normal menu clicks, but did not make the check/set operation atomic under true concurrent calls.
+
+### Completed
+- Added `threading.Lock` around the `_cycle_in_progress` check/set path in `_trigger_recording()`.
+- Cleared the cycle guard under the same lock after each wake-loop cycle.
+- Added a threaded regression test: 20 simultaneous trigger calls produce one mic check and one wake cycle.
+- Restored the F047 assertion that `last_result.json` stores the same `spoken_summary` as the session log.
+
+### Verification
+- Focused F047/F048 tests passed: 11/11.
+- `./init.sh check`, `./init.sh lint`, and full `./init.sh test` passed: 167/167.
+- `python setup.py py2app` passed.

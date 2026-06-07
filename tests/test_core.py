@@ -2949,10 +2949,61 @@ class TestTTSTruncation:
         assert session["spoken_summary"] != long_text
         assert "完整内容可在菜单栏 Last Summary 查看" in session["spoken_summary"]
         assert last_result["summary"] == long_text
+        assert last_result["spoken_summary"] == session["spoken_summary"]
 
 
 # ── F048: Concurrent Trigger Safety ─────────────────────────
 class TestConcurrentTriggerSafety:
+    def test_simultaneous_threaded_triggers_start_one_cycle(self):
+        """Concurrent trigger calls should atomically allow only one cycle."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        release_wake = threading.Event()
+        wake_starts = []
+        mic_checks = 0
+        counter_lock = threading.Lock()
+
+        def wake_target():
+            wake_starts.append("started")
+            release_wake.wait(timeout=3.0)
+
+        app = VoiceClaudeApp(
+            _wake_target=wake_target,
+            _alert_patch=lambda **kw: None,
+        )
+        app._update_mic_status = lambda: None
+
+        def check_mic():
+            nonlocal mic_checks
+            with counter_lock:
+                mic_checks += 1
+            return True
+
+        app._check_mic_or_alert = check_mic
+
+        ready = threading.Barrier(21)
+
+        def trigger():
+            ready.wait(timeout=3.0)
+            app._trigger_recording(app.trigger_item)
+
+        threads = [threading.Thread(target=trigger) for _ in range(20)]
+        for thread in threads:
+            thread.start()
+        ready.wait(timeout=3.0)
+        for thread in threads:
+            thread.join(timeout=3.0)
+
+        assert mic_checks == 1
+        assert len(wake_starts) == 1
+        assert app._cycle_in_progress is True
+
+        release_wake.set()
+        if app._wake_thread:
+            app._wake_thread.join(timeout=3.0)
+        app._wake_active = False
+        app._cycle_in_progress = False
+
     def test_rapid_triple_trigger_one_thread(self):
         """3 rapid _trigger_recording calls should create at most 1 thread."""
         from voice_claude_agent.app import VoiceClaudeApp

@@ -56,6 +56,7 @@ class VoiceClaudeApp(rumps.App):
         self._wake_thread: threading.Thread | None = None
         self._single_trigger_mode = False
         self._cycle_in_progress = False  # F043: non-reentrant guard
+        self._cycle_lock = threading.Lock()
 
         # F046: last transcript/summary for menu bar inspection
         self._last_transcript: str = ""
@@ -277,15 +278,16 @@ class VoiceClaudeApp(rumps.App):
         self._sync_menu_titles()
 
     def _trigger_recording(self, sender: rumps.MenuItem) -> None:
-        # F043: non-reentrant guard — ignore if a cycle is already running
-        if self._cycle_in_progress:
-            return
+        # F048: check and set the non-reentrant guard atomically.
+        with self._cycle_lock:
+            if self._cycle_in_progress:
+                return
 
-        self._update_mic_status()
-        if not self._check_mic_or_alert():
-            return
+            self._update_mic_status()
+            if not self._check_mic_or_alert():
+                return
 
-        self._cycle_in_progress = True
+            self._cycle_in_progress = True
         if not self._wake_active:
             self._wake_active = True
             self._single_trigger_mode = True
@@ -317,7 +319,8 @@ class VoiceClaudeApp(rumps.App):
             try:
                 self._record_and_execute()
             finally:
-                self._cycle_in_progress = False  # F043: clear guard on cycle complete
+                with self._cycle_lock:
+                    self._cycle_in_progress = False
                 if self._single_trigger_mode:
                     self._single_trigger_mode = False
                     self._wake_active = False
