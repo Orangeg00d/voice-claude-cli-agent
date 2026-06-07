@@ -2741,3 +2741,96 @@ class TestTitleRecovery:
 
         app._record_and_execute()
         assert app.trigger_item.title == "Trigger Recording"
+
+
+# ── F046: Last Transcript / Last Summary Menu Items ────────
+class TestLastTranscriptSummary:
+    def test_menu_items_present(self):
+        """Menu should contain 'Last Transcript' and 'Last Summary' items."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        assert app.transcript_item is not None
+        assert app.summary_item is not None
+        assert "Transcript" in app.transcript_item.title or "transcript" in app.transcript_item.title.lower()
+        assert "Summary" in app.summary_item.title or "summary" in app.summary_item.title.lower()
+
+    def test_placeholder_when_empty(self):
+        """Before any cycle, transcript/summary should show placeholder."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        assert app._last_transcript == ""
+        assert app._last_summary == ""
+        assert "(none)" in app.transcript_item.title
+        assert "(none)" in app.summary_item.title
+
+    def test_updated_after_successful_cycle(self, tmp_path, monkeypatch):
+        """After a successful _record_and_execute, menu items show last values."""
+        import voice_claude_agent.app as app_mod
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "DEFAULT_RECORD_SECONDS", 0.01)
+
+        last_result = tmp_path / "last_result.json"
+        last_result.write_text(json.dumps(
+            {"prompt": "hello", "exit_code": 0, "summary": "Claude says hi"}
+        ), encoding="utf-8")
+        monkeypatch.setattr(
+            "voice_claude_agent.config.get_last_result_path",
+            lambda: last_result,
+        )
+
+        mock_rec = mock.MagicMock()
+        mock_rec.get_audio.return_value = b"x"
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            mock.MagicMock(return_value=mock_rec),
+        )
+        monkeypatch.setattr("voice_claude_agent.cli._run_pipeline", mock.MagicMock())
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.RecordingTranscriber",
+            mock.MagicMock(return_value=mock.MagicMock(
+                transcribe=mock.MagicMock(return_value="hello")
+            )),
+        )
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(
+            stt_backend="text-input",
+            _alert_patch=lambda **kw: None,
+            _wake_target=lambda: None,
+        )
+        app._record_and_execute()
+
+        assert app._last_transcript == "hello"
+        assert app._last_summary == "Claude says hi"
+        assert "hello" in app.transcript_item.title
+        assert "Claude says hi" in app.summary_item.title
+
+    def test_show_alert_on_click(self, monkeypatch):
+        """Clicking Last Transcript should show an alert."""
+        alerts = []
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._last_transcript = "test transcript"
+        app._show_last_transcript(app.transcript_item)
+
+        assert len(alerts) == 1
+        assert alerts[0]["title"] == "Last Transcript"
+        assert "test transcript" in alerts[0]["message"]
+
+    def test_show_alert_placeholder_when_empty(self, monkeypatch):
+        """Clicking Last Summary with no data shows placeholder."""
+        alerts = []
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._show_last_summary(app.summary_item)
+
+        assert len(alerts) == 1
+        assert "(no summary yet)" in alerts[0]["message"]

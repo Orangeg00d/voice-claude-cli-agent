@@ -57,6 +57,10 @@ class VoiceClaudeApp(rumps.App):
         self._single_trigger_mode = False
         self._cycle_in_progress = False  # F043: non-reentrant guard
 
+        # F046: last transcript/summary for menu bar inspection
+        self._last_transcript: str = ""
+        self._last_summary: str = ""
+
         self.start_item = rumps.MenuItem("Start Wake", callback=self._start_wake)
         self.stop_item = rumps.MenuItem("Stop Wake", callback=self._stop_wake)
         self.trigger_item = rumps.MenuItem(
@@ -68,6 +72,12 @@ class VoiceClaudeApp(rumps.App):
         self.mic_status_item = rumps.MenuItem(
             "Mic Status: checking...", callback=self._refresh_mic_status_event
         )
+        self.transcript_item = rumps.MenuItem(
+            "Last Transcript: (none)", callback=self._show_last_transcript
+        )
+        self.summary_item = rumps.MenuItem(
+            "Last Summary: (none)", callback=self._show_last_summary
+        )
         self.quit_item = rumps.MenuItem("Quit", callback=self._quit)
 
         self.menu = [
@@ -77,6 +87,9 @@ class VoiceClaudeApp(rumps.App):
             None,
             self.diagnostic_item,
             self.mic_status_item,
+            None,
+            self.transcript_item,
+            self.summary_item,
             None,
             self.quit_item,
         ]
@@ -149,6 +162,16 @@ class VoiceClaudeApp(rumps.App):
             )
             return False
         return True
+
+    # ── F046: Show last transcript / summary ─────────────────
+
+    def _show_last_transcript(self, sender: rumps.MenuItem) -> None:
+        text = self._last_transcript or "(no transcript yet)"
+        self._alert(title="Last Transcript", message=text)
+
+    def _show_last_summary(self, sender: rumps.MenuItem) -> None:
+        text = self._last_summary or "(no summary yet)"
+        self._alert(title="Last Summary", message=text)
 
     # ── Mic Diagnostic ───────────────────────────────────────
 
@@ -364,6 +387,19 @@ class VoiceClaudeApp(rumps.App):
             self.trigger_item.title = "Running Claude..."
             claude_start = _time.monotonic()
             self._append_runtime_event("claude_start", elapsed=f"{claude_start - cycle_start:.3f}s")
+
+            # Capture summary from last_result.json written by _run_pipeline
+            import json as _json
+            try:
+                from voice_claude_agent.config import get_last_result_path
+                last_json = get_last_result_path().read_text(encoding="utf-8")
+                last_data = _json.loads(last_json)
+            except Exception:
+                last_data = {}
+            self._last_transcript = transcript
+            self._last_summary = last_data.get("summary", "")
+            self.transcript_item.title = f"Last Transcript: {transcript[:60]}{'...' if len(transcript) > 60 else ''}"
+            self.summary_item.title = f"Last Summary: {self._last_summary[:60]}{'...' if len(self._last_summary) > 60 else ''}"
             _run_pipeline(transcript, input_mode="voice", tts_fake=False)
             self._append_runtime_event(
                 "claude_done",

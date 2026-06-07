@@ -1576,3 +1576,12 @@
 - tests/test_core.py
 - feature_list.json
 - agent-progress.md
+
+## 2026-06-07 11:00 — Phase 7: F046 — Last Transcript / Last Summary Menu
+
+### Completed
+- Added transcript_item and summary_item to VoiceClaudeApp. Captured after successful cycle from last_result.json.
+- Click opens rumps.alert dialog. Placeholder when empty. 5 tests.
+
+### Verification
+- ./init.sh check/lint passed, 155/155 tests
