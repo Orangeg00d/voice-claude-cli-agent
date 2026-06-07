@@ -2465,22 +2465,18 @@ class TestNonReentrantTrigger:
 
     def test_cycle_guard_cleared_after_error(self):
         """After _record_and_execute with mic error, _cycle_in_progress clears."""
-        import voice_claude_agent.app as app_mod
-
         from voice_claude_agent.app import VoiceClaudeApp
-
-        monkeypatch = mock.patch.object
-        monkeypatch(app_mod, "check_mic_permission", lambda: (True, ""))
 
         app = VoiceClaudeApp(_alert_patch=lambda **kw: None)
 
-        # Make _open_mic_or_alert return None (simulate mic failure)
-        app._open_mic_or_alert = lambda: None
+        def boom():
+            raise RuntimeError("cycle failed")
 
         app._cycle_in_progress = True
-        app._record_and_execute()
-        # Guard is cleared by the finally block in _run_wake_loop,
-        # but _record_and_execute alone won't clear it.
-        # The guard clear is in _run_wake_loop's finally.
-        # Just verify _record_and_execute doesn't crash
-        assert app.trigger_item.title == "Trigger Recording"  # reset by finally in _record_and_execute
+        app._trigger_event.set()
+        app._record_and_execute = boom
+
+        with pytest.raises(RuntimeError, match="cycle failed"):
+            app._run_wake_loop()
+
+        assert app._cycle_in_progress is False
