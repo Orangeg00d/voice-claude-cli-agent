@@ -2438,9 +2438,20 @@ assert ".zip" not in package_path
         )
         assert ".zip" not in result.stdout
 
-    def test_mic_diagnostic_includes_portaudio_status(self):
+    def test_mic_diagnostic_includes_portaudio_status(self, monkeypatch):
         """_run_mic_diagnostic should include PortAudio load status."""
+        import voice_claude_agent.app as app_mod
+
         alerts = []
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "mock microphone accessible"))
+        monkeypatch.setattr(
+            "sounddevice.query_devices",
+            lambda kind=None: {
+                "name": "Mock Microphone",
+                "max_input_channels": 1,
+                "default_samplerate": 48000.0,
+            },
+        )
 
         from voice_claude_agent.app import VoiceClaudeApp
 
@@ -3260,15 +3271,61 @@ class TestVoiceRecordSeconds:
         app = VoiceClaudeApp()
         assert app.record_seconds == 5
 
+    def test_env_var_overrides_default(self, monkeypatch):
+        """VOICE_RECORD_SECONDS=3 should set record_seconds to 3."""
+        monkeypatch.setenv("VOICE_RECORD_SECONDS", "3")
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        assert app.record_seconds == 3
+
+    def test_invalid_env_var_falls_back_to_default(self, monkeypatch):
+        """VOICE_RECORD_SECONDS=abc should fall back to default 5."""
+        monkeypatch.setenv("VOICE_RECORD_SECONDS", "abc")
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        assert app.record_seconds == 5
+
+    def test_negative_value_falls_back_to_default(self, monkeypatch):
+        """VOICE_RECORD_SECONDS=-1 should fall back to default 5."""
+        monkeypatch.setenv("VOICE_RECORD_SECONDS", "-1")
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        assert app.record_seconds == 5
+
+    def test_zero_value_falls_back_to_default(self, monkeypatch):
+        """VOICE_RECORD_SECONDS=0 should fall back to default 5."""
+        monkeypatch.setenv("VOICE_RECORD_SECONDS", "0")
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        assert app.record_seconds == 5
+
+    def test_record_timeout_uses_configured_seconds(self, monkeypatch):
+        """The hard timeout should be based on configured record_seconds."""
+        monkeypatch.setenv("VOICE_RECORD_SECONDS", "3")
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: None)
+        app.RECORD_WORKER_GRACE_SECONDS = 0.25
+
+        assert app._record_timeout_seconds() == 3.25
+
 
 # ── F054: Actionable Error Messages Audit ───────────────────
 class TestActionableErrors:
-    def test_mic_denied_mentions_system_settings(self):
+    def test_mic_denied_mentions_system_settings(self, monkeypatch):
         """Mic denied alert should mention System Settings path."""
         import voice_claude_agent.app as app_mod
 
         alerts = []
-        monkeypatch = __import__("pytest").MonkeyPatch()
         monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (False, "test denial"))
 
         from voice_claude_agent.app import VoiceClaudeApp
@@ -3281,12 +3338,11 @@ class TestActionableErrors:
         assert "Microphone" in alerts[0]["message"]
         assert "test denial" in alerts[0]["message"]
 
-    def test_no_audio_alert_has_diagnostic_info(self):
+    def test_no_audio_alert_has_diagnostic_info(self, monkeypatch):
         """Empty audio alert must contain actionable diagnostic info."""
         import voice_claude_agent.app as app_mod
 
         alerts = []
-        monkeypatch = __import__("pytest").MonkeyPatch()
         monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
 
         from voice_claude_agent.app import VoiceClaudeApp

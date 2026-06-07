@@ -26,6 +26,10 @@ voice-claude-agent record                    # 纯录音 + 转写 (不执行 Cla
 voice-claude-agent voice                     # 录音 → STT → Claude → say
 voice-claude-agent wake                      # 唤醒循环，Enter 触发，Ctrl+C 退出
 
+# 菜单栏 App 录音时长（默认 5 秒）
+VOICE_RECORD_SECONDS=3 voice-claude-agent app
+launchctl setenv VOICE_RECORD_SECONDS 3      # Finder 双击 .app 前设置 GUI 环境
+
 # 开发
 ./init.sh test     # 运行测试
 ./init.sh lint     # ruff 检查

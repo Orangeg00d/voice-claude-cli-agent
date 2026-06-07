@@ -19,6 +19,21 @@
 4. 已运行测试：`./init.sh test`（167/167 通过）
 5. 如需 .app 构建：`python setup.py py2app`
 
+### 可选：配置单次录音时长
+
+菜单栏 App 默认录音 5 秒。需要缩短或拉长时可设置：
+
+```bash
+# 终端启动模式
+VOICE_RECORD_SECONDS=3 voice-claude-agent app
+
+# Finder 双击 .app 模式
+launchctl setenv VOICE_RECORD_SECONDS 3
+open dist/VoiceClaudeAgent.app
+```
+
+`VOICE_RECORD_SECONDS` 必须是正整数；非法、0 或负数会回退到默认 5 秒。
+
 ## 1. 启动菜单栏 App
 
 ### 终端模式
@@ -150,5 +165,6 @@ open dist/VoiceClaudeAgent.app
 | App 不出现在麦克风权限列表 | TCC 不注册 CLI/bundle | `tccutil reset` + Finder 双击打开 |
 | STT 返回空或错误 | whisper-cli 或模型问题 | 检查 `WHISPER_CPP_MODEL`，终端测试 whisper-cli；Finder 启动时用 `launchctl setenv` 写入 GUI 环境 |
 | 录音返回空音频 | 麦克风权限或设备问题 | 运行 Mic Diagnostic，检查系统设置 |
+| 录音太短或太长 | `VOICE_RECORD_SECONDS` 未设置或 Finder 未继承环境 | 终端启动用 `VOICE_RECORD_SECONDS=3 voice-claude-agent app`；Finder 启动用 `launchctl setenv VOICE_RECORD_SECONDS 3` |
 | 大回答 TTS 朗读太长 | Summary 超出语音合理长度 | 已自动截断，完整内容在 Last Summary |
 | py2app bundle 闪退 | PortAudio 动态库问题 | 重新 `python setup.py py2app` |

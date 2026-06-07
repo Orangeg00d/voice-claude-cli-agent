@@ -719,7 +719,7 @@
         "README documents the env var"
       ],
       "passes": true,
-      "evidence": "VoiceClaudeApp reads VOICE_RECORD_SECONDS env var in __init__. Overrides DEFAULT_RECORD_SECONDS (5) with parsed positive int. Invalid/negative/zero values fall back to 5. record_seconds used in _record_with_timeout timeout and _record_fixed_duration_with_diag deadline. 5 tests: default=5, override=3, abc→5, -1→5, 0→5. 176/176 tests, lint clean."
+      "evidence": "VoiceClaudeApp reads VOICE_RECORD_SECONDS env var in __init__. Positive integer values override the 5s default; invalid, negative, and zero values fall back to 5. record_seconds is used by both _record_with_timeout and _record_fixed_duration_with_diag via _record_timeout_seconds(). Codex restored F053 tests accidentally removed by an early F054 commit and added timeout coverage proving VOICE_RECORD_SECONDS=3 produces a 3.25s hard timeout with grace. README and MANUAL_TEST_PHASE8.md document terminal and Finder/launchctl usage. 6 F053 tests, 179/179 tests, lint clean."
     },
     {
       "id": "F054",
@@ -732,8 +732,8 @@
         "Claude timeout → message includes retry suggestion",
         "PortAudio dylib fail → message includes py2app build hint"
       ],
-      "passes": true,
-      "evidence": "Audited all error paths for actionable messages: mic denied → System Settings path, no audio → Input device diagnostic, STT error → backend switch hint, Claude timeout → retry suggestion, PortAudio dylib → py2app build hint. 2 tests: mic denied message audit, empty audio diagnostic audit. 174/174 tests, lint clean."
+      "passes": false,
+      "evidence": ""
     },
     {
       "id": "F055",

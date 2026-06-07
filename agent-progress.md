@@ -1794,3 +1794,22 @@
 
 ### Verification
 - ./init.sh check/lint passed, 174/174 tests
+
+## 2026-06-07 14:28 — Codex Review: F053 Record Duration Config
+
+### Finding
+- F053 implementation correctly added `VOICE_RECORD_SECONDS` parsing and used `record_seconds` in the recording path.
+- README and manual test docs did not document the env var, despite the F053 acceptance step requiring README coverage.
+- A premature F054 commit removed four F053 tests and marked F054 passed before Codex review.
+
+### Completed
+- Restored F053 tests for override, invalid, negative, and zero values.
+- Added timeout coverage proving `VOICE_RECORD_SECONDS=3` drives the hard timeout plus grace period.
+- Documented `VOICE_RECORD_SECONDS` in README and `MANUAL_TEST_PHASE8.md`, including Finder `.app` usage via `launchctl setenv`.
+- Restored F054 to `passes=false` pending a separate Codex review.
+
+### Verification
+- Focused F053 tests passed.
+- `./init.sh check` passed.
+- `./init.sh lint` passed.
+- `./init.sh test` passed: 179/179.

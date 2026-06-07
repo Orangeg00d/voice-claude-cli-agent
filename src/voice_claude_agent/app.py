@@ -512,7 +512,7 @@ class VoiceClaudeApp(rumps.App):
 
         worker = threading.Thread(target=_target, daemon=True, name="record-worker")
         worker.start()
-        timeout = self.record_seconds + self.RECORD_WORKER_GRACE_SECONDS
+        timeout = self._record_timeout_seconds()
         worker.join(timeout=timeout)
 
         if worker.is_alive():
@@ -538,6 +538,9 @@ class VoiceClaudeApp(rumps.App):
         if result:
             return result[0]
         return b"", "Recording ended without producing a result."
+
+    def _record_timeout_seconds(self) -> float:
+        return self.record_seconds + self.RECORD_WORKER_GRACE_SECONDS
 
     def _best_effort_stop_recorder(self, recorder) -> None:
         try:
