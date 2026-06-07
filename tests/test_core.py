@@ -3366,3 +3366,39 @@ class TestActionableErrors:
         no_audio = [a for a in alerts if a["title"] == "No Audio"]
         assert len(no_audio) >= 1
         assert "Input device" in no_audio[0]["message"]
+
+    def test_recording_failed_has_microphone_hint(self):
+        """Recording Failed alert should mention Microphone path."""
+        import voice_claude_agent.app as app_mod
+
+        alerts = []
+        monkeypatch = __import__("pytest").MonkeyPatch()
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            __import__("unittest").mock.MagicMock(return_value=None),
+        )
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._record_and_execute()
+
+        failed = [a for a in alerts if a["title"] == "Recording Failed"]
+        assert len(failed) >= 1
+        assert "Microphone" in failed[0]["message"]
+
+    def test_summarizer_timeout_has_actionable_hint(self):
+        """Timeout summary should mention check or retry."""
+        from voice_claude_agent.summarizer import summarize
+
+        result = summarize("", exit_code=-1, duration_seconds=300)
+        assert "超时" in result or "timeout" in result.lower()
+        assert "retry" in result.lower() or "重试" in result or "检查" in result
+
+    def test_summarizer_cli_not_found_has_install_hint(self):
+        """Claude CLI not found summary should mention install."""
+        from voice_claude_agent.summarizer import summarize
+
+        result = summarize("", exit_code=-2, duration_seconds=0)
+        assert "安装" in result or "install" in result.lower()

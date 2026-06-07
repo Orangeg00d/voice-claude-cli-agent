@@ -1813,3 +1813,11 @@
 - `./init.sh check` passed.
 - `./init.sh lint` passed.
 - `./init.sh test` passed: 179/179.
+
+## 2026-06-07 13:10 — Phase 8: F054 — Actionable Error Messages
+
+### Completed
+- 5 tests: mic denied, no audio diagnostic, recording failed, timeout retry, CLI not found install hint. 182/182 tests.
+
+### Verification
+- ./init.sh check/lint passed, 182/182 tests
