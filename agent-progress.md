@@ -1557,3 +1557,22 @@
 
 ### Verification
 - ./init.sh check/lint passed, 148 tests collected
+
+## 2026-06-07 10:52 — Codex Review: F045 Completion Coverage
+
+### Finding
+- F045 correctly relied on the existing `_record_and_execute()` `finally` block, but Claude's tests did not cover the Claude/pipeline failure path named in the acceptance steps.
+- Successful cycles intentionally leave the title as `Done ✓` briefly and rely on a Timer to restore `Trigger Recording`; that delayed success path also needed direct coverage.
+
+### Completed
+- Added `test_title_reset_after_claude_pipeline_crash`.
+- Added `test_title_resets_after_success_timer` with an immediate Timer stub.
+- Updated F045 evidence to reflect 6 title-recovery tests.
+
+### Verification
+- Focused F045 tests passed.
+
+### Files Changed
+- tests/test_core.py
+- feature_list.json
+- agent-progress.md

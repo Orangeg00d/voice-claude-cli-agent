@@ -2677,3 +2677,67 @@ class TestTitleRecovery:
         app = self._make_app()
         app._record_and_execute()
         assert app.trigger_item.title == "Trigger Recording"
+
+    def test_title_reset_after_claude_pipeline_crash(self, monkeypatch):
+        """After Claude/pipeline crashes, title must be 'Trigger Recording'."""
+        import voice_claude_agent.app as app_mod
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "DEFAULT_RECORD_SECONDS", 0.01)
+
+        app = self._make_app()
+        mock_rec = mock.MagicMock()
+        mock_rec.get_audio.return_value = b"x"
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            mock.MagicMock(return_value=mock_rec),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.RecordingTranscriber",
+            mock.MagicMock(return_value=mock.MagicMock(
+                transcribe=mock.MagicMock(return_value="hello")
+            )),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._run_pipeline",
+            mock.MagicMock(side_effect=RuntimeError("claude crashed")),
+        )
+
+        app._record_and_execute()
+        assert app.trigger_item.title == "Trigger Recording"
+
+    def test_title_resets_after_success_timer(self, monkeypatch):
+        """After a successful cycle, Done should reset to Trigger Recording."""
+        import voice_claude_agent.app as app_mod
+
+        class ImmediateTimer:
+            def __init__(self, _interval, callback):
+                self.callback = callback
+
+            def start(self):
+                self.callback()
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "DEFAULT_RECORD_SECONDS", 0.01)
+        monkeypatch.setattr(app_mod.threading, "Timer", ImmediateTimer)
+
+        app = self._make_app()
+        mock_rec = mock.MagicMock()
+        mock_rec.get_audio.return_value = b"x"
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            mock.MagicMock(return_value=mock_rec),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.RecordingTranscriber",
+            mock.MagicMock(return_value=mock.MagicMock(
+                transcribe=mock.MagicMock(return_value="hello")
+            )),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._run_pipeline",
+            mock.MagicMock(),
+        )
+
+        app._record_and_execute()
+        assert app.trigger_item.title == "Trigger Recording"
