@@ -36,13 +36,17 @@ launchctl setenv VOICE_RECORD_SECONDS 3      # Finder 双击 .app 前设置 GUI 
 ./init.sh format   # ruff 格式化
 ```
 
-## 当前阶段 — Phase 4 (完成)
+## v0.1.0 Release
 
-Phase 1-3 已完成。Phase 4 补充了真机防护：
+Phases 1-8 已完成，共 55 项验收 (F001-F055) 全部通过，184 个测试，lint clean。当前 Phase 9 聚焦 Release Hardening（安装/配置/健康检查）。
 
-- 运行 `voice-claude-agent check` 即可看到麦克风权限、可用 STT 后端。
-- `record` / `voice` / `wake` 不使用 `--fake` 时会先检查麦克风，失败则打印详细错误。
-- 录音崩溃、STT 返回错误、Claude 超时均已受保护，循环不会闪退。
+核心能力：
+- CLI 文本/语音命令执行，高风险动作二次确认
+- 菜单栏 App (rumps) + py2app .app 构建
+- whisper.cpp 离线语音转文字
+- 录音诊断、错误恢复、并发安全
+- 结构化日志 (app_events + sessions + last_result)
+- `--fake` 模式无需麦克风即可测试
 
 ## 架构
 
@@ -174,7 +178,7 @@ voice-claude-agent wake
 
 ## 开发状态
 
-Phase 1-7 已完成。F001-F050 全部通过。详情见 `feature_list.json`。
+v0.1.0 Release — F001-F055 (Phase 1-8) 全部通过。184 个测试。当前 Phase 9 (Release Hardening)。详情见 `feature_list.json`、`RELEASE_NOTES.md`。
 
 ## Manual Smoke Test（手动验收）
 

@@ -758,8 +758,8 @@
         "Replace with v0.1.0 release overview",
         "Structure for GitHub landing page readability"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "README updated: removed stale Phase 4/7 references, added v0.1.0 Release section with phase summary, updated test count to 184, 6-point core capability list. 184 tests collected, lint clean."
     },
     {
       "id": "F057",

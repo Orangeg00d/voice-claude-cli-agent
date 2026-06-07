@@ -1875,3 +1875,16 @@
 - F059: ~/.voice-claude-agent/config.json local config.
 - F060: MANUAL_TEST_RELEASE.md fresh-install walkthrough.
 - All passes=false. Implementation one feature per round.
+
+## 2026-06-07 13:40 — Phase 9: F056 — README Version Status Cleanup
+
+### Completed
+- Replaced stale "当前阶段 — Phase 4" with "v0.1.0 Release" section.
+- Updated test count 55→184, listed Phase 1-8 completion, Phase 9 in progress.
+- 6-point core capability list. 184 tests collected, lint clean.
+
+### Verification
+- ./init.sh check/lint passed
+
+### Files Changed
+- README.md, feature_list.json, agent-progress.md
