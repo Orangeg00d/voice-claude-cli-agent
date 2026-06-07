@@ -1778,3 +1778,11 @@
 - `./init.sh lint` passed.
 - `./init.sh test` passed: 171/171.
 - `python setup.py py2app` passed.
+
+## 2026-06-07 12:45 — Phase 8: F053 — VOICE_RECORD_SECONDS Config
+
+### Completed
+- VoiceClaudeApp reads VOICE_RECORD_SECONDS env var, overrides Default 5s. 5 tests: default, override, invalid, negative, zero.
+
+### Verification
+- ./init.sh check/lint passed, 176/176 tests

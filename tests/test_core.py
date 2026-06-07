@@ -3247,3 +3247,51 @@ class TestViewLogs:
         assert len(alerts) == 1
         msg = alerts[0]["message"]
         assert "Error reading app_events" in msg or "corrupted" in msg
+
+
+# ── F053: VOICE_RECORD_SECONDS Env Config ───────────────────
+class TestVoiceRecordSeconds:
+    def test_default_is_5(self, monkeypatch):
+        """Default record_seconds should be 5."""
+        monkeypatch.delenv("VOICE_RECORD_SECONDS", raising=False)
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        assert app.record_seconds == 5
+
+    def test_env_var_overrides_default(self, monkeypatch):
+        """VOICE_RECORD_SECONDS=3 should set record_seconds to 3."""
+        monkeypatch.setenv("VOICE_RECORD_SECONDS", "3")
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        assert app.record_seconds == 3
+
+    def test_invalid_env_var_falls_back_to_default(self, monkeypatch):
+        """VOICE_RECORD_SECONDS=abc should fall back to default 5."""
+        monkeypatch.setenv("VOICE_RECORD_SECONDS", "abc")
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        assert app.record_seconds == 5
+
+    def test_negative_value_falls_back_to_default(self, monkeypatch):
+        """VOICE_RECORD_SECONDS=-1 should fall back to default 5."""
+        monkeypatch.setenv("VOICE_RECORD_SECONDS", "-1")
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        assert app.record_seconds == 5
+
+    def test_zero_value_falls_back_to_default(self, monkeypatch):
+        """VOICE_RECORD_SECONDS=0 should fall back to default 5."""
+        monkeypatch.setenv("VOICE_RECORD_SECONDS", "0")
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        assert app.record_seconds == 5

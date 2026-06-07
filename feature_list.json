@@ -718,8 +718,8 @@
         "Verify recording lasts ~3 seconds instead of default 5",
         "README documents the env var"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "VoiceClaudeApp reads VOICE_RECORD_SECONDS env var in __init__. Overrides DEFAULT_RECORD_SECONDS (5) with parsed positive int. Invalid/negative/zero values fall back to 5. record_seconds used in _record_with_timeout timeout and _record_fixed_duration_with_diag deadline. 5 tests: default=5, override=3, abc→5, -1→5, 0→5. 176/176 tests, lint clean."
     },
     {
       "id": "F054",

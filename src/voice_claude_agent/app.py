@@ -50,6 +50,17 @@ class VoiceClaudeApp(rumps.App):
         self._wake_target = _wake_target or self._run_wake_loop
         self._alert = _alert_patch or self._rumps_alert
 
+        # F053: VOICE_RECORD_SECONDS env var override
+        self.record_seconds = self.DEFAULT_RECORD_SECONDS
+        env_val = os.environ.get("VOICE_RECORD_SECONDS", "").strip()
+        if env_val:
+            try:
+                parsed = int(env_val)
+                if parsed > 0:
+                    self.record_seconds = parsed
+            except ValueError:
+                pass  # use default
+
         self._wake_active = False
         self._wake_event = threading.Event()
         self._trigger_event = threading.Event()
@@ -501,7 +512,7 @@ class VoiceClaudeApp(rumps.App):
 
         worker = threading.Thread(target=_target, daemon=True, name="record-worker")
         worker.start()
-        timeout = self.DEFAULT_RECORD_SECONDS + self.RECORD_WORKER_GRACE_SECONDS
+        timeout = self.record_seconds + self.RECORD_WORKER_GRACE_SECONDS
         worker.join(timeout=timeout)
 
         if worker.is_alive():
@@ -561,7 +572,7 @@ class VoiceClaudeApp(rumps.App):
         return recorder
 
     def _record_fixed_duration_with_diag(self, recorder) -> tuple[bytes, str]:
-        """Record for DEFAULT_RECORD_SECONDS. Returns (audio_bytes, diagnostic_string)."""
+        """Record for record_seconds. Returns (audio_bytes, diagnostic_string)."""
         diag_parts = []
         device_name = "unknown"
 
@@ -584,7 +595,7 @@ class VoiceClaudeApp(rumps.App):
 
         diag_parts.append("recorder.start: OK")
 
-        deadline = time.monotonic() + self.DEFAULT_RECORD_SECONDS
+        deadline = time.monotonic() + self.record_seconds
         while time.monotonic() < deadline:
             if self._wake_event.is_set():
                 diag_parts.append("recording interrupted by stop event")
