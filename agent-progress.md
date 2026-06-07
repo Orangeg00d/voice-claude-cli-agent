@@ -1514,3 +1514,12 @@
 
 ### Verification
 - ./init.sh check/lint passed, 142 tests collected, all 3 F043 tests pass
+
+## 2026-06-07 10:15 — Phase 7: F044 — Structured App-Events
+
+### Completed
+- Added write_app_event to logging_store. Enhanced _append_runtime_event to emit JSONL with fields.
+- 9 structured events per cycle: trigger, record_start/stop, stt_start/done, claude_start/done, tts_done, cycle_done. Each with elapsed timestamps.
+
+### Verification
+- ./init.sh check/lint passed, 144/144 tests

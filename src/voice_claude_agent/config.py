@@ -24,6 +24,10 @@ def get_last_result_path() -> Path:
     return get_agent_state_dir() / "last_result.json"
 
 
+def get_app_events_log_path() -> Path:
+    return get_agent_state_dir() / "app_events.jsonl"
+
+
 def find_claude_executable() -> str | None:
     return shutil.which("claude")
 

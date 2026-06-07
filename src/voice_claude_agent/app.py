@@ -304,10 +304,13 @@ class VoiceClaudeApp(rumps.App):
     # ── Non-interactive recording (NO input()) ───────────────
 
     def _record_and_execute(self) -> None:
+        import time as _time
+
         from voice_claude_agent.cli import _run_pipeline
         from voice_claude_agent.stt import RecordingTranscriber
 
-        self._append_runtime_event("record_cycle_start")
+        cycle_start = _time.monotonic()
+        self._append_runtime_event("trigger")
         try:
             recorder = self._open_mic_or_alert()
             if recorder is None:
@@ -315,9 +318,13 @@ class VoiceClaudeApp(rumps.App):
                 return
 
             self.trigger_item.title = "Recording..."
-            self._append_runtime_event("record_start")
+            self._append_runtime_event("record_start", elapsed=f"{_time.monotonic() - cycle_start:.3f}s")
             audio, diag = self._record_with_timeout(recorder)
-            self._append_runtime_event(f"record_done bytes={len(audio)}")
+            self._append_runtime_event(
+                "record_stop",
+                elapsed=f"{_time.monotonic() - cycle_start:.3f}s",
+                audio_bytes=len(audio),
+            )
             if not audio:
                 self.mic_status_item.title = "Mic: No audio captured"
                 self._alert(
@@ -330,9 +337,16 @@ class VoiceClaudeApp(rumps.App):
                 return
 
             self.trigger_item.title = "Transcribing..."
+            stt_start = _time.monotonic()
+            self._append_runtime_event("stt_start", elapsed=f"{stt_start - cycle_start:.3f}s")
             transcriber = RecordingTranscriber(backend=self.stt_backend)
             transcript = transcriber.transcribe(audio)
-            self._append_runtime_event(f"stt_done transcript={transcript[:120]!r}")
+            self._append_runtime_event(
+                "stt_done",
+                elapsed=f"{_time.monotonic() - cycle_start:.3f}s",
+                duration=f"{_time.monotonic() - stt_start:.3f}s",
+                transcript_preview=transcript[:120],
+            )
 
             if not transcript.strip():
                 self.mic_status_item.title = "Mic: Empty transcript"
@@ -348,11 +362,23 @@ class VoiceClaudeApp(rumps.App):
                 return
 
             self.trigger_item.title = "Running Claude..."
-            self._append_runtime_event("claude_start")
+            claude_start = _time.monotonic()
+            self._append_runtime_event("claude_start", elapsed=f"{claude_start - cycle_start:.3f}s")
             _run_pipeline(transcript, input_mode="voice", tts_fake=False)
-            self._append_runtime_event("claude_done")
+            self._append_runtime_event(
+                "claude_done",
+                elapsed=f"{_time.monotonic() - cycle_start:.3f}s",
+                duration=f"{_time.monotonic() - claude_start:.3f}s",
+            )
+
+            # TTS is handled inside _run_pipeline via MacOSSaySpeaker
+            self._append_runtime_event("tts_done")
 
             self.trigger_item.title = "Done ✓"
+            self._append_runtime_event(
+                "cycle_done",
+                total_elapsed=f"{_time.monotonic() - cycle_start:.3f}s",
+            )
             threading.Timer(1.5, lambda: setattr(self.trigger_item, "title", "Trigger Recording")).start()
         except Exception as e:
             self.mic_status_item.title = "Mic: Runtime error"
@@ -409,7 +435,8 @@ class VoiceClaudeApp(rumps.App):
         except Exception as e:
             self._append_runtime_event(f"record_timeout_cleanup_stop_error {type(e).__name__}: {e}")
 
-    def _append_runtime_event(self, message: str) -> None:
+    def _append_runtime_event(self, message: str, **fields) -> None:
+        import json
         from datetime import datetime
 
         from voice_claude_agent.config import get_agent_state_dir
@@ -419,8 +446,14 @@ class VoiceClaudeApp(rumps.App):
             state_dir.mkdir(parents=True, exist_ok=True)
             path = state_dir / "app-events.log"
             timestamp = datetime.now().isoformat(timespec="seconds")
+            record = {
+                "timestamp": timestamp,
+                "event": message,
+            }
+            if fields:
+                record.update(fields)
             with path.open("a", encoding="utf-8") as f:
-                f.write(f"{timestamp} {message}\n")
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
         except Exception:
             pass
 

@@ -7,7 +7,7 @@ import json
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-from voice_claude_agent.config import get_sessions_log_path, get_last_result_path
+from voice_claude_agent.config import get_sessions_log_path, get_last_result_path, get_app_events_log_path
 
 
 def _tz_now() -> str:
@@ -49,3 +49,23 @@ def write_last_result(result: dict) -> Path:
         json.dump(result, f, ensure_ascii=False, indent=2)
 
     return result_path
+
+
+def write_app_event(event_type: str, **fields) -> Path:
+    """Append a structured app-event entry to agent_state/app_events.jsonl.
+
+    Used for F044: trace trigger, recording, STT, Claude, TTS lifecycle.
+    """
+    record = {
+        "timestamp": _tz_now(),
+        "event": event_type,
+    }
+    record.update(fields)
+
+    log_path = get_app_events_log_path()
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(log_path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+    return log_path

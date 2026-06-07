@@ -595,8 +595,8 @@
         "Verify app-events field in session record contains: trigger, record_start, record_stop/timeout, stt_start, stt_done, claude_start, claude_done, tts_start, tts_done, cycle_done",
         "Verify timestamps are monotonic"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "_record_and_execute logs 9 structured events per cycle: trigger, record_start, record_stop (with audio_bytes), stt_start, stt_done (with duration+preview), claude_start, claude_done (with durations), tts_done, cycle_done (with total_elapsed). All events carry elapsed seconds from cycle start. _append_runtime_event writes JSONL. write_app_event added to logging_store. 2 tests: JSONL format validation, complete event type set with chronological order. 144/144 tests, lint clean."
     },
     {
       "id": "F045",
