@@ -1969,3 +1969,11 @@
 - `./init.sh test -q` passed: 203/203.
 - `./init.sh build-app` passed and rebuilt `dist/VoiceClaudeAgent.app`.
 - `./init.sh install-app` passed and installed `~/Applications/VoiceClaudeAgent.app` with bundle id `com.voiceclaude.agent`.
+
+## 2026-06-07 14:45 — Phase 10: F062 — zh-CN Output & Record Duration Display
+
+### Completed
+- zh-CN prompt constraint, txt2zh conversion, Health Check record_seconds display, config.json record seconds. 5 tests. 208/208 tests, lint clean.
+
+### Verification
+- ./init.sh check/lint passed, 208/208 tests

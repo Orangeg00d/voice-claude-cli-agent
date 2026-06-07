@@ -3806,3 +3806,85 @@ class TestMainThreadAlert:
         assert app._cycle_in_progress is True
 
         app._stop_wake(app.stop_item)
+
+
+# ── F062: zh-CN Output & Record Duration Display ───────────
+class TestZhCNOutput:
+    def test_claude_prompt_has_zh_cn_constraint(self, monkeypatch):
+        """_run_pipeline should prepend zh-CN constraint to the prompt."""
+        from unittest import mock as _mock
+
+        import pathlib
+
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_sessions_log_path",
+            lambda: pathlib.Path("/tmp/fake.jsonl"),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_last_result_path",
+            lambda: pathlib.Path("/tmp/fake_result.json"),
+        )
+
+        with _mock.patch("voice_claude_agent.cli.run_claude") as mock_run:
+            mock_run.return_value.exit_code = 0
+            mock_run.return_value.stdout = "你好"
+            mock_run.return_value.stderr = ""
+            mock_run.return_value.timed_out = False
+            mock_run.return_value.duration_seconds = 0.1
+            mock_run.return_value.command = ["claude", "-p", "test"]
+
+            from voice_claude_agent.cli import _run_pipeline
+
+            _run_pipeline("test prompt", input_mode="text", tts_fake=True)
+
+        call_args = mock_run.call_args[0][0] if mock_run.call_args else ""
+        assert "简体中文" in call_args, f"zh-CN constraint missing: {call_args}"
+
+    def test_t2s_converts_traditional_to_simplified(self):
+        """_t2s_convert should convert traditional characters to simplified."""
+        from voice_claude_agent.stt import _t2s_convert
+
+        result = _t2s_convert("請問這是什麼時候開始的")
+        assert "请" in result
+        assert "问" in result
+        assert "这" in result
+        assert "么" in result
+        assert "时" in result
+        assert "开" in result
+
+    def test_t2s_leaves_simplified_unchanged(self):
+        """_t2s_convert should not modify already-simplified text."""
+        from voice_claude_agent.stt import _t2s_convert
+
+        simplified = "请问这是什么"
+        result = _t2s_convert(simplified)
+        assert result == simplified
+
+    def test_health_check_shows_record_duration(self, monkeypatch):
+        """Health Check should include Record duration with current seconds."""
+        alerts = []
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._run_health_check(app.health_item)
+
+        msg = alerts[0]["message"]
+        assert "Record duration" in msg
+        assert "5s" in msg
+
+    def test_voice_claude_app_reads_record_seconds_from_config(self, tmp_path, monkeypatch):
+        """VoiceClaudeApp should read VOICE_RECORD_SECONDS from config.json."""
+        import json
+
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({"VOICE_RECORD_SECONDS": "10"}))
+        monkeypatch.setattr(
+            "voice_claude_agent.config.get_config_path",
+            lambda: cfg_file,
+        )
+        monkeypatch.delenv("VOICE_RECORD_SECONDS", raising=False)
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        assert app.record_seconds == 10

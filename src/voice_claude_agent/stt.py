@@ -209,6 +209,8 @@ def _transcribe_whisper_cli(audio_data: bytes) -> str:
         result = proc.stdout.strip()
         if not result and proc.stderr.strip():
             result = _extract_text_from_whisper_stderr(proc.stderr)
+        if result:
+            result = _t2s_convert(result)  # F062: traditional → simplified
         return result or "[whisper returned empty]"
     except subprocess.TimeoutExpired:
         return "[STT error: whisper transcription timed out]"
@@ -320,6 +322,41 @@ def _extract_text_from_whisper_stderr(stderr: str) -> str:
         if stripped and not stripped.startswith("[") and "whisper" not in stripped.lower():
             return stripped
     return ""
+
+
+# ── F062: Traditional-to-Simplified Chinese conversion ─────
+
+_T2S_MAP: dict[str, str] = {}
+
+
+def _t2s_convert(text: str) -> str:
+    """Convert traditional Chinese to simplified using a built-in character map."""
+    global _T2S_MAP
+    if not _T2S_MAP:
+        _T2S_MAP = {
+            "說": "说", "話": "话", "來": "来", "時": "时",
+            "會": "会", "過": "过", "個": "个", "們": "们",
+            "為": "为", "學": "学", "開": "开", "關": "关",
+            "對": "对", "現": "现", "實": "实", "體": "体",
+            "點": "点", "機": "机", "當": "当", "還": "还",
+            "讓": "让", "問": "问", "見": "见", "聽": "听",
+            "寫": "写", "讀": "读", "給": "给", "從": "从",
+            "長": "长", "後": "后", "頭": "头", "書": "书",
+            "裡": "里", "麼": "么", "樣": "样", "進": "进",
+            "發": "发", "經": "经", "動": "动", "國": "国",
+            "這": "这", "沒": "没", "應": "应", "請": "请",
+            "與": "与", "嗎": "吗", "種": "种", "處": "处",
+            "臺": "台", "灣": "湾", "線": "线", "碼": "码",
+            "確": "确", "認": "认", "導": "导", "際": "际",
+            "總": "总", "統": "统", "計": "计", "設": "设",
+            "運": "运", "轉": "转", "連": "连", "萬": "万",
+            "電": "电", "視": "视", "覺": "觉", "響": "响",
+            "難": "难", "買": "买", "賣": "卖", "門": "门",
+        }
+    try:
+        return "".join(_T2S_MAP.get(ch, ch) for ch in text)
+    except Exception:
+        return text
 
 
 def list_available_backends() -> list[str]:

@@ -232,10 +232,12 @@ def _run_pipeline(prompt: str, input_mode: str, tts_fake: bool) -> None:
         confirmation_received = True
 
     # 3. Execute Claude CLI
+    # F062: prepend zh-CN constraint
+    wrapped = f"请始终使用简体中文回答。{prompt}"
     click.echo(
-        f"Running: claude -p \"{prompt[:80]}{'...' if len(prompt) > 80 else ''}\""
+        f"Running: claude -p \"{wrapped[:80]}{'...' if len(wrapped) > 80 else ''}\""
     )
-    result = run_claude(prompt)
+    result = run_claude(wrapped)
 
     if result.timed_out:
         click.echo(click.style("Claude CLI timed out.", fg="red"))

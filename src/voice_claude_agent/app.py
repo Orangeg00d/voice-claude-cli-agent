@@ -400,7 +400,12 @@ class VoiceClaudeApp(rumps.App):
         lines.append(self._check_item("macOS say (TTS)", sk,
             "available" if sk else "not found", ""))
         lines.append("")
-        
+
+        # F062: Record duration
+        lines.append(self._check_item(
+            "Record duration", True, f"{self.record_seconds}s", ""))
+        lines.append("")
+
         all_ok = all([claude, wb, m, hm, po, sd, sk])
         lines.append("Overall: " + ("ALL CHECKS PASSED" if all_ok else "SOME CHECKS FAILED — see hints above"))
         self._alert_on_main(title="Health Check", message="\n".join(lines))
