@@ -918,6 +918,22 @@
       ],
       "passes": true,
       "evidence": "Added badges to README (MIT, macOS, Python 3.11+, tests 223). Created GITHUB_RELEASE_DRAFT.md (v0.1.0 summary, quick start, requirements, limitations, privacy, license). Created REPOSITORY_METADATA.md (GitHub description, topics, release checklist). Updated README, RELEASE_NOTES, and DEVELOPER_PROGRAM_APPLICATION.md to F001-F067, Phase 1-13, 67 acceptance items. No runtime code changes. 223/223 tests, lint clean, check clean."
+    },
+    {
+      "id": "F068",
+      "priority": 68,
+      "category": "app",
+      "description": "Settings menu item for viewing and editing local config",
+      "steps": [
+        "Add Settings... menu item with dialog-based config viewer/editor",
+        "Support: VOICE_RECORD_SECONDS, VOICE_STT_BACKEND, WHISPER_CPP_MODEL, WHISPER_CPP_LANGUAGE",
+        "Save to ~/.voice-claude-agent/config.json, reload immediately",
+        "Input validation: record_seconds positive int, stt_backend valid backend",
+        "Reset to defaults capability",
+        "Tests: read config, save valid, reject invalid, reset, post-save reload"
+      ],
+      "passes": true,
+      "evidence": "Added Settings... menu item with rumps.Window dialog: view config from ~/.voice-claude-agent/config.json, edit (key=value per line), validate (record_seconds positive int, stt_backend in valid set), save+reload immediately via _reload_from_config(). Reset button clears config. 6 tests: menu present, reload record_seconds, reload stt_backend, reject invalid backend, reject negative, reject zero. 229/229 tests, lint clean."
     }
   ]
 }

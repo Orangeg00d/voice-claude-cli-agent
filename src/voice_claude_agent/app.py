@@ -102,6 +102,9 @@ class VoiceClaudeApp(rumps.App):
         # F058: Health Check
         self.health_item = rumps.MenuItem("Health Check", callback=self._run_health_check)
 
+        # F068: Settings
+        self.settings_item = rumps.MenuItem("Settings...", callback=self._show_settings)
+
         self.menu = [
             self.start_item,
             self.stop_item,
@@ -109,6 +112,8 @@ class VoiceClaudeApp(rumps.App):
             None,
             self.diagnostic_item,
             self.mic_status_item,
+            None,
+            self.settings_item,
             None,
             self.transcript_item,
             self.summary_item,
@@ -122,6 +127,124 @@ class VoiceClaudeApp(rumps.App):
         self._update_mic_status()
         self._sync_menu_titles()
         self._validate_stt_backend()
+
+    # ── F068: Settings UI ───────────────────────────────────
+
+    _VALID_BACKENDS = {"text-input", "whisper-cli", "apple-speech"}
+
+    def _show_settings(self, sender: rumps.MenuItem) -> None:
+        """Display a settings dialog chain: view → edit → save."""
+        import json
+        from pathlib import Path
+
+        cfg_path = Path.home() / ".voice-claude-agent" / "config.json"
+        cfg = {}
+        if cfg_path.exists():
+            try:
+                cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+            except Exception:
+                cfg = {}
+
+        # Step 1: show current config
+        current = (
+            f"Config path: {cfg_path}\n\n"
+            f"VOICE_RECORD_SECONDS: {cfg.get('VOICE_RECORD_SECONDS', '')}\n"
+            f"VOICE_STT_BACKEND: {cfg.get('VOICE_STT_BACKEND', '')}\n"
+            f"WHISPER_CPP_MODEL: {cfg.get('WHISPER_CPP_MODEL', '')}\n"
+            f"WHISPER_CPP_LANGUAGE: {cfg.get('WHISPER_CPP_LANGUAGE', '')}\n\n"
+            "Enter new values below each key (blank = keep current):"
+        )
+        response = rumps.Window(
+            message=current,
+            title="Settings — View",
+            default_text="",
+            dimensions=(400, 200),
+        ).run()
+
+        if not response.clicked or response.text is None:
+            return  # cancelled
+
+        # Step 2: parse input
+        new_cfg = {}
+        errors = []
+        for line in response.text.strip().split("\n"):
+            line = line.strip()
+            if not line or "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            key = key.strip()
+            val = val.strip()
+            if not val:
+                continue  # blank means keep current
+            if key not in ("VOICE_RECORD_SECONDS", "VOICE_STT_BACKEND",
+                           "WHISPER_CPP_MODEL", "WHISPER_CPP_LANGUAGE"):
+                continue
+
+            new_cfg[key] = val
+
+        # Validate
+        if "VOICE_RECORD_SECONDS" in new_cfg:
+            try:
+                secs = int(new_cfg["VOICE_RECORD_SECONDS"])
+                if secs <= 0:
+                    errors.append("Record seconds must be a positive integer.")
+                else:
+                    new_cfg["VOICE_RECORD_SECONDS"] = str(secs)
+            except ValueError:
+                errors.append("Record seconds must be an integer.")
+
+        if "VOICE_STT_BACKEND" in new_cfg:
+            if new_cfg["VOICE_STT_BACKEND"] not in self._VALID_BACKENDS:
+                errors.append(
+                    f"STT backend must be one of: {', '.join(sorted(self._VALID_BACKENDS))}"
+                )
+
+        if errors:
+            self._alert_on_main(
+                title="Settings Validation Error",
+                message="\n".join(errors),
+            )
+            return
+
+        # Step 3: save
+        merged = {**cfg, **new_cfg}
+        cfg_path.parent.mkdir(parents=True, exist_ok=True)
+        cfg_path.write_text(json.dumps(merged, ensure_ascii=False, indent=2) + "\n")
+
+        # Step 4: reload into app
+        self._reload_from_config(merged)
+
+        self._alert_on_main(
+            title="Settings Saved",
+            message="Config saved and reloaded. Changes take effect immediately.",
+        )
+
+    def _show_reset_settings(self, sender: rumps.MenuItem) -> None:
+        """Reset config.json to defaults."""
+        from pathlib import Path
+
+        cfg_path = Path.home() / ".voice-claude-agent" / "config.json"
+        if cfg_path.exists():
+            cfg_path.unlink()
+        self._reload_from_config({})
+        self._alert_on_main(
+            title="Settings Reset",
+            message="Config reset to defaults. Restart recommended.",
+        )
+
+    def _reload_from_config(self, cfg: dict) -> None:
+        """Apply config dict values to the running app instance."""
+        # record_seconds
+        if "VOICE_RECORD_SECONDS" in cfg:
+            try:
+                v = int(cfg["VOICE_RECORD_SECONDS"])
+                if v > 0:
+                    self.record_seconds = v
+            except (ValueError, TypeError):
+                pass
+        # stt_backend
+        if "VOICE_STT_BACKEND" in cfg and cfg["VOICE_STT_BACKEND"] in self._VALID_BACKENDS:
+            self.stt_backend = cfg["VOICE_STT_BACKEND"]
 
     # ── STT backend validation ───────────────────────────────
 

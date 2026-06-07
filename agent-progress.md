@@ -2133,3 +2133,11 @@
 - `./init.sh check` passed.
 - `./init.sh lint` passed.
 - `./init.sh test -q` passed: 223/223.
+
+## 2026-06-07 16:00 — Phase 14: F068 — Settings UI
+
+### Completed
+- Added Settings... menu item with rumps.Window dialog. View/edit/save config. Validate inputs. Reload immediately. 6 tests. 229/229 tests, lint clean.
+
+### Verification
+- ./init.sh check/lint passed, 229/229 tests

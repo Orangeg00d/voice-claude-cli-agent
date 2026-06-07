@@ -4330,3 +4330,56 @@ class TestVoiceConfirmation:
         session = json.loads(records[-1])
         assert session["confirmation_required"] is True
         assert session["confirmation_received"] is True
+
+
+# ── F068: Settings UI ───────────────────────────────────────
+class TestSettingsUI:
+    def test_settings_menu_item_present(self):
+        """Menu should contain 'Settings...' item."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        assert app.settings_item is not None
+        assert "Settings" in app.settings_item.title
+
+    def test_reload_from_config_updates_record_seconds(self):
+        """_reload_from_config should update record_seconds immediately."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        app._reload_from_config({"VOICE_RECORD_SECONDS": "15"})
+        assert app.record_seconds == 15
+
+    def test_reload_from_config_updates_stt_backend(self):
+        """_reload_from_config should update stt_backend."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(stt_backend="text-input")
+        app._reload_from_config({"VOICE_STT_BACKEND": "whisper-cli"})
+        assert app.stt_backend == "whisper-cli"
+
+    def test_reload_from_config_rejects_invalid_backend(self):
+        """_reload_from_config should NOT change stt_backend to invalid value."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(stt_backend="text-input")
+        app._reload_from_config({"VOICE_STT_BACKEND": "invalid-backend"})
+        assert app.stt_backend == "text-input"  # unchanged
+
+    def test_reload_from_config_rejects_negative_record_seconds(self):
+        """_reload_from_config should NOT apply negative record seconds."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        orig = app.record_seconds
+        app._reload_from_config({"VOICE_RECORD_SECONDS": "-5"})
+        assert app.record_seconds == orig
+
+    def test_reload_from_config_rejects_zero_record_seconds(self):
+        """_reload_from_config should NOT apply zero record seconds."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        orig = app.record_seconds
+        app._reload_from_config({"VOICE_RECORD_SECONDS": "0"})
+        assert app.record_seconds == orig
