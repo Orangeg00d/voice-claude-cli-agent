@@ -10,7 +10,7 @@ import time
 
 import rumps
 
-from voice_claude_agent.config import check_mic_permission, get_agent_state_dir
+from voice_claude_agent.config import check_mic_permission, get_agent_state_dir, load_config
 
 # Silence rumps debug output during tests
 import logging
@@ -50,8 +50,16 @@ class VoiceClaudeApp(rumps.App):
         self._wake_target = _wake_target or self._run_wake_loop
         self._alert = _alert_patch or self._rumps_alert
 
-        # F053: VOICE_RECORD_SECONDS env var override
+        # F053 + F059: record_seconds = env > config.json > default
+        cfg = load_config()
         self.record_seconds = self.DEFAULT_RECORD_SECONDS
+        if "VOICE_RECORD_SECONDS" in cfg:
+            try:
+                v = int(cfg["VOICE_RECORD_SECONDS"])
+                if v > 0:
+                    self.record_seconds = v
+            except (ValueError, TypeError):
+                pass
         env_val = os.environ.get("VOICE_RECORD_SECONDS", "").strip()
         if env_val:
             try:
@@ -59,7 +67,7 @@ class VoiceClaudeApp(rumps.App):
                 if parsed > 0:
                     self.record_seconds = parsed
             except ValueError:
-                pass  # use default
+                pass
 
         self._wake_active = False
         self._wake_event = threading.Event()

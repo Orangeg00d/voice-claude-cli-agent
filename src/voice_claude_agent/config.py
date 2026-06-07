@@ -88,4 +88,33 @@ def check_apple_speech_available() -> bool:
     return shutil.which("say") is not None
 
 
+# ── F059: Local config file ─────────────────────────────────
+
+def get_config_path() -> Path:
+    return Path.home() / ".voice-claude-agent" / "config.json"
+
+
+def load_config() -> dict:
+    """Load settings from ~/.voice-claude-agent/config.json.
+
+    Returns a dict of recognized keys, or empty dict on any failure.
+    Priority: environment variable > config.json > default.
+    """
+    config_path = get_config_path()
+    if not config_path.exists():
+        return {}
+    try:
+        data = __import__("json").loads(config_path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return {}
+    except Exception:
+        return {}
+
+    allowed = {
+        "VOICE_RECORD_SECONDS", "VOICE_STT_BACKEND",
+        "WHISPER_CPP_MODEL", "WHISPER_CPP_LANGUAGE",
+    }
+    return {k: v for k, v in data.items() if k in allowed and v is not None}
+
+
 DEFAULT_TIMEOUT_SECONDS = 300

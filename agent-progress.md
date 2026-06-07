@@ -1904,3 +1904,11 @@
 
 ### Verification
 - ./init.sh check/lint passed, 188 tests collected
+
+## 2026-06-07 14:10 — Phase 9: F059 — Config File
+
+### Completed
+- Added load_config() to config.py. VoiceClaudeApp uses config.json for record_seconds. Priority: env > config > default. 5 tests. 193/193 tests, lint clean.
+
+### Verification
+- ./init.sh check/lint passed, 193/193 tests

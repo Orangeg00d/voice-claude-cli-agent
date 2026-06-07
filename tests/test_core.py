@@ -3505,3 +3505,86 @@ class TestHealthCheck:
         assert "Agent state dir" in msg
         assert "macOS say" in msg
         assert "Overall" in msg
+
+
+# ── F059: Config File ───────────────────────────────────────
+class TestConfigFile:
+    def test_load_config_no_file(self, tmp_path, monkeypatch):
+        """When config.json does not exist, load_config returns empty dict."""
+        monkeypatch.setattr(
+            "voice_claude_agent.config.get_config_path",
+            lambda: tmp_path / "nonexistent.json",
+        )
+        from voice_claude_agent.config import load_config
+
+        cfg = load_config()
+        assert cfg == {}
+
+    def test_load_config_valid(self, tmp_path, monkeypatch):
+        """Valid config.json should return recognized keys."""
+        import json
+
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({
+            "VOICE_RECORD_SECONDS": "3",
+            "VOICE_STT_BACKEND": "text-input",
+            "unknown_key": "ignored",
+        }))
+        monkeypatch.setattr(
+            "voice_claude_agent.config.get_config_path",
+            lambda: cfg_file,
+        )
+        from voice_claude_agent.config import load_config
+
+        cfg = load_config()
+        assert cfg["VOICE_RECORD_SECONDS"] == "3"
+        assert cfg["VOICE_STT_BACKEND"] == "text-input"
+        assert "unknown_key" not in cfg
+
+    def test_load_config_corrupted_json(self, tmp_path, monkeypatch):
+        """Corrupted JSON should return empty dict, not crash."""
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text("{{{broken")
+        monkeypatch.setattr(
+            "voice_claude_agent.config.get_config_path",
+            lambda: cfg_file,
+        )
+        from voice_claude_agent.config import load_config
+
+        cfg = load_config()
+        assert cfg == {}
+
+    def test_env_var_overrides_config_json(self, tmp_path, monkeypatch):
+        """Environment variable should override config.json value."""
+        import json
+
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({"VOICE_RECORD_SECONDS": "10"}))
+        monkeypatch.setattr(
+            "voice_claude_agent.config.get_config_path",
+            lambda: cfg_file,
+        )
+        monkeypatch.setenv("VOICE_RECORD_SECONDS", "2")
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        # env (2) > config.json (10) > default (5)
+        assert app.record_seconds == 2
+
+    def test_config_json_sets_record_seconds_without_env(self, tmp_path, monkeypatch):
+        """Config.json should set record_seconds when no env var."""
+        import json
+
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({"VOICE_RECORD_SECONDS": "7"}))
+        monkeypatch.setattr(
+            "voice_claude_agent.config.get_config_path",
+            lambda: cfg_file,
+        )
+        monkeypatch.delenv("VOICE_RECORD_SECONDS", raising=False)
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        assert app.record_seconds == 7

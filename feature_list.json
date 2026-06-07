@@ -797,8 +797,8 @@
         "Override VOICE_RECORD_SECONDS, VOICE_STT_BACKEND, WHISPER_CPP_MODEL, WHISPER_CPP_LANGUAGE",
         "Env vars still take highest priority"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Added load_config() reading ~/.voice-claude-agent/config.json. Supports VOICE_RECORD_SECONDS, VOICE_STT_BACKEND, WHISPER_CPP_MODEL, WHISPER_CPP_LANGUAGE. Priority: env var > config.json > default. VoiceClaudeApp uses config.json for record_seconds. 5 tests: no file, valid, corrupted, env override, config without env. 193/193 tests, lint clean."
     },
     {
       "id": "F060",
