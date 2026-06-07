@@ -784,8 +784,8 @@
         "Check Claude CLI, whisper-cli binary, model path, mic permission, PortAudio, agent_state",
         "Show PASS/FAIL for each check with actionable fix hints"
       ],
-      "passes": false,
-      "evidence": ""
+      "passes": true,
+      "evidence": "Added Health Check menu item with _check_item helper. Checks 7 items: Claude CLI, whisper-cli, model, mic, PortAudio, agent_state, macOS say. Shows PASS/FAIL per item with fix hints. 4 tests: menu present, PASS format, FAIL format+fix hint, all sections. 188 tests collected, lint clean."
     },
     {
       "id": "F059",

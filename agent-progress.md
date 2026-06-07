@@ -1896,3 +1896,11 @@
 
 ### Verification
 - ./init.sh test passed, lint clean
+
+## 2026-06-07 14:00 — Phase 9: F058 — App Health Check
+
+### Completed
+- Added Health Check menu item. Checks 7 systems with PASS/FAIL + fix hints. 4 tests.
+
+### Verification
+- ./init.sh check/lint passed, 188 tests collected

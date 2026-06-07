@@ -95,6 +95,9 @@ class VoiceClaudeApp(rumps.App):
         # F052: View Logs
         self.logs_item = rumps.MenuItem("View Logs", callback=self._show_logs)
 
+        # F058: Health Check
+        self.health_item = rumps.MenuItem("Health Check", callback=self._run_health_check)
+
         self.menu = [
             self.start_item,
             self.stop_item,
@@ -107,6 +110,7 @@ class VoiceClaudeApp(rumps.App):
             self.summary_item,
             None,
             self.logs_item,
+            self.health_item,
             None,
             self.quit_item,
         ]
@@ -311,6 +315,75 @@ class VoiceClaudeApp(rumps.App):
         lines.append("- Use: 'tccutil reset Microphone com.voiceclaude.agent' to reset permissions")
 
         self._alert(title="Mic Diagnostic", message="\n".join(lines))
+
+    # ─
+    # ── F058: Health Check ──────────────────────────────────
+
+    @staticmethod
+    def _check_item(name, ok, detail="", fix_hint=""):
+        status = "PASS" if ok else "FAIL"
+        line = f"[{status}] {name}"
+        if detail:
+            line += f" — {detail}"
+        if not ok and fix_hint:
+            line += f"\n     → {fix_hint}"
+        return line
+
+    def _run_health_check(self, sender):
+        from voice_claude_agent.config import (
+            check_apple_speech_available, check_mic_permission,
+            find_claude_executable, get_agent_state_dir,
+        )
+        from voice_claude_agent.stt import _resolve_whisper_model, _find_whisper_cpp_binary
+
+        lines = ["=== Health Check ===", ""]
+        
+        claude = find_claude_executable()
+        lines.append(self._check_item("Claude CLI", claude is not None,
+            claude or "not found", "Install: brew install claude"))
+        lines.append("")
+        
+        wb = _find_whisper_cpp_binary()
+        lines.append(self._check_item("whisper-cli", wb is not None,
+            wb or "not found", "Install: brew install whisper-cpp"))
+        lines.append("")
+        
+        m, me = _resolve_whisper_model()
+        lines.append(self._check_item("Whisper model", m is not None,
+            m or me, "Set WHISPER_CPP_MODEL=/path/to/ggml-base.bin"))
+        lines.append("")
+        
+        hm, md = check_mic_permission()
+        lines.append(self._check_item("Microphone", hm, md,
+            "Check System Settings > Privacy & Security > Microphone"))
+        lines.append("")
+        
+        po = False
+        pd = ""
+        try:
+            import sounddevice as sd
+            sd.query_devices(kind="input")
+            po = True
+            pd = "loaded"
+        except Exception as e:
+            pd = str(e)[:100]
+        lines.append(self._check_item("PortAudio", po, pd,
+            "Rebuild: python setup.py py2app"))
+        lines.append("")
+        
+        sd = get_agent_state_dir().exists()
+        lines.append(self._check_item("Agent state dir", sd,
+            str(get_agent_state_dir()), "Created on first use"))
+        lines.append("")
+        
+        sk = check_apple_speech_available()
+        lines.append(self._check_item("macOS say (TTS)", sk,
+            "available" if sk else "not found", ""))
+        lines.append("")
+        
+        all_ok = all([claude, wb, m, hm, po, sd, sk])
+        lines.append("Overall: " + ("ALL CHECKS PASSED" if all_ok else "SOME CHECKS FAILED — see hints above"))
+        self._alert(title="Health Check", message="\n".join(lines))
 
     # ── Menu title sync ──────────────────────────────────────
 

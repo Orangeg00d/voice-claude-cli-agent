@@ -3455,3 +3455,53 @@ class TestActionableErrors:
         assert "PortAudio" in detail
         assert "libportaudio.dylib" in detail
         assert "python setup.py py2app" in detail
+
+
+# ── F058: Health Check Menu Item ───────────────────────────
+class TestHealthCheck:
+    def test_health_menu_item_present(self):
+        """Menu should contain 'Health Check' item."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp()
+        assert app.health_item is not None
+        assert "Health" in app.health_item.title
+
+    def test_check_item_pass_format(self):
+        """_check_item with ok=True should return [PASS]."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        result = VoiceClaudeApp._check_item("Test", True, "ok")
+        assert "[PASS]" in result
+        assert "Test" in result
+        assert "ok" in result
+
+    def test_check_item_fail_format(self):
+        """_check_item with ok=False should return [FAIL] with fix hint."""
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        result = VoiceClaudeApp._check_item("Test", False, "broken", "Fix it")
+        assert "[FAIL]" in result
+        assert "broken" in result
+        assert "Fix it" in result
+
+    def test_health_check_includes_all_sections(self, monkeypatch):
+        """Health check alert should include all 7 check categories."""
+        alerts = []
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._run_health_check(app.health_item)
+
+        assert len(alerts) == 1
+        assert alerts[0]["title"] == "Health Check"
+        msg = alerts[0]["message"]
+        assert "Claude CLI" in msg
+        assert "whisper-cli" in msg
+        assert "Whisper model" in msg
+        assert "Microphone" in msg
+        assert "PortAudio" in msg
+        assert "Agent state dir" in msg
+        assert "macOS say" in msg
+        assert "Overall" in msg
