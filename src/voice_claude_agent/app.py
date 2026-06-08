@@ -967,18 +967,39 @@ class VoiceClaudeApp(rumps.App):
         if worker.is_alive():
             self._append_runtime_event(f"record_timeout after={timeout:.1f}s")
             self._wake_event.set()
+            rescued_audio = b""
+            rescue_diag = []
+            try:
+                rescued_audio = recorder.get_audio()
+                rescue_diag.append(f"Rescued audio bytes: {len(rescued_audio)}")
+            except Exception as e:
+                rescue_diag.append(f"Could not rescue audio before cleanup: {e}")
             threading.Thread(
                 target=self._best_effort_stop_recorder,
                 args=(recorder,),
                 daemon=True,
                 name="record-stop-cleanup",
             ).start()
+            if rescued_audio:
+                self._append_runtime_event(
+                    "record_timeout_rescued_audio",
+                    audio_bytes=len(rescued_audio),
+                )
+                return (
+                    rescued_audio,
+                    (
+                        f"Recording timed out after {timeout:.1f}s while stopping the microphone.\n"
+                        "Captured audio was recovered and processing will continue.\n"
+                        + "\n".join(rescue_diag)
+                    ),
+                )
             return (
                 b"",
                 (
                     f"Recording timed out after {timeout:.1f}s and was interrupted.\n"
                     "The menu app recovered, but the audio backend may need an app restart "
-                    "if the microphone remains busy."
+                    "if the microphone remains busy.\n"
+                    + "\n".join(rescue_diag)
                 ),
             )
 

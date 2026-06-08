@@ -2263,3 +2263,23 @@
 - Settings focused tests passed: 16/16.
 - `./init.sh lint` passed.
 - `pytest tests/ -q` passed: 278/278.
+
+## 2026-06-08 22:25 — Codex Review: Recording Timeout Audio Rescue
+
+### Finding
+- User hit `No audio was captured` after a recording timeout at 11s.
+- Runtime events showed `recorder_stop` fired at the configured 8s mark, but the recording worker did not return during the 3s grace period.
+- The app discarded the already captured frames because timeout handling returned `b""` immediately.
+- Full test runs were also reading the user's real config file, which made tests depend on local Settings values.
+
+### Completed
+- `_record_with_timeout()` now attempts `recorder.get_audio()` before returning from a timeout.
+- If audio bytes are recovered, the app logs `record_timeout_rescued_audio` and continues to STT/Claude instead of showing `No Audio`.
+- Kept background best-effort recorder cleanup for stuck `stop()/close()` calls.
+- Added a regression test for stop hanging while captured audio is still available.
+- Added an autouse test fixture that isolates tests from the user's real `~/.voice-claude-agent/config.json` and related environment variables.
+
+### Verification
+- Recording timeout focused tests passed.
+- `./init.sh lint` passed.
+- `pytest tests/ -vv -x` passed: 279/279.

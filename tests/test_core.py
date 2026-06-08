@@ -33,6 +33,22 @@ from voice_claude_agent.summarizer import summarize
 from voice_claude_agent.tts import FakeSpeaker, MacOSSaySpeaker
 
 
+@pytest.fixture(autouse=True)
+def _isolate_user_config(tmp_path, monkeypatch):
+    """Keep tests independent from the user's real ~/.voice-claude-agent config."""
+    from voice_claude_agent.config import CONFIG_KEYS
+    import voice_claude_agent.config as config_mod
+
+    for key in CONFIG_KEYS:
+        monkeypatch.delenv(key, raising=False)
+
+    cfg_file = tmp_path / "config.json"
+    monkeypatch.setattr(config_mod, "get_config_path", lambda: cfg_file)
+    app_mod = sys.modules.get("voice_claude_agent.app")
+    if app_mod is not None:
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+
+
 # ── Risk Classifier Tests ─────────────────────────────────
 class TestRiskClassifier:
     def test_read_only_for_neutral_prompt(self):
@@ -2096,12 +2112,42 @@ class TestNonInteractiveRecording:
         from voice_claude_agent.app import VoiceClaudeApp
 
         app = VoiceClaudeApp(_alert_patch=lambda **kw: None)
+        app.record_seconds = 0.01
         started_at = time.monotonic()
         audio, diag = app._record_with_timeout(HangingRecorder())
 
         assert time.monotonic() - started_at < 0.5
         assert audio == b""
         assert "Recording timed out" in diag
+        assert app._wake_event.is_set()
+
+    def test_record_timeout_rescues_audio_when_stop_hangs(self, monkeypatch):
+        """If stopping the microphone hangs, captured audio should still be used."""
+        import time
+
+        import voice_claude_agent.app as app_mod
+
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "DEFAULT_RECORD_SECONDS", 0.01)
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "RECORD_WORKER_GRACE_SECONDS", 0.01)
+
+        class StopHangsRecorder:
+            def start(self):
+                return None
+
+            def stop(self):
+                time.sleep(1.0)
+
+            def get_audio(self):
+                return b"\x01\x02" * 100
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: None)
+        app.record_seconds = 0.01
+        audio, diag = app._record_with_timeout(StopHangsRecorder())
+
+        assert audio == b"\x01\x02" * 100
+        assert "Captured audio was recovered" in diag
         assert app._wake_event.is_set()
 
     def test_stt_error_shows_alert(self, monkeypatch):
