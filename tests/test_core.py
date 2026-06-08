@@ -4376,6 +4376,48 @@ class TestSettingsUI:
         assert app.stt_backend == "apple-speech"
         assert alerts[-1]["title"] == "Settings Saved"
 
+    def test_show_settings_blank_values_remove_config_without_validation_error(self, tmp_path, monkeypatch):
+        """Blank Settings values should remove keys instead of failing validation."""
+        import json
+        from unittest import mock
+
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({
+            "VOICE_RECORD_SECONDS": "12",
+            "VOICE_STT_BACKEND": "whisper-cli",
+            "VOLCENGINE_ASR_API_KEY": "secret",
+        }), encoding="utf-8")
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+        monkeypatch.setattr(app_mod, "load_config", lambda: json.loads(cfg_file.read_text(encoding="utf-8")))
+
+        response = mock.MagicMock()
+        response.clicked = True
+        response.text = (
+            "VOICE_RECORD_SECONDS=\n"
+            "VOICE_STT_BACKEND=\n"
+            "VOLCENGINE_ASR_API_KEY=<keep existing secret>\n"
+        )
+        monkeypatch.setattr(
+            app_mod.rumps,
+            "Window",
+            mock.MagicMock(return_value=mock.MagicMock(run=mock.MagicMock(return_value=response))),
+        )
+
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._show_settings(app.settings_item)
+
+        saved = json.loads(cfg_file.read_text(encoding="utf-8"))
+        assert "VOICE_RECORD_SECONDS" not in saved
+        assert "VOICE_STT_BACKEND" not in saved
+        assert saved["VOLCENGINE_ASR_API_KEY"] == "secret"
+        assert app.record_seconds == app.DEFAULT_RECORD_SECONDS
+        assert app.stt_backend == "text-input"
+        assert alerts[-1]["title"] == "Settings Saved"
+
     def test_reload_from_config_updates_record_seconds(self):
         """_reload_from_config should update record_seconds immediately."""
         from voice_claude_agent.app import VoiceClaudeApp

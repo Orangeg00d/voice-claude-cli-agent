@@ -211,17 +211,18 @@ class VoiceClaudeApp(rumps.App):
 
         # Validate
         if "VOICE_RECORD_SECONDS" in new_cfg:
-            try:
-                secs = int(new_cfg["VOICE_RECORD_SECONDS"])
-                if secs <= 0:
-                    errors.append("Record seconds must be a positive integer.")
-                else:
-                    new_cfg["VOICE_RECORD_SECONDS"] = str(secs)
-            except ValueError:
-                errors.append("Record seconds must be an integer.")
+            if new_cfg["VOICE_RECORD_SECONDS"]:
+                try:
+                    secs = int(new_cfg["VOICE_RECORD_SECONDS"])
+                    if secs <= 0:
+                        errors.append("Record seconds must be a positive integer.")
+                    else:
+                        new_cfg["VOICE_RECORD_SECONDS"] = str(secs)
+                except ValueError:
+                    errors.append("Record seconds must be an integer.")
 
         if "VOICE_STT_BACKEND" in new_cfg:
-            if new_cfg["VOICE_STT_BACKEND"] not in self._VALID_BACKENDS:
+            if new_cfg["VOICE_STT_BACKEND"] and new_cfg["VOICE_STT_BACKEND"] not in self._VALID_BACKENDS:
                 errors.append(
                     f"STT backend must be one of: {', '.join(sorted(self._VALID_BACKENDS))}"
                 )
