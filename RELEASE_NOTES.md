@@ -14,7 +14,7 @@ Voice Claude Agent 是一个 macOS local-first 语音 Agent。用户通过菜单
 ## 当前 main 状态
 
 - **验收项**: 71/71 passed (F001-F071)
-- **测试数量**: 279
+- **测试数量**: 281
 - **最新阶段**: Phase 17 — Volcengine/Doubao TTS backend
 
 ## v0.1.0 功能清单 (67 项验收全部通过)
@@ -142,7 +142,7 @@ Voice Claude Agent 是一个 macOS local-first 语音 Agent。用户通过菜单
 ## 测试
 
 - **测试框架**: pytest
-- **当前测试数量**: 279
+- **当前测试数量**: 281
 - **v0.1.0 发布测试数量**: 223
 - **测试覆盖**: CLI 管道、录音、STT、风险分类、菜单栏生命周期、并发安全、日志格式
 

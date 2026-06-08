@@ -5351,6 +5351,41 @@ class TestVolcengineDoubaoTTS:
         speaker.speak("测试文本")
         assert speaker._fallback_called is False
 
+    def test_volcengine_speaker_default_resource_matches_default_voice(self, monkeypatch):
+        """Default moon_bigtts voice should use seed-tts-1.0 to avoid resource mismatch."""
+        import base64
+        import json
+
+        monkeypatch.setattr(
+            "voice_claude_agent.tts.get_config_value",
+            lambda key, default="": {
+                "VOLCENGINE_TTS_API_KEY": "test-key",
+            }.get(key, default),
+        )
+
+        requests = []
+
+        class _FakeResp:
+            def __enter__(self): return self
+            def __exit__(self, *a): pass
+            def __iter__(self):
+                data = base64.b64encode(b"\xff\xfb\x90\x00").decode()
+                return iter([json.dumps({"code": 0, "data": data}).encode()])
+
+        def fake_request(url, data=None, headers=None, method=None):
+            requests.append({"url": url, "headers": headers or {}, "body": json.loads(data.decode("utf-8"))})
+            return object()
+
+        monkeypatch.setattr("urllib.request.Request", fake_request)
+        monkeypatch.setattr("urllib.request.urlopen", lambda req, timeout=None: _FakeResp())
+        monkeypatch.setattr("subprocess.run", lambda *a, **kw: None)
+
+        from voice_claude_agent.tts import VolcengineDoubaoSpeaker
+        VolcengineDoubaoSpeaker().speak("测试文本")
+
+        assert requests[0]["headers"]["X-Api-Resource-Id"] == "seed-tts-1.0"
+        assert requests[0]["body"]["req_params"]["speaker"] == "zh_female_shuangkuaisisi_moon_bigtts"
+
     def test_volcengine_speaker_falls_back_on_http_error(self, monkeypatch):
         """VolcengineDoubaoSpeaker falls back to say on HTTP error."""
         monkeypatch.setattr(
@@ -5422,6 +5457,33 @@ class TestVolcengineDoubaoTTS:
 
         msg = alerts[-1]["message"]
         assert "TTS backend" in msg
+
+    def test_health_check_shows_backend_env_overrides(self, monkeypatch):
+        """Health Check should reveal env vars that override Settings config."""
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        monkeypatch.setenv("VOICE_STT_BACKEND", "whisper-cli")
+        monkeypatch.setenv("VOICE_TTS_BACKEND", "macos-say")
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+        monkeypatch.setattr("voice_claude_agent.config.find_claude_executable", lambda: "/usr/bin/claude")
+        monkeypatch.setattr("voice_claude_agent.config.check_apple_speech_available", lambda: True)
+        monkeypatch.setattr("voice_claude_agent.config.check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr("voice_claude_agent.stt._find_whisper_cpp_binary", lambda: "/usr/bin/whisper-cli")
+        monkeypatch.setattr("voice_claude_agent.stt._resolve_whisper_model", lambda: ("/tmp/model.bin", ""))
+        monkeypatch.setattr("voice_claude_agent.stt._check_volcengine_credentials", lambda: ({}, ""))
+        monkeypatch.setattr("voice_claude_agent.tts._check_volcengine_tts_credentials", lambda: ({}, ""))
+
+        import sounddevice as sd
+        monkeypatch.setattr(sd, "query_devices", lambda **kw: {"name": "test"})
+
+        alerts = []
+        app = VoiceClaudeApp(stt_backend="whisper-cli", _alert_patch=lambda **kw: alerts.append(kw))
+        app._run_health_check(app.health_item)
+
+        msg = alerts[-1]["message"]
+        assert "env override: VOICE_STT_BACKEND=whisper-cli" in msg
+        assert "env override: VOICE_TTS_BACKEND=macos-say" in msg
 
     def test_mic_diagnostic_includes_tts_backend(self, monkeypatch):
         """Mic Diagnostic shows TTS backend configuration."""

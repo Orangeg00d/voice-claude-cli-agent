@@ -58,7 +58,9 @@ class MacOSSaySpeaker:
 # project-local: docs/VOLCENGINE_TTS_SETUP.md
 
 _VOLCENGINE_TTS_DEFAULT_ENDPOINT = "https://openspeech.bytedance.com/api/v3/tts/unidirectional"
-_VOLCENGINE_TTS_DEFAULT_RESOURCE_ID = "seed-tts-2.0"
+# moon_bigtts speakers belong to Seed TTS 1.0. Using seed-tts-2.0 with this
+# default voice returns code=55000000 resource mismatch.
+_VOLCENGINE_TTS_DEFAULT_RESOURCE_ID = "seed-tts-1.0"
 _VOLCENGINE_TTS_DEFAULT_VOICE_TYPE = "zh_female_shuangkuaisisi_moon_bigtts"
 _VOLCENGINE_TTS_DEFAULT_AUDIO_FORMAT = "mp3"
 

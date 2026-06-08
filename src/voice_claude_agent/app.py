@@ -6,6 +6,7 @@ Reuses cli.py's pipeline functions for recording, STT, Claude execution, and TTS
 
 import threading
 import time
+import os
 
 import rumps
 
@@ -645,6 +646,9 @@ class VoiceClaudeApp(rumps.App):
             "",
         ))
         lines.append(self._check_item("STT backend", True, self.stt_backend, ""))
+        stt_env_override = os.environ.get("VOICE_STT_BACKEND", "").strip()
+        if stt_env_override:
+            lines.append(f"  env override: VOICE_STT_BACKEND={stt_env_override}")
 
         # TTS backend health
         from voice_claude_agent.tts import _resolve_tts_backend, _check_volcengine_tts_credentials
@@ -654,6 +658,9 @@ class VoiceClaudeApp(rumps.App):
         tts_detail = f"{tts_backend}" + (" (configured)" if tts_healthy else " (API key missing)")
         lines.append(self._check_item("TTS backend", tts_healthy, tts_detail,
             "Set VOLCENGINE_TTS_API_KEY or use VOICE_TTS_BACKEND=macos-say" if not tts_healthy else ""))
+        tts_env_override = os.environ.get("VOICE_TTS_BACKEND", "").strip()
+        if tts_env_override:
+            lines.append(f"  env override: VOICE_TTS_BACKEND={tts_env_override}")
         lines.append("")
 
         claude_workdir = get_claude_workdir()

@@ -7,7 +7,7 @@
 - 官方文档：https://www.volcengine.com/docs/6561/1598757
 - 协议：HTTP POST，流式 JSON Lines 响应（每行一个 base64 音频块）
 - Endpoint：`https://openspeech.bytedance.com/api/v3/tts/unidirectional`
-- 音色模型：`seed-tts-2.0`
+- 音色模型：`seed-tts-1.0`（默认音色为 `moon_bigtts` 系列）
 
 ## 2. 控制台需要的字段
 
@@ -20,7 +20,7 @@
 | Endpoint | API 地址（可选） | `VOLCENGINE_TTS_ENDPOINT` |
 
 默认值：
-- `VOLCENGINE_TTS_RESOURCE_ID` = `seed-tts-2.0`
+- `VOLCENGINE_TTS_RESOURCE_ID` = `seed-tts-1.0`
 - `VOLCENGINE_TTS_VOICE_TYPE` = `zh_female_shuangkuaisisi_moon_bigtts`
 - `VOLCENGINE_TTS_AUDIO_FORMAT` = `mp3`
 - `VOLCENGINE_TTS_ENDPOINT` = `https://openspeech.bytedance.com/api/v3/tts/unidirectional`
@@ -31,7 +31,7 @@
 POST /api/v3/tts/unidirectional
 Content-Type: application/json
 X-Api-Key: {API Key}
-X-Api-Resource-Id: seed-tts-2.0
+X-Api-Resource-Id: seed-tts-1.0
 X-Api-App-Key: aGjiRDfUWi
 X-Api-Request-Id: {UUID}
 ```
@@ -83,7 +83,7 @@ cat >> ~/.voice-claude-agent/config.json <<'JSON'
 {
   "VOICE_TTS_BACKEND": "volcengine-doubao",
   "VOLCENGINE_TTS_API_KEY": "your-api-key",
-  "VOLCENGINE_TTS_RESOURCE_ID": "seed-tts-2.0",
+  "VOLCENGINE_TTS_RESOURCE_ID": "seed-tts-1.0",
   "VOLCENGINE_TTS_VOICE_TYPE": "zh_female_shuangkuaisisi_moon_bigtts"
 }
 JSON
@@ -113,7 +113,7 @@ voice-claude-agent check
 
 | speaker 参数 | 描述 |
 |---|---|
-| `zh_female_shuangkuaisisi_moon_bigtts` | 爽快思思（女声，默认） |
+| `zh_female_shuangkuaisisi_moon_bigtts` | 爽快思思（女声，默认，使用 `seed-tts-1.0`） |
 | `zh_male_qingrun_moon_bigtts` | 清润男声 |
 | `BV701_streaming` | 标准女声 |
 | `BV120_streaming` | 标准男声 |

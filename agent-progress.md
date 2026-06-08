@@ -2283,3 +2283,23 @@
 - Recording timeout focused tests passed.
 - `./init.sh lint` passed.
 - `pytest tests/ -vv -x` passed: 279/279.
+
+## 2026-06-08 23:10 — Codex Review: Runtime Backend Drift and Volcengine TTS Resource
+
+### Finding
+- User reported ASR quality did not look like Doubao after configuring Volcengine.
+- Runtime inspection found `launchctl` still exported `VOICE_STT_BACKEND=whisper-cli`, which overrides Settings/config for Finder-launched apps and can silently force whisper.cpp after restart.
+- TTS fallback logs showed Volcengine error `code=55000000` with message `resource ID is mismatched with speaker related resource`.
+- The app defaulted `VOLCENGINE_TTS_RESOURCE_ID` to `seed-tts-2.0` while the default `zh_female_shuangkuaisisi_moon_bigtts` speaker belongs to the Seed TTS 1.0 resource family.
+
+### Completed
+- Cleared stale GUI environment overrides for `VOICE_STT_BACKEND`, `WHISPER_CPP_MODEL`, and `WHISPER_CPP_LANGUAGE`.
+- Updated local config to keep `VOICE_STT_BACKEND=volcengine-doubao` and set `VOLCENGINE_TTS_RESOURCE_ID=seed-tts-1.0`.
+- Changed the code and setup docs so the default TTS resource matches the default voice.
+- Health Check now displays explicit `env override: ...` lines when `VOICE_STT_BACKEND` or `VOICE_TTS_BACKEND` is set in the process environment.
+- Added regression tests for the default Volcengine TTS resource/voice pairing and backend environment override visibility.
+
+### Verification
+- Focused Health Check and Volcengine TTS tests passed: 22/22.
+- `./init.sh lint` passed.
+- `pytest tests/ -vv -x` passed: 281/281.
