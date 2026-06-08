@@ -952,6 +952,21 @@
       ],
       "passes": true,
       "evidence": "Added volcengine-doubao backend using official BigModel ASR Flash endpoint https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash. Supports VOLCENGINE_ASR_API_KEY (X-Api-Key) and legacy VOLCENGINE_ASR_APP_ID + VOLCENGINE_ASR_ACCESS_TOKEN (X-Api-App-Key/X-Api-Access-Key), X-Api-Resource-Id, X-Api-Request-Id, and X-Api-Sequence=-1. Sends base64 WAV audio with request.model_name=bigmodel; parses result.text with utterances fallback. Settings UI, Health Check, Mic Diagnostic, CLI check expose config status with masked secrets and keep existing secrets out of editable default text. Added docs/VOLCENGINE_ASR_SETUP.md. 21 focused Volcengine tests; 255/255 tests, lint clean."
+    },
+    {
+      "id": "F070",
+      "priority": 70,
+      "category": "claude",
+      "description": "Pin Claude CLI execution to the configured project workdir",
+      "steps": [
+        "Add VOICE_CLAUDE_WORKDIR config key",
+        "Pass cwd to subprocess.run when invoking claude -p",
+        "Reject missing or non-directory workdirs before calling Claude CLI",
+        "Expose workdir in Settings UI, Health Check, Mic Diagnostic, View Logs, sessions, and last_result",
+        "Add tests for cwd passing, invalid workdir blocking, Settings save, and Health Check display"
+      ],
+      "passes": true,
+      "evidence": "Added get_claude_workdir() and VOICE_CLAUDE_WORKDIR. run_claude() now resolves the workdir, passes cwd to subprocess.run, records cwd on ClaudeRunResult, and returns exit_code=-3 without invoking Claude if the directory is missing or invalid. Sessions and last_result include claude_cwd; View Logs, Mic Diagnostic, Health Check, CLI check, and Settings UI display/edit the workdir. Added F070 regression tests for cwd passing, invalid workdir skipping subprocess, Settings save, Health Check display, and log schema parity. 260/260 tests, lint clean."
     }
   ]
 }

@@ -2184,3 +2184,23 @@
 - `./init.sh check` passed.
 - `./init.sh lint` passed.
 - `./init.sh test -q` passed: 255/255.
+
+## 2026-06-08 19:25 — Codex Review: F070 Claude Workdir Pinning
+
+### Finding
+- Claude's reported F070 completion only changed one test isolation case; runtime code still invoked `claude -p` without `cwd`.
+- The menu-bar app could therefore still run Claude CLI in the wrong project context.
+
+### Completed
+- Added `VOICE_CLAUDE_WORKDIR` and `get_claude_workdir()`.
+- Updated `run_claude()` to validate the workdir and pass `cwd=` to `subprocess.run`.
+- Invalid or missing workdirs now return `exit_code=-3` without invoking Claude CLI.
+- Sessions, last_result, View Logs, Mic Diagnostic, Health Check, and CLI check now expose the Claude workdir.
+- Settings UI can save `VOICE_CLAUDE_WORKDIR`.
+- Added regression tests for cwd passing, invalid workdir blocking, Settings save, Health Check display, and log schema parity.
+
+### Verification
+- F070 focused tests passed.
+- `./init.sh check` passed.
+- `./init.sh lint` passed.
+- `pytest tests/ -vv -x` passed: 260/260.

@@ -14,6 +14,7 @@ from voice_claude_agent.config import (
     get_agent_state_dir,
     get_config_path,
     get_config_value,
+    get_claude_workdir,
     load_config,
     mask_credential,
 )
@@ -149,6 +150,7 @@ class VoiceClaudeApp(rumps.App):
         setting_keys = [
             "VOICE_RECORD_SECONDS",
             "VOICE_STT_BACKEND",
+            "VOICE_CLAUDE_WORKDIR",
             "WHISPER_CPP_MODEL",
             "WHISPER_CPP_LANGUAGE",
             "VOLCENGINE_ASR_API_KEY",
@@ -197,6 +199,7 @@ class VoiceClaudeApp(rumps.App):
             key = key.strip()
             val = val.strip()
             if key not in ("VOICE_RECORD_SECONDS", "VOICE_STT_BACKEND",
+                           "VOICE_CLAUDE_WORKDIR",
                            "WHISPER_CPP_MODEL", "WHISPER_CPP_LANGUAGE",
                            "VOLCENGINE_ASR_API_KEY", "VOLCENGINE_ASR_APP_ID",
                            "VOLCENGINE_ASR_ACCESS_TOKEN",
@@ -410,6 +413,8 @@ class VoiceClaudeApp(rumps.App):
                 data = json.loads(result_path.read_text(encoding="utf-8"))
                 lines.append("Last result:")
                 lines.append(f"  prompt: {data.get('prompt', '?')}")
+                if data.get("claude_cwd"):
+                    lines.append(f"  claude_cwd: {data.get('claude_cwd')}")
                 lines.append(f"  exit_code: {data.get('exit_code', '?')}")
                 summary = data.get("summary", data.get("spoken_summary", "?"))
                 lines.append(f"  summary: {summary[:200]}")
@@ -437,6 +442,7 @@ class VoiceClaudeApp(rumps.App):
         lines.append(f"Agent state dir: {get_agent_state_dir()}")
         lines.append(f"Config path: {get_config_path()}")
         lines.append(f"STT backend: {self.stt_backend}")
+        lines.append(f"Claude workdir: {get_claude_workdir()}")
         lines.append(f"Record duration: {self.record_seconds}s")
         lines.append(f"Whisper model: {get_config_value('WHISPER_CPP_MODEL', '(not set)')}")
         lines.append(f"Whisper language: {get_config_value('WHISPER_CPP_LANGUAGE', 'zh')}")
@@ -582,6 +588,14 @@ class VoiceClaudeApp(rumps.App):
             "",
         ))
         lines.append(self._check_item("STT backend", True, self.stt_backend, ""))
+
+        claude_workdir = get_claude_workdir()
+        lines.append(self._check_item(
+            "Claude workdir",
+            claude_workdir.exists() and claude_workdir.is_dir(),
+            str(claude_workdir),
+            "Set VOICE_CLAUDE_WORKDIR to an existing project directory",
+        ))
 
         # Volcengine ASR health
         from voice_claude_agent.stt import _check_volcengine_credentials

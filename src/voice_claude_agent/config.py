@@ -92,6 +92,7 @@ def check_apple_speech_available() -> bool:
 CONFIG_KEYS = {
     "VOICE_RECORD_SECONDS",
     "VOICE_STT_BACKEND",
+    "VOICE_CLAUDE_WORKDIR",
     "WHISPER_CPP_MODEL",
     "WHISPER_CPP_LANGUAGE",
     "VOLCENGINE_ASR_API_KEY",
@@ -147,6 +148,11 @@ def get_config_value(key: str, default: str = "") -> str:
     if value is None:
         return default
     return str(value).strip() or default
+
+
+def get_claude_workdir() -> Path:
+    """Resolve the working directory used for Claude CLI subprocesses."""
+    return Path(get_config_value("VOICE_CLAUDE_WORKDIR", str(get_project_root()))).expanduser()
 
 
 DEFAULT_TIMEOUT_SECONDS = 300

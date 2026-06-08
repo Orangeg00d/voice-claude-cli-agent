@@ -269,6 +269,28 @@ class TestClaudeRunnerResult:
         assert kwargs["encoding"] == "utf-8"
         assert kwargs["errors"] == "replace"
 
+    def test_run_claude_uses_configured_workdir(self, tmp_path):
+        fake_proc = mock.MagicMock()
+        fake_proc.returncode = 0
+        fake_proc.stdout = "ok"
+        fake_proc.stderr = ""
+        with mock.patch("subprocess.run", return_value=fake_proc) as run_mock:
+            result = run_claude("test", timeout=5, workdir=tmp_path)
+
+        assert result.exit_code == 0
+        assert result.cwd == str(tmp_path)
+        assert run_mock.call_args.kwargs["cwd"] == str(tmp_path)
+
+    def test_run_claude_invalid_workdir_skips_subprocess(self, tmp_path):
+        missing = tmp_path / "missing"
+        with mock.patch("subprocess.run") as run_mock:
+            result = run_claude("test", timeout=5, workdir=missing)
+
+        assert result.exit_code == -3
+        assert str(missing) in result.stderr
+        assert result.cwd == str(missing)
+        run_mock.assert_not_called()
+
     def test_run_claude_timeout(self):
         import subprocess
 
@@ -1568,9 +1590,14 @@ class TestAppSTTBackendPassthrough:
         )
         assert app.stt_backend == "whisper-cli"
 
-    def test_stt_backend_default_is_text_input(self):
-        """Default stt_backend should be 'text-input'."""
+    def test_stt_backend_default_is_text_input(self, monkeypatch, tmp_path):
+        """Default stt_backend should be 'text-input' when no config is set."""
         from voice_claude_agent.app import VoiceClaudeApp
+
+        # Isolate from host's ~/.voice-claude-agent/config.json
+        cfg_file = tmp_path / "config.json"
+        monkeypatch.setattr("voice_claude_agent.app.get_config_path", lambda: cfg_file)
+        monkeypatch.setattr("voice_claude_agent.app.get_config_value", lambda key, default="": default)
 
         app = VoiceClaudeApp()
         assert app.stt_backend == "text-input"
@@ -1942,8 +1969,8 @@ class TestSessionLogParity:
         expected_keys = {
             "timestamp", "input_mode", "transcript", "classified_intent",
             "risk_level", "confirmation_required", "confirmation_received",
-            "claude_command", "exit_code", "claude_stdout", "claude_stderr",
-            "summary", "spoken_summary", "spoken",
+            "claude_command", "claude_cwd", "exit_code", "claude_stdout",
+            "claude_stderr", "summary", "spoken_summary", "spoken",
         }
         assert set(cli_entry.keys()) == expected_keys
         assert set(menu_entry.keys()) == expected_keys
@@ -4376,6 +4403,37 @@ class TestSettingsUI:
         assert app.stt_backend == "apple-speech"
         assert alerts[-1]["title"] == "Settings Saved"
 
+    def test_show_settings_saves_claude_workdir(self, tmp_path, monkeypatch):
+        """Settings dialog should save VOICE_CLAUDE_WORKDIR."""
+        import json
+        from unittest import mock
+
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        cfg_file = tmp_path / "config.json"
+        workdir = tmp_path / "project"
+        workdir.mkdir()
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+
+        response = mock.MagicMock()
+        response.clicked = True
+        response.text = f"VOICE_CLAUDE_WORKDIR={workdir}\n"
+        monkeypatch.setattr(
+            app_mod.rumps,
+            "Window",
+            mock.MagicMock(return_value=mock.MagicMock(run=mock.MagicMock(return_value=response))),
+        )
+
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._show_settings(app.settings_item)
+
+        saved = json.loads(cfg_file.read_text(encoding="utf-8"))
+        assert saved["VOICE_CLAUDE_WORKDIR"] == str(workdir)
+        assert alerts[-1]["title"] == "Settings Saved"
+
     def test_show_settings_blank_values_remove_config_without_validation_error(self, tmp_path, monkeypatch):
         """Blank Settings values should remove keys instead of failing validation."""
         import json
@@ -4504,6 +4562,20 @@ class TestSettingsUI:
 
         assert str(cfg_file) in alerts[-1]["message"]
         assert "Config file" in alerts[-1]["message"]
+
+    def test_health_check_includes_claude_workdir(self, tmp_path, monkeypatch):
+        """Health Check should show the Claude workdir."""
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        monkeypatch.setattr(app_mod, "get_claude_workdir", lambda: tmp_path)
+
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._run_health_check(app.health_item)
+
+        assert "Claude workdir" in alerts[-1]["message"]
+        assert str(tmp_path) in alerts[-1]["message"]
 
     def test_mic_diagnostic_includes_config_path_and_backend(self, tmp_path, monkeypatch):
         """Mic Diagnostic should show current config path and STT backend."""

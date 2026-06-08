@@ -29,6 +29,7 @@ def write_session(entry: dict) -> Path:
         "confirmation_required": entry.get("confirmation_required", False),
         "confirmation_received": entry.get("confirmation_received", False),
         "claude_command": entry.get("claude_command", []),
+        "claude_cwd": entry.get("claude_cwd", ""),
         "exit_code": entry.get("exit_code", -1),
         "claude_stdout": entry.get("claude_stdout", ""),
         "claude_stderr": entry.get("claude_stderr", ""),

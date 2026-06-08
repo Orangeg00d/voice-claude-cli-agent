@@ -13,9 +13,9 @@ Voice Claude Agent 是一个 macOS 本地语音 Agent。用户通过菜单栏点
 
 ## 当前 main 状态
 
-- **验收项**: 69/69 passed (F001-F069)
-- **测试数量**: 255
-- **最新阶段**: Phase 15 — Volcengine/Doubao ASR backend
+- **验收项**: 70/70 passed (F001-F070)
+- **测试数量**: 260
+- **最新阶段**: Phase 16 — Claude CLI workdir pinning
 
 ## v0.1.0 功能清单 (67 项验收全部通过)
 
@@ -123,10 +123,16 @@ Voice Claude Agent 是一个 macOS 本地语音 Agent。用户通过菜单栏点
 - Settings UI、Health Check、Mic Diagnostic、CLI check 均脱敏展示密钥
 - 新增 `docs/VOLCENGINE_ASR_SETUP.md`
 
+### Unreleased: Claude Workdir Pinning (F070)
+- 新增 `VOICE_CLAUDE_WORKDIR`
+- `claude -p` subprocess 调用固定在配置的项目目录执行
+- 无效目录会阻止执行并返回明确错误
+- Settings UI、Health Check、Mic Diagnostic、View Logs 显示 Claude workdir
+
 ## 测试
 
 - **测试框架**: pytest
-- **当前测试数量**: 255
+- **当前测试数量**: 260
 - **v0.1.0 发布测试数量**: 223
 - **测试覆盖**: CLI 管道、录音、STT、风险分类、菜单栏生命周期、并发安全、日志格式
 

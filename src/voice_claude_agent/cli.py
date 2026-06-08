@@ -8,6 +8,7 @@ from voice_claude_agent.config import (
     check_mic_permission,
     find_claude_executable,
     get_agent_state_dir,
+    get_claude_workdir,
     get_config_value,
 )
 from voice_claude_agent.claude_runner import run_claude
@@ -51,6 +52,8 @@ def _check_dependencies() -> dict:
         "mic_detail": "",
         "stt_backends": [],
         "agent_state_dir": str(get_agent_state_dir()),
+        "claude_workdir": str(get_claude_workdir()),
+        "claude_workdir_ok": get_claude_workdir().exists() and get_claude_workdir().is_dir(),
     }
 
     # Check claude
@@ -194,6 +197,10 @@ def check():
     else:
         click.echo("  Volcengine ASR:    not configured")
     click.echo(f"  Agent state dir:  {status['agent_state_dir']}")
+    click.echo(
+        f"  Claude workdir:   {'OK' if status['claude_workdir_ok'] else 'INVALID'}"
+        f" ({status['claude_workdir']})"
+    )
 
     all_ok = (
         status["claude_available"]
@@ -273,6 +280,7 @@ def _run_pipeline(
         f"Running: claude -p \"{wrapped[:80]}{'...' if len(wrapped) > 80 else ''}\""
     )
     result = run_claude(wrapped)
+    result_cwd = result.cwd if isinstance(getattr(result, "cwd", ""), str) else ""
 
     if result.timed_out:
         click.echo(click.style("Claude CLI timed out.", fg="red"))
@@ -287,6 +295,7 @@ def _run_pipeline(
             "confirmation_required": confirmation_required,
             "confirmation_received": confirmation_received,
             "claude_command": result.command,
+            "claude_cwd": result_cwd,
             "exit_code": result.exit_code,
             "claude_stdout": result.stdout,
             "claude_stderr": result.stderr,
@@ -313,6 +322,7 @@ def _run_pipeline(
         "confirmation_required": confirmation_required,
         "confirmation_received": confirmation_received,
         "claude_command": result.command,
+        "claude_cwd": result_cwd,
         "exit_code": result.exit_code,
         "claude_stdout": result.stdout,
         "claude_stderr": result.stderr,
@@ -323,6 +333,7 @@ def _run_pipeline(
 
     write_last_result({
         "prompt": prompt,
+        "claude_cwd": result_cwd,
         "exit_code": result.exit_code,
         "summary": summary,
         "spoken_summary": spoken_summary,
