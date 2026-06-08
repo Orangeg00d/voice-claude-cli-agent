@@ -2227,3 +2227,22 @@
 - `./init.sh check` passed.
 - `./init.sh lint` passed.
 - `./init.sh test` passed: 274/274.
+
+## 2026-06-08 21:45 — Codex Review: Health Check Regression
+
+### Finding
+- User's manual Health Check showed `[FAIL] Volcengine ASR` but still ended with `Overall: ALL CHECKS PASSED`.
+- The same output showed Claude workdir as `VoiceClaudeAgent.app/Contents/Resources/lib`; that directory exists, but it is not a valid project workdir.
+- The local config file was empty, so Finder-launched App did not have the intended ASR/TTS/workdir settings.
+
+### Completed
+- Health Check now includes selected cloud backend health in the Overall calculation.
+- Volcengine ASR is only required when `VOICE_STT_BACKEND=volcengine-doubao`.
+- Claude workdir pointing inside `.app/Contents/Resources` now fails Health Check.
+- Added regression tests for missing selected Volcengine ASR credentials and app-bundle workdir.
+- Restored local non-secret `VOICE_CLAUDE_WORKDIR` in `~/.voice-claude-agent/config.json`.
+
+### Verification
+- Health Check focused tests passed.
+- `./init.sh lint` passed.
+- `pytest tests/ -q` passed: 276/276.

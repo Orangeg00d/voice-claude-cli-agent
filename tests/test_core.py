@@ -3562,6 +3562,62 @@ class TestHealthCheck:
         assert "macOS say" in msg
         assert "Overall" in msg
 
+    def test_health_check_overall_fails_when_selected_volcengine_asr_missing_creds(self, monkeypatch):
+        """Overall status should fail when a selected cloud ASR backend is not configured."""
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+        monkeypatch.setattr("voice_claude_agent.config.find_claude_executable", lambda: "/usr/bin/claude")
+        monkeypatch.setattr("voice_claude_agent.config.check_apple_speech_available", lambda: True)
+        monkeypatch.setattr("voice_claude_agent.config.check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "get_claude_workdir", lambda: Path("/tmp"))
+        monkeypatch.setattr("voice_claude_agent.stt._find_whisper_cpp_binary", lambda: "/usr/bin/whisper-cli")
+        monkeypatch.setattr("voice_claude_agent.stt._resolve_whisper_model", lambda: ("/tmp/model.bin", ""))
+        monkeypatch.setattr("voice_claude_agent.stt._check_volcengine_credentials", lambda: ({}, "missing"))
+        monkeypatch.setattr("voice_claude_agent.tts._resolve_tts_backend", lambda: "macos-say")
+        monkeypatch.setattr("voice_claude_agent.tts._check_volcengine_tts_credentials", lambda: ({}, ""))
+
+        import sounddevice as sd
+        monkeypatch.setattr(sd, "query_devices", lambda **kw: {"name": "test"})
+
+        alerts = []
+        app = VoiceClaudeApp(stt_backend="volcengine-doubao", _alert_patch=lambda **kw: alerts.append(kw))
+        app._run_health_check(app.health_item)
+
+        msg = alerts[-1]["message"]
+        assert "[FAIL] Volcengine ASR" in msg
+        assert "Overall: SOME CHECKS FAILED" in msg
+
+    def test_health_check_fails_app_bundle_workdir(self, tmp_path, monkeypatch):
+        """An app bundle resource directory exists but is not a valid Claude project workdir."""
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        bundle_workdir = tmp_path / "VoiceClaudeAgent.app" / "Contents" / "Resources" / "lib"
+        bundle_workdir.mkdir(parents=True)
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+        monkeypatch.setattr("voice_claude_agent.config.find_claude_executable", lambda: "/usr/bin/claude")
+        monkeypatch.setattr("voice_claude_agent.config.check_apple_speech_available", lambda: True)
+        monkeypatch.setattr("voice_claude_agent.config.check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "get_claude_workdir", lambda: bundle_workdir)
+        monkeypatch.setattr("voice_claude_agent.stt._find_whisper_cpp_binary", lambda: "/usr/bin/whisper-cli")
+        monkeypatch.setattr("voice_claude_agent.stt._resolve_whisper_model", lambda: ("/tmp/model.bin", ""))
+        monkeypatch.setattr("voice_claude_agent.stt._check_volcengine_credentials", lambda: ({}, ""))
+        monkeypatch.setattr("voice_claude_agent.tts._resolve_tts_backend", lambda: "macos-say")
+        monkeypatch.setattr("voice_claude_agent.tts._check_volcengine_tts_credentials", lambda: ({}, ""))
+
+        import sounddevice as sd
+        monkeypatch.setattr(sd, "query_devices", lambda **kw: {"name": "test"})
+
+        alerts = []
+        app = VoiceClaudeApp(stt_backend="whisper-cli", _alert_patch=lambda **kw: alerts.append(kw))
+        app._run_health_check(app.health_item)
+
+        msg = alerts[-1]["message"]
+        assert "[FAIL] Claude workdir" in msg
+        assert "Overall: SOME CHECKS FAILED" in msg
+
 
 # ── F059: Config File ───────────────────────────────────────
 class TestConfigFile:

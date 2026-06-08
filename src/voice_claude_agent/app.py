@@ -631,9 +631,14 @@ class VoiceClaudeApp(rumps.App):
         lines.append("")
 
         claude_workdir = get_claude_workdir()
+        claude_workdir_ok = (
+            claude_workdir.exists()
+            and claude_workdir.is_dir()
+            and ".app/Contents/Resources" not in str(claude_workdir)
+        )
         lines.append(self._check_item(
             "Claude workdir",
-            claude_workdir.exists() and claude_workdir.is_dir(),
+            claude_workdir_ok,
             str(claude_workdir),
             "Set VOICE_CLAUDE_WORKDIR to an existing project directory",
         ))
@@ -641,13 +646,15 @@ class VoiceClaudeApp(rumps.App):
         # Volcengine ASR health
         from voice_claude_agent.stt import _check_volcengine_credentials
         ve_creds, _ve_err = _check_volcengine_credentials()
+        ve_required = self.stt_backend == "volcengine-doubao"
         ve_ok = bool(ve_creds)
-        ve_detail = "configured" if ve_ok else "not configured"
-        lines.append(self._check_item("Volcengine ASR", ve_ok, ve_detail,
-            "Set VOLCENGINE_ASR_API_KEY, or APP_ID + ACCESS_TOKEN" if not ve_ok else ""))
+        ve_healthy = ve_ok or not ve_required
+        ve_detail = "configured" if ve_ok else ("not configured" if ve_required else "not selected")
+        lines.append(self._check_item("Volcengine ASR", ve_healthy, ve_detail,
+            "Set VOLCENGINE_ASR_API_KEY, or APP_ID + ACCESS_TOKEN" if ve_required and not ve_ok else ""))
         lines.append("")
 
-        all_ok = all([claude, wb, m, hm, po, sd, sk])
+        all_ok = all([claude, wb, m, hm, po, sd, sk, tts_healthy, claude_workdir_ok, ve_healthy])
         lines.append("Overall: " + ("ALL CHECKS PASSED" if all_ok else "SOME CHECKS FAILED — see hints above"))
         self._alert_on_main(title="Health Check", message="\n".join(lines))
 
