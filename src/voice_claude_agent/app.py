@@ -196,9 +196,18 @@ class VoiceClaudeApp(rumps.App):
             return  # cancelled
 
         # Step 2: parse input
+        raw_text = response.text or ""
+        if not raw_text.strip():
+            self._alert_on_main(
+                title="Settings Validation Error",
+                message="No settings were entered. Config was not changed.",
+            )
+            return
+
         new_cfg = {}
         errors = []
-        for line in response.text.strip().split("\n"):
+        recognized_lines = 0
+        for line in raw_text.strip().split("\n"):
             line = line.strip()
             if not line or "=" not in line:
                 continue
@@ -217,11 +226,19 @@ class VoiceClaudeApp(rumps.App):
                            "VOLCENGINE_TTS_VOICE_TYPE", "VOLCENGINE_TTS_AUDIO_FORMAT",
                            "VOLCENGINE_TTS_ENDPOINT"):
                 continue
+            recognized_lines += 1
 
             if key in credential_keys and val == keep_secret and key in cfg:
                 continue
 
             new_cfg[key] = val
+
+        if recognized_lines == 0:
+            self._alert_on_main(
+                title="Settings Validation Error",
+                message="No recognized settings were entered. Config was not changed.",
+            )
+            return
 
         # Validate
         if "VOICE_RECORD_SECONDS" in new_cfg:
@@ -248,11 +265,20 @@ class VoiceClaudeApp(rumps.App):
             )
             return
 
-        # Step 3: save
+        # Step 3: save atomically so a failed write cannot leave a 0-byte config.
         merged = {**cfg, **new_cfg}
         merged = {k: v for k, v in merged.items() if v}
-        cfg_path.parent.mkdir(parents=True, exist_ok=True)
-        cfg_path.write_text(json.dumps(merged, ensure_ascii=False, indent=2) + "\n")
+        try:
+            cfg_path.parent.mkdir(parents=True, exist_ok=True)
+            tmp_path = cfg_path.with_name(f"{cfg_path.name}.tmp")
+            tmp_path.write_text(json.dumps(merged, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            tmp_path.replace(cfg_path)
+        except Exception as e:
+            self._alert_on_main(
+                title="Settings Save Error",
+                message=f"Could not save config: {e}",
+            )
+            return
 
         # Step 4: reload into app
         self._reload_from_config(merged)

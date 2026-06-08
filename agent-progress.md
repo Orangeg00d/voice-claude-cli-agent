@@ -2246,3 +2246,20 @@
 - Health Check focused tests passed.
 - `./init.sh lint` passed.
 - `pytest tests/ -q` passed: 276/276.
+
+## 2026-06-08 22:05 — Codex Review: Settings Save Empty Config Bug
+
+### Finding
+- User reported Settings confirm produced no success alert, and `~/.voice-claude-agent/config.json` remained a 0-byte file.
+- Current Settings save path allowed empty dialog text or text with no recognized keys to continue into a save, and writes were not atomic.
+
+### Completed
+- Empty Settings text now shows `Settings Validation Error` and does not modify config.
+- Text with zero recognized config keys now shows `Settings Validation Error` and does not modify config.
+- Config saving now writes to a temporary file and atomically replaces `config.json`, preventing a failed write from leaving a 0-byte config.
+- Added regression tests for empty text and unrecognized key text preserving the existing config.
+
+### Verification
+- Settings focused tests passed: 16/16.
+- `./init.sh lint` passed.
+- `pytest tests/ -q` passed: 278/278.

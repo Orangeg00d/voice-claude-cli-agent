@@ -4533,6 +4533,68 @@ class TestSettingsUI:
         assert app.stt_backend == "text-input"
         assert alerts[-1]["title"] == "Settings Saved"
 
+    def test_show_settings_empty_text_does_not_truncate_config(self, tmp_path, monkeypatch):
+        """Empty Settings text should be rejected without touching config.json."""
+        import json
+        from unittest import mock
+
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        cfg_file = tmp_path / "config.json"
+        original = {"VOICE_CLAUDE_WORKDIR": "/tmp/project"}
+        cfg_file.write_text(json.dumps(original), encoding="utf-8")
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+        monkeypatch.setattr(app_mod, "load_config", lambda: json.loads(cfg_file.read_text(encoding="utf-8")))
+
+        response = mock.MagicMock()
+        response.clicked = True
+        response.text = ""
+        monkeypatch.setattr(
+            app_mod.rumps,
+            "Window",
+            mock.MagicMock(return_value=mock.MagicMock(run=mock.MagicMock(return_value=response))),
+        )
+
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._show_settings(app.settings_item)
+
+        assert json.loads(cfg_file.read_text(encoding="utf-8")) == original
+        assert cfg_file.stat().st_size > 0
+        assert alerts[-1]["title"] == "Settings Validation Error"
+
+    def test_show_settings_unrecognized_text_does_not_truncate_config(self, tmp_path, monkeypatch):
+        """Unrecognized Settings keys should be rejected without touching config.json."""
+        import json
+        from unittest import mock
+
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        cfg_file = tmp_path / "config.json"
+        original = {"VOICE_CLAUDE_WORKDIR": "/tmp/project"}
+        cfg_file.write_text(json.dumps(original), encoding="utf-8")
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+        monkeypatch.setattr(app_mod, "load_config", lambda: json.loads(cfg_file.read_text(encoding="utf-8")))
+
+        response = mock.MagicMock()
+        response.clicked = True
+        response.text = "NOT_A_SETTING=value\nALSO_BAD=value"
+        monkeypatch.setattr(
+            app_mod.rumps,
+            "Window",
+            mock.MagicMock(return_value=mock.MagicMock(run=mock.MagicMock(return_value=response))),
+        )
+
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._show_settings(app.settings_item)
+
+        assert json.loads(cfg_file.read_text(encoding="utf-8")) == original
+        assert cfg_file.stat().st_size > 0
+        assert alerts[-1]["title"] == "Settings Validation Error"
+
     def test_reload_from_config_updates_record_seconds(self):
         """_reload_from_config should update record_seconds immediately."""
         from voice_claude_agent.app import VoiceClaudeApp
