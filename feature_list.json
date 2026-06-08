@@ -986,6 +986,25 @@
       ],
       "passes": true,
       "evidence": "tts.py rewritten with VolcengineDoubaoSpeaker using POST /api/v3/tts/unidirectional (streaming JSON Lines). create_speaker() factory selects MacOSSaySpeaker or VolcengineDoubaoSpeaker via VOICE_TTS_BACKEND. TTS failures auto-fallback to macOS say with _log_tts_fallback() and _fallback_called tracking. Success terminal code 20000000 is accepted, not treated as failure. Sessions, last_result, View Logs, and app_events include tts_backend, tts_duration_seconds, and tts_fallback_used. Settings UI, Health Check, and Mic Diagnostic display TTS backend/config with masked API keys. Health Check now correctly fails Overall when selected Volcengine ASR lacks credentials or Claude workdir points inside the .app bundle. Settings save now rejects empty/unrecognized input and writes config atomically to avoid 0-byte config files. Recording timeout now rescues already captured audio when microphone stop/close hangs. Codex aligned the default Volcengine TTS resource ID with the default moon_bigtts speaker and added Health Check visibility for STT/TTS environment overrides. docs/VOLCENGINE_TTS_SETUP.md created. 281/281 tests, lint clean, check clean."
+    },
+    {
+      "id": "F072",
+      "priority": 72,
+      "category": "app",
+      "description": "Preview TTS Voice menu item for testing TTS voices without full Trigger Recording",
+      "steps": [
+        "MenuItem 'Preview TTS Voice' exists in menu bar app",
+        "Click opens input dialog with default test text",
+        "Cancel does not play audio, no error, no session written",
+        "Empty input uses default text: 你好，我是语音助手...",
+        "Does not call Claude CLI, does not write session",
+        "Plays TTS with current backend (volcengine-doubao or macOS say)",
+        "Fallback from Volcengine to macOS say records tts_preview_failed in app_events",
+        "Menu title changes: Preview TTS Voice → Previewing... → Preview TTS Voice",
+        "app_events records: tts_preview_start, tts_preview_done, tts_preview_failed with backend, fallback_used, duration"
+      ],
+      "passes": true,
+      "evidence": "Added 'Preview TTS Voice' menu item with _preview_tts_voice callback. Input dialog via rumps.Window with default text. Uses create_speaker() for current backend; VolcengineDoubaoSpeaker fallback to MacOSSaySpeaker with tts_preview_failed event. App-events: tts_preview_start (backend, text_length), tts_preview_failed when fallback occurs, and tts_preview_done (backend, tts_backend_used, tts_fallback_used, duration). Title resets in finally block. 8 tests: menu item exists, cancel no-op, empty input uses default, no Claude/session, explicit exception fallback recorded, internal Volcengine fallback recorded, title restores after play, title stays after cancel. Updated docs/VOLCENGINE_TTS_SETUP.md with preview instructions. 289/289 tests, lint clean, check clean."
     }
   ]
 }

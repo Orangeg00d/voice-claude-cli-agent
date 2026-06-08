@@ -5237,7 +5237,327 @@ class TestVolcengineDoubaoBackend:
         assert "not configured" in result.output
 
 
-# ── F071: Volcengine/Doubao TTS backend ─────────────────────
+# ── F072: TTS Preview Voice ──────────────────────────────────
+
+
+class TestTTSPreviewVoice:
+    """Tests for volcengine-doubao TTS backend (mock only, no real network)."""
+
+    DEFAULT_PREVIEW_TEXT = "你好，我是语音助手。当前正在测试语音播报效果。"
+
+    def test_menu_item_exists(self, monkeypatch):
+        """Preview TTS Voice menu item is present in VoiceClaudeApp menu."""
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+
+        app = VoiceClaudeApp()
+        titles = set()
+        for m in app.menu:
+            if m is not None:
+                t = m.title
+                if callable(t):
+                    titles.add(t())
+                else:
+                    titles.add(t)
+        assert "Preview Tts Voice" in titles
+
+    def test_cancel_input_does_not_play(self, monkeypatch, tmp_path):
+        """Cancelling the input dialog does not play TTS or write events."""
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+
+        events_path = tmp_path / "app_events.jsonl"
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_app_events_log_path",
+            lambda: events_path,
+        )
+
+        class _Cancelled:
+            clicked = False
+            text = None
+        monkeypatch.setattr("rumps.Window.run", lambda self: _Cancelled)
+
+        # Prevent any real TTS
+        monkeypatch.setattr(
+            "voice_claude_agent.tts.create_speaker",
+            lambda: None,
+        )
+
+        app = VoiceClaudeApp()
+        app._preview_tts_voice(app.preview_tts_item)
+
+        # No events logged on cancel
+        if events_path.exists():
+            events = events_path.read_text().strip()
+            assert events == ""
+
+    def test_empty_input_uses_default_text(self, monkeypatch, tmp_path):
+        """Empty input falls back to the default preview text."""
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+
+        events_path = tmp_path / "app_events.jsonl"
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_app_events_log_path",
+            lambda: events_path,
+        )
+
+        spoken: list[str] = []
+
+        class _FakeSpeaker:
+            def speak(self, text):
+                spoken.append(text)
+
+        monkeypatch.setattr(
+            "voice_claude_agent.tts.create_speaker",
+            lambda: _FakeSpeaker(),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.tts._resolve_tts_backend",
+            lambda: "macos-say",
+        )
+
+        # User clicks OK but provides no text
+        class _EmptySubmit:
+            clicked = True
+            text = ""
+        monkeypatch.setattr("rumps.Window.run", lambda self: _EmptySubmit)
+
+        app = VoiceClaudeApp()
+        app._preview_tts_voice(app.preview_tts_item)
+
+        assert spoken == [self.DEFAULT_PREVIEW_TEXT]
+
+    def test_preview_does_not_call_claude_or_write_session(self, monkeypatch, tmp_path):
+        """Preview TTS Voice never calls Claude CLI or writes sessions.jsonl."""
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+
+        events_path = tmp_path / "app_events.jsonl"
+        sessions_path = tmp_path / "sessions.jsonl"
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_app_events_log_path",
+            lambda: events_path,
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_sessions_log_path",
+            lambda: sessions_path,
+        )
+
+        spoken: list[str] = []
+
+        class _FakeSpeaker:
+            def speak(self, text):
+                spoken.append(text)
+
+        monkeypatch.setattr(
+            "voice_claude_agent.tts.create_speaker",
+            lambda: _FakeSpeaker(),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.tts._resolve_tts_backend",
+            lambda: "macos-say",
+        )
+
+        class _Clicked:
+            clicked = True
+            text = "测试文本"
+        monkeypatch.setattr("rumps.Window.run", lambda self: _Clicked)
+
+        app = VoiceClaudeApp()
+        app._preview_tts_voice(app.preview_tts_item)
+
+        # Must have spoken the given text
+        assert spoken == ["测试文本"]
+
+        # Must NOT write sessions.jsonl
+        assert not sessions_path.exists()
+
+        # Must have app_events: tts_preview_start, tts_preview_done
+        events_text = events_path.read_text().strip()
+        assert "tts_preview_start" in events_text
+        assert "tts_preview_done" in events_text
+
+    def test_volcengine_tts_fallback_recorded(self, monkeypatch, tmp_path):
+        """VolcengineDoubaoSpeaker fallback records tts_preview_failed and fallback flag."""
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+
+        events_path = tmp_path / "app_events.jsonl"
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_app_events_log_path",
+            lambda: events_path,
+        )
+
+        class _FakeFallbackVolcengineSpeaker:
+            _fallback_called = True
+            def speak(self, text):
+                raise RuntimeError("Volcengine TTS API error")
+
+        monkeypatch.setattr(
+            "voice_claude_agent.tts.create_speaker",
+            lambda: _FakeFallbackVolcengineSpeaker(),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.tts._resolve_tts_backend",
+            lambda: "volcengine-doubao",
+        )
+        # Mock MacOSSaySpeaker so fallback doesn't actually call subprocess
+        monkeypatch.setattr(
+            "voice_claude_agent.tts.MacOSSaySpeaker.speak",
+            lambda self, text: None,
+        )
+
+        class _Clicked:
+            clicked = True
+            text = "测试"
+        monkeypatch.setattr("rumps.Window.run", lambda self: _Clicked)
+
+        app = VoiceClaudeApp()
+        app._preview_tts_voice(app.preview_tts_item)
+
+        events_text = events_path.read_text().strip()
+        lines = events_text.split("\n")
+        event_names = []
+        for line in lines:
+            ev = json.loads(line)
+            event_names.append(ev["event"])
+
+        assert "tts_preview_start" in event_names
+        assert "tts_preview_failed" in event_names
+        assert "tts_preview_done" in event_names
+
+        # The done event should show fallback
+        done_line = [line for line in lines if "tts_preview_done" in line][0]
+        done = json.loads(done_line)
+        assert done["tts_backend_used"] == "macos-say"
+        assert done["tts_fallback_used"] is True
+
+    def test_volcengine_internal_fallback_records_failed_event(self, monkeypatch, tmp_path):
+        """Real Volcengine speaker fallback does not raise, but preview still logs failed."""
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+        from voice_claude_agent.tts import VolcengineDoubaoSpeaker
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+
+        events_path = tmp_path / "app_events.jsonl"
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_app_events_log_path",
+            lambda: events_path,
+        )
+
+        class _InternalFallbackSpeaker(VolcengineDoubaoSpeaker):
+            def __init__(self):
+                self._fallback_called = False
+
+            def speak(self, text):
+                self._fallback_called = True
+
+        monkeypatch.setattr(
+            "voice_claude_agent.tts.create_speaker",
+            lambda: _InternalFallbackSpeaker(),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.tts._resolve_tts_backend",
+            lambda: "volcengine-doubao",
+        )
+
+        class _Clicked:
+            clicked = True
+            text = "测试"
+
+        monkeypatch.setattr("rumps.Window.run", lambda self: _Clicked)
+
+        app = VoiceClaudeApp()
+        app._preview_tts_voice(app.preview_tts_item)
+
+        events = [json.loads(line) for line in events_path.read_text().splitlines()]
+        assert [event["event"] for event in events] == [
+            "tts_preview_start",
+            "tts_preview_failed",
+            "tts_preview_done",
+        ]
+        assert events[1]["reason"] == "fallback_used"
+        assert events[2]["tts_backend_used"] == "macos-say"
+        assert events[2]["tts_fallback_used"] is True
+
+    def test_menu_title_restores_after_preview(self, monkeypatch, tmp_path):
+        """Menu title goes Preview TTS Voice → Previewing... → Preview TTS Voice."""
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+
+        events_path = tmp_path / "app_events.jsonl"
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_app_events_log_path",
+            lambda: events_path,
+        )
+
+        class _FakeSpeaker:
+            def speak(self, text):
+                pass
+        monkeypatch.setattr(
+            "voice_claude_agent.tts.create_speaker",
+            lambda: _FakeSpeaker(),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.tts._resolve_tts_backend",
+            lambda: "macos-say",
+        )
+
+        class _Clicked:
+            clicked = True
+            text = "测试"
+        monkeypatch.setattr("rumps.Window.run", lambda self: _Clicked)
+
+        app = VoiceClaudeApp()
+        # Initial title
+        assert app.preview_tts_item.title == "Preview TTS Voice"
+
+        app._preview_tts_voice(app.preview_tts_item)
+
+        # Must restore to original title
+        assert app.preview_tts_item.title == "Preview TTS Voice"
+
+    def test_menu_title_restores_after_cancel(self, monkeypatch, tmp_path):
+        """Menu title stays 'Preview TTS Voice' when user cancels."""
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+
+        class _Cancelled:
+            clicked = False
+            text = None
+        monkeypatch.setattr("rumps.Window.run", lambda self: _Cancelled)
+
+        app = VoiceClaudeApp()
+        app._preview_tts_voice(app.preview_tts_item)
+
+        assert app.preview_tts_item.title == "Preview TTS Voice"
+
+
+# ── F071: Volcengine/Doubao TTS backend (continued) ──────────
 
 
 class TestVolcengineDoubaoTTS:

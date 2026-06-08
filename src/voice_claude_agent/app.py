@@ -86,6 +86,9 @@ class VoiceClaudeApp(rumps.App):
         self.trigger_item = rumps.MenuItem(
             "Trigger Recording", callback=self._trigger_recording
         )
+        self.preview_tts_item = rumps.MenuItem(
+            "Preview TTS Voice", callback=self._preview_tts_voice
+        )
         self.diagnostic_item = rumps.MenuItem(
             "Mic Diagnostic", callback=self._run_mic_diagnostic
         )
@@ -116,6 +119,7 @@ class VoiceClaudeApp(rumps.App):
             self.start_item,
             self.stop_item,
             self.trigger_item,
+            self.preview_tts_item,
             None,
             self.diagnostic_item,
             self.mic_status_item,
@@ -751,6 +755,90 @@ class VoiceClaudeApp(rumps.App):
             self._wake_thread.start()
         else:
             self._trigger_event.set()
+
+    # ── F072: TTS Preview ──────────────────────────────────────
+
+    DEFAULT_PREVIEW_TEXT = "你好，我是语音助手。当前正在测试语音播报效果。"
+
+    def _preview_tts_voice(self, sender: rumps.MenuItem) -> None:
+        """Show an input dialog, then play TTS with current backend config.
+
+        Does not call Claude CLI, does not write a session.
+        Records app_events: tts_preview_start, tts_preview_done, tts_preview_failed.
+        Menu title: Preview TTS Voice → Previewing... → Preview TTS Voice.
+        """
+        import time as _time
+        from voice_claude_agent.tts import _resolve_tts_backend, create_speaker, VolcengineDoubaoSpeaker
+
+        # 1. Show input dialog
+        response = rumps.Window(
+            message=(
+                "Enter text to preview TTS voice.\n\n"
+                "The current TTS backend will be used to speak this text.\n"
+                "Cancel to skip — no session is written."
+            ),
+            title="Preview TTS Voice",
+            default_text=self.DEFAULT_PREVIEW_TEXT,
+            dimensions=(480, 160),
+        ).run()
+
+        if not response.clicked:
+            return  # user cancelled — no error, no event
+
+        text = (response.text or "").strip()
+        if not text:
+            text = self.DEFAULT_PREVIEW_TEXT
+
+        # 2. Update menu title and log start
+        sender.title = "Previewing..."
+        self._append_runtime_event(
+            "tts_preview_start",
+            backend=_resolve_tts_backend(),
+            text_length=len(text),
+        )
+
+        # 3. Play TTS
+        tts_backend_used = _resolve_tts_backend()
+        fallback_used = False
+        tts_duration = 0
+        tts_start = _time.monotonic()
+        try:
+            speaker = create_speaker()
+            speaker.speak(text)
+            tts_duration = round(_time.monotonic() - tts_start, 3)
+            if isinstance(speaker, VolcengineDoubaoSpeaker):
+                fallback_used = getattr(speaker, "_fallback_called", False)
+                if fallback_used:
+                    tts_backend_used = "macos-say"
+                    self._append_runtime_event(
+                        "tts_preview_failed",
+                        backend=_resolve_tts_backend(),
+                        reason="fallback_used",
+                        duration=tts_duration,
+                    )
+        except Exception as e:
+            tts_duration = round(_time.monotonic() - tts_start, 3)
+            self._append_runtime_event(
+                "tts_preview_failed",
+                backend=_resolve_tts_backend(),
+                error=str(e)[:200],
+            )
+            try:
+                from voice_claude_agent.tts import MacOSSaySpeaker
+                MacOSSaySpeaker().speak(text)
+                tts_backend_used = "macos-say"
+                fallback_used = True
+            except Exception:
+                pass
+        finally:
+            sender.title = "Preview TTS Voice"
+            self._append_runtime_event(
+                "tts_preview_done",
+                backend=_resolve_tts_backend(),
+                tts_backend_used=tts_backend_used,
+                tts_fallback_used=fallback_used,
+                duration=tts_duration,
+            )
 
     def _quit(self, sender: rumps.MenuItem) -> None:
         if self._wake_active:

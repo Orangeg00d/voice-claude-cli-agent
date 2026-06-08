@@ -89,7 +89,22 @@ cat >> ~/.voice-claude-agent/config.json <<'JSON'
 JSON
 ```
 
-### 6.2 检查配置状态
+### 6.2 预览音色 (Preview TTS Voice)
+
+配好 TTS 后，最快验证音色的方式是通过菜单栏 App 的 **Preview TTS Voice** 菜单项：
+
+1. 启动 App（Finder 双击或终端 `voice-claude-agent app`）。
+2. 点击菜单栏 **Preview TTS Voice**。
+3. 在弹出的对话框中输入测试文本（默认：`你好，我是语音助手。当前正在测试语音播报效果。`）。
+4. 点击 OK → 用当前 `VOICE_TTS_BACKEND` 配置的语音引擎播放。
+   - 如果 `VOICE_TTS_BACKEND=volcengine-doubao`，用当前 `VOLCENGINE_TTS_VOICE_TYPE` 播放。
+   - 如果 Volcengine TTS 失败，自动 fallback 到 macOS `say`，并在 `app_events` 中记录 `tts_preview_failed`。
+5. 菜单项标题变化：`Preview TTS Voice` → `Previewing...` → `Preview TTS Voice`。
+6. 如果点击 Cancel，不播放、不报错。
+
+预览不会调用 Claude CLI，也不会写 session。
+
+### 6.3 检查配置状态
 
 ```bash
 voice-claude-agent check

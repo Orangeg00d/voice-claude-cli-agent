@@ -2303,3 +2303,36 @@
 - Focused Health Check and Volcengine TTS tests passed: 22/22.
 - `./init.sh lint` passed.
 - `pytest tests/ -vv -x` passed: 281/281.
+
+## 2026-06-08 18:13 — Phase 18 (F072): TTS Preview Voice
+
+### Completed
+- Added 'Preview TTS Voice' menu item to VoiceClaudeApp menu bar.
+- `_preview_tts_voice()` callback: rumps.Window input dialog, uses create_speaker() for current TTS backend.
+- Default preview text: 你好，我是语音助手。当前正在测试语音播报效果。
+- Empty input falls back to default text. Cancel does nothing.
+- VolcengineDoubaoSpeaker failure auto-fallback to MacOSSaySpeaker, with tts_preview_failed event.
+- Menu title state: Preview TTS Voice → Previewing... → Preview TTS Voice (finally block).
+- App events logged: tts_preview_start, tts_preview_done, tts_preview_failed with backend, tts_fallback_used, duration.
+- Updated docs/VOLCENGINE_TTS_SETUP.md with preview instructions (section 6.2).
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh lint` passed
+- `./init.sh test` passed: 289/289 after Codex added internal Volcengine fallback coverage
+- `python setup.py py2app` built successfully
+
+### Files Changed
+- src/voice_claude_agent/app.py (added preview_tts_item, _preview_tts_voice)
+- tests/test_core.py (added TestTTSPreviewVoice: 8 tests after Codex fallback coverage)
+- docs/VOLCENGINE_TTS_SETUP.md (added section 6.2: Preview TTS Voice)
+- feature_list.json (added F072, passes=true)
+- agent-progress.md (this entry)
+
+### Next Recommended Task
+- Phase 18 complete. Ready for Codex review.
+
+### Risks / Notes
+- Preview does not call Claude CLI, does not write sessions — purely TTS playback.
+- Codex review fixed a logging gap: real VolcengineDoubaoSpeaker fallback does not raise, so preview now also records `tts_preview_failed` when `_fallback_called=True`.
+- rumps.Window dialog may have slightly different rendering in py2app vs terminal context.
