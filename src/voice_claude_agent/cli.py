@@ -18,14 +18,17 @@ from voice_claude_agent.stt import (
     FakeTranscriber,
     RecordingTranscriber,
     TextInputTranscriber,
+    _check_volcengine_credentials,
+    _mask_credential,
     _t2s_convert,
+    _volcengine_backend_available,
     list_available_backends,
 )
 from voice_claude_agent.summarizer import summarize, summarize_for_record
 from voice_claude_agent.tts import MacOSSaySpeaker, FakeSpeaker
 from voice_claude_agent.wake import ManualWakeTrigger
 
-_STT_BACKEND_HELP = "STT backend: text-input (dev), whisper-cli, or apple-speech (macOS)"
+_STT_BACKEND_HELP = "STT backend: text-input (dev), whisper-cli, apple-speech (macOS), or volcengine-doubao (cloud ASR)"
 
 
 def _resolve_stt_backend(option_value: str | None, default: str = "text-input") -> str:
@@ -76,6 +79,11 @@ def _check_dependencies() -> dict:
 
     # List STT backends
     status["stt_backends"] = list_available_backends()
+
+    # Volcengine ASR credential status
+    ve_creds, _ve_err = _check_volcengine_credentials()
+    status["volcengine_available"] = _volcengine_backend_available()
+    status["volcengine_credentials"] = ve_creds
 
     return status
 
@@ -171,6 +179,20 @@ def check():
     click.echo(
         f"  STT backends:     {', '.join(status['stt_backends']) if status['stt_backends'] else 'none'}"
     )
+    # Volcengine ASR credential status (masked)
+    ve_creds = status["volcengine_credentials"]
+    if ve_creds:
+        click.echo("  Volcengine ASR:    CONFIGURED")
+        for key in (
+            "VOLCENGINE_ASR_API_KEY", "VOLCENGINE_ASR_APP_ID",
+            "VOLCENGINE_ASR_ACCESS_TOKEN",
+            "VOLCENGINE_ASR_RESOURCE_ID", "VOLCENGINE_ASR_CLUSTER",
+            "VOLCENGINE_ASR_LANGUAGE", "VOLCENGINE_ASR_ENDPOINT",
+        ):
+            val = ve_creds.get(key, "")
+            click.echo(f"    {key}: {_mask_credential(key, val)}")
+    else:
+        click.echo("  Volcengine ASR:    not configured")
     click.echo(f"  Agent state dir:  {status['agent_state_dir']}")
 
     all_ok = (

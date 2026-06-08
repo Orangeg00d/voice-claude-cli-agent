@@ -1,13 +1,18 @@
 """Speech-to-Text abstraction layer.
 
 Phase 4 — real STT backends: text-input (dev), whisper-cli (local),
-and apple-speech (macOS NSSpeechRecognizer via osascript).
+apple-speech (macOS NSSpeechRecognizer via osascript), and
+volcengine-doubao (Volcengine BigModel ASR Flash, Phase 15).
 """
 
+import base64
+import json
 import subprocess
 import tempfile
+import uuid
 from pathlib import Path
 from typing import Protocol
+from urllib import error as urllib_error, request as urllib_request
 
 from voice_claude_agent.config import get_config_value
 
@@ -46,6 +51,7 @@ class RecordingTranscriber:
     - text-input: prints audio stats (dev mode, no real STT)
     - whisper-cli: local whisper.cpp binary (requires WHISPER_CPP_MODEL)
     - apple-speech: macOS on-device dictation via osascript
+    - volcengine-doubao: Volcengine BigModel ASR Flash (cloud API)
     """
 
     def __init__(self, backend: str = "text-input") -> None:
@@ -63,6 +69,8 @@ class RecordingTranscriber:
             return _transcribe_whisper_cli(audio_data)
         if self.backend == "apple-speech":
             return _transcribe_apple_speech(audio_data)
+        if self.backend == "volcengine-doubao":
+            return _transcribe_volcengine_doubao(audio_data)
         return f"[unknown backend: {self.backend}]"
 
 
@@ -359,11 +367,194 @@ def _t2s_convert(text: str) -> str:
         return text
 
 
+# ── volcengine-doubao backend (Phase 15) ───────────────────
+#
+# Official endpoint: POST https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash
+# Docs: https://www.volcengine.com/docs/6561/1631584
+# docs/VOLCENGINE_ASR_SETUP.md (project-local setup guide)
+#
+# Supports both old-console (X-Api-App-Key + X-Api-Access-Key) and
+# new-console (X-Api-Key) authentication headers. Credentials are read
+# from env vars or ~/.voice-claude-agent/config.json; never hardcoded.
+
+_VOLCENGINE_LEGACY_REQUIRED_KEYS = [
+    "VOLCENGINE_ASR_APP_ID",
+    "VOLCENGINE_ASR_ACCESS_TOKEN",
+]
+_VOLCENGINE_OPTIONAL_KEYS = [
+    "VOLCENGINE_ASR_API_KEY",
+    "VOLCENGINE_ASR_RESOURCE_ID",
+    "VOLCENGINE_ASR_CLUSTER",
+    "VOLCENGINE_ASR_LANGUAGE",
+    "VOLCENGINE_ASR_ENDPOINT",
+]
+_VOLCENGINE_DEFAULT_ENDPOINT = (
+    "https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash"
+)
+_VOLCENGINE_DEFAULT_RESOURCE_ID = "volc.bigasr.auc_turbo"
+_VOLCENGINE_DEFAULT_CLUSTER = "volcengine_input_common"
+
+
+def _check_volcengine_credentials() -> tuple[dict, str]:
+    """Load Volcengine ASR credentials. Returns (creds_dict, error_message)."""
+    creds = {}
+    api_key = get_config_value("VOLCENGINE_ASR_API_KEY")
+    if api_key:
+        creds["VOLCENGINE_ASR_API_KEY"] = api_key
+
+    missing_legacy = []
+    for key in _VOLCENGINE_LEGACY_REQUIRED_KEYS:
+        val = get_config_value(key)
+        if val:
+            creds[key] = val
+        else:
+            missing_legacy.append(key)
+
+    for key in _VOLCENGINE_OPTIONAL_KEYS:
+        val = get_config_value(key)
+        if val:
+            creds[key] = val
+
+    if "VOLCENGINE_ASR_API_KEY" not in creds and missing_legacy:
+        return {}, (
+            "[STT error: volcengine-doubao credentials missing: set either "
+            "VOLCENGINE_ASR_API_KEY, or both VOLCENGINE_ASR_APP_ID and "
+            "VOLCENGINE_ASR_ACCESS_TOKEN. "
+            "See docs/VOLCENGINE_ASR_SETUP.md for details.]"
+        )
+    return creds, ""
+
+
+def _mask_credential(key: str, value: str) -> str:
+    """Mask a credential value for safe display (first 3 + last 3 chars)."""
+    if not value:
+        return "(not set)"
+    if len(value) <= 6:
+        return "*" * len(value)
+    return value[:3] + "*" * (len(value) - 6) + value[-3:]
+
+
+def _transcribe_volcengine_doubao(audio_data: bytes) -> str:
+    """Transcribe via Volcengine BigModel ASR Flash.
+
+    POST https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash
+    Headers (old console): X-Api-App-Key, X-Api-Access-Key, X-Api-Resource-Id,
+                           X-Api-Request-Id, X-Api-Sequence: -1
+    Headers (new console): X-Api-Key, X-Api-Resource-Id, X-Api-Request-Id,
+                            X-Api-Sequence: -1
+    Body: {"user":{"uid":"app_key"}, "audio":{"data":"<base64 wav>"},
+            "request":{"model_name":"bigmodel"}}
+    Response: result.text or result.utterances[].text
+    """
+    creds, err = _check_volcengine_credentials()
+    if err:
+        return err
+
+    api_key = creds.get("VOLCENGINE_ASR_API_KEY")
+    app_id = creds.get("VOLCENGINE_ASR_APP_ID", "voice-claude-agent")
+    access_token = creds.get("VOLCENGINE_ASR_ACCESS_TOKEN")
+    resource_id = creds.get("VOLCENGINE_ASR_RESOURCE_ID", _VOLCENGINE_DEFAULT_RESOURCE_ID)
+
+    endpoint = get_config_value("VOLCENGINE_ASR_ENDPOINT", _VOLCENGINE_DEFAULT_ENDPOINT)
+    if not endpoint:
+        endpoint = _VOLCENGINE_DEFAULT_ENDPOINT
+
+    wav_data = _pcm_to_wav(audio_data)
+    b64_audio = base64.b64encode(wav_data).decode("ascii")
+    request_id = uuid.uuid4().hex
+
+    headers = {
+        "Content-Type": "application/json",
+        "X-Api-Resource-Id": resource_id,
+        "X-Api-Request-Id": request_id,
+        "X-Api-Sequence": "-1",
+    }
+    if api_key:
+        headers["X-Api-Key"] = api_key
+    else:
+        headers["X-Api-App-Key"] = app_id
+        headers["X-Api-Access-Key"] = access_token or ""
+
+    body = {
+        "user": {"uid": app_id},
+        "audio": {"data": b64_audio},
+        "request": {"model_name": "bigmodel"},
+    }
+
+    try:
+        req = urllib_request.Request(
+            endpoint,
+            data=json.dumps(body).encode("utf-8"),
+            headers=headers,
+            method="POST",
+        )
+        # urllib_request.urlopen also accepts the url + data directly
+        with urllib_request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+    except urllib_error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="replace")[:300]
+        return f"[STT error: Volcengine ASR HTTP {e.code}: {err_body}]"
+    except urllib_error.URLError as e:
+        return f"[STT error: Volcengine ASR network error: {e.reason}]"
+    except Exception as e:
+        return f"[STT error: Volcengine ASR failed: {e}]"
+    except BaseException as e:
+        return f"[STT error: Volcengine ASR unexpected error: {e}]"
+
+    return _parse_volcengine_response(result)
+
+
+def _parse_volcengine_response(result: dict) -> str:
+    """Parse the Volcengine BigModel ASR Flash JSON response."""
+    resp = result.get("result", result.get("resp", {}))
+    if not isinstance(resp, dict):
+        resp = {}
+
+    code = resp.get("code")
+    message = resp.get("message", resp.get("status_text", ""))
+
+    # Success codes: 1000 (v1) or 20000000 (v3 / flash), or None (some responses omit code on success)
+    if code is None or code in (1000, 20000000):
+        # Primary: result.text
+        text = resp.get("text", "")
+        if text:
+            return text.strip()
+
+        # Fallback: result.utterances[].text
+        utterances = resp.get("utterances", [])
+        if isinstance(utterances, list) and utterances:
+            parts = []
+            for u in utterances:
+                sentence = u.get("text", u.get("sentence", ""))
+                if sentence:
+                    parts.append(sentence)
+            if parts:
+                return "".join(parts)
+
+        return "[STT error: Volcengine ASR returned empty result]"
+
+    # Explicit error from API
+    if code is not None:
+        return f"[STT error: Volcengine ASR response error (code={code}): {message}]"
+
+    # Response did not follow expected schema
+    return "[STT error: Volcengine ASR returned unexpected response format]"
+
+
+def _volcengine_backend_available() -> bool:
+    """Return True if volcengine-doubao credentials are configured."""
+    creds, _ = _check_volcengine_credentials()
+    return "VOLCENGINE_ASR_API_KEY" in creds or all(
+        k in creds for k in _VOLCENGINE_LEGACY_REQUIRED_KEYS
+    )
+
+
 def list_available_backends() -> list[str]:
     """Return the list of STT backends that are usable right now.
 
     whisper-cli is only included if a real whisper.cpp binary is found
     (NOT the Python openai-whisper package).
+    volcengine-doubao is included if required credentials are configured.
     """
     import platform
 
@@ -372,6 +563,9 @@ def list_available_backends() -> list[str]:
     cpp_bin = _find_whisper_cpp_binary()
     if cpp_bin and not _is_python_whisper(cpp_bin):
         backends.append("whisper-cli")
+
+    if _volcengine_backend_available():
+        backends.append("volcengine-doubao")
 
     if platform.system() == "Darwin":
         backends.append("apple-speech")

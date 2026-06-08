@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![macOS](https://img.shields.io/badge/platform-macOS-lightgrey)](https://www.apple.com/macos/)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-green)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-234%20passing-brightgreen)](tests/)
+[![Tests](https://img.shields.io/badge/tests-255%20passing-brightgreen)](tests/)
 
 一个面向 macOS 的本地语音 Agent 项目。目标是让用户通过语音唤醒发出开发指令，由本地 Claude CLI 执行任务，并在完成后用语音播报结果。
 
@@ -54,7 +54,7 @@ JSON
 
 ## Current Status
 
-Phases 1-14 已完成，共 68 项验收 (F001-F068) 全部通过，234 个测试，lint clean。Phase 10 完成了真实使用验收中的稳定性、中文体验、连续触发保护与高风险动作语音确认；Phase 11 完成发布前审计、最终人工验收手册和开发者计划申请材料；Phase 12 完成 MIT License、仓库安全/贡献说明和依赖工具索引；Phase 13 完成 GitHub Release 草稿、README badges 和仓库元数据建议；Phase 14 增加菜单栏 Settings UI，用于查看、编辑、重置本地配置。
+Phases 1-15 已完成，共 69 项验收 (F001-F069) 全部通过，255 个测试，lint clean。Phase 10 完成了真实使用验收中的稳定性、中文体验、连续触发保护与高风险动作语音确认；Phase 11 完成发布前审计、最终人工验收手册和开发者计划申请材料；Phase 12 完成 MIT License、仓库安全/贡献说明和依赖工具索引；Phase 13 完成 GitHub Release 草稿、README badges 和仓库元数据建议；Phase 14 增加菜单栏 Settings UI，用于查看、编辑、重置本地配置；Phase 15 增加 Volcengine/Doubao BigModel ASR Flash 云端语音识别后端。
 
 核心能力：
 - CLI 文本/语音命令执行，高风险动作二次确认；菜单栏语音流程支持说“同意/取消”确认高风险动作
@@ -184,6 +184,7 @@ voice-claude-agent wake
 - `GITHUB_RELEASE_DRAFT.md`：GitHub v0.1.0 Release 草稿。
 - `REPOSITORY_METADATA.md`：GitHub description、topics、homepage 等仓库设置建议。
 - `MANUAL_TEST_PHASE14.md`：Settings UI 手动验收手册。
+- `docs/VOLCENGINE_ASR_SETUP.md`：Volcengine/Doubao ASR 后端配置和安全说明。
 - `MANUAL_TEST_PHASE8.md`：菜单栏 App 手动验收手册。
 - `MANUAL_TEST_PHASE11.md`：最终人工验收手册（Health Check、Mic Diagnostic、语音指令、高风险确认、View Logs）。
 - `DEVELOPER_PROGRAM_APPLICATION.md`：开发者计划申请材料。
@@ -206,7 +207,7 @@ MIT License — 详见 [LICENSE](LICENSE)。欢迎通过 [CONTRIBUTING.md](CONTR
 
 ## 开发状态
 
-Current main — F001-F068 (Phase 1-14) 全部通过。234 个测试。详情见 `feature_list.json`、`RELEASE_NOTES.md`。
+Current main — F001-F069 (Phase 1-15) 全部通过。255 个测试。详情见 `feature_list.json`、`RELEASE_NOTES.md`。
 
 v0.1.0 Release — F001-F067 (Phase 1-13)，223 个测试，已发布到 GitHub Releases。
 

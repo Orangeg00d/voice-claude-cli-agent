@@ -15,6 +15,7 @@ from voice_claude_agent.config import (
     get_config_path,
     get_config_value,
     load_config,
+    mask_credential,
 )
 
 # Silence rumps debug output during tests
@@ -135,7 +136,7 @@ class VoiceClaudeApp(rumps.App):
 
     # ── F068: Settings UI ───────────────────────────────────
 
-    _VALID_BACKENDS = {"text-input", "whisper-cli", "apple-speech"}
+    _VALID_BACKENDS = {"text-input", "whisper-cli", "apple-speech", "volcengine-doubao"}
 
     def _show_settings(self, sender: rumps.MenuItem) -> None:
         """Display a settings dialog chain: view → edit → save."""
@@ -145,28 +146,41 @@ class VoiceClaudeApp(rumps.App):
         cfg = load_config()
 
         # Step 1: show current config
+        setting_keys = [
+            "VOICE_RECORD_SECONDS",
+            "VOICE_STT_BACKEND",
+            "WHISPER_CPP_MODEL",
+            "WHISPER_CPP_LANGUAGE",
+            "VOLCENGINE_ASR_API_KEY",
+            "VOLCENGINE_ASR_APP_ID",
+            "VOLCENGINE_ASR_ACCESS_TOKEN",
+            "VOLCENGINE_ASR_RESOURCE_ID",
+            "VOLCENGINE_ASR_CLUSTER",
+            "VOLCENGINE_ASR_LANGUAGE",
+            "VOLCENGINE_ASR_ENDPOINT",
+        ]
+        credential_keys = {"VOLCENGINE_ASR_API_KEY", "VOLCENGINE_ASR_ACCESS_TOKEN"}
+        keep_secret = "<keep existing secret>"
+
+        def _masked(key, val):
+            if key in credential_keys and val:
+                return mask_credential(val)
+            return val
+
         editable = "\n".join(
-            f"{key}={cfg.get(key, '')}"
-            for key in (
-                "VOICE_RECORD_SECONDS",
-                "VOICE_STT_BACKEND",
-                "WHISPER_CPP_MODEL",
-                "WHISPER_CPP_LANGUAGE",
-            )
+            f"{k}={keep_secret if k in credential_keys and cfg.get(k) else cfg.get(k, '')}"
+            for k in setting_keys
         )
-        current = (
-            f"Config path: {cfg_path}\n\n"
-            f"VOICE_RECORD_SECONDS: {cfg.get('VOICE_RECORD_SECONDS', '')}\n"
-            f"VOICE_STT_BACKEND: {cfg.get('VOICE_STT_BACKEND', '')}\n"
-            f"WHISPER_CPP_MODEL: {cfg.get('WHISPER_CPP_MODEL', '')}\n"
-            f"WHISPER_CPP_LANGUAGE: {cfg.get('WHISPER_CPP_LANGUAGE', '')}\n\n"
-            "Edit as KEY=value lines. Blank values remove that key."
-        )
+        current_lines = [f"Config path: {cfg_path}\n"]
+        for k in setting_keys:
+            current_lines.append(f"{k}: {_masked(k, cfg.get(k, ''))}")
+        current_lines.append("\nEdit as KEY=value lines. Blank values remove that key.")
+        current = "\n".join(current_lines)
         response = rumps.Window(
             message=current,
             title="Settings — View",
             default_text=editable,
-            dimensions=(400, 200),
+            dimensions=(480, 300),
         ).run()
 
         if not response.clicked or response.text is None:
@@ -183,7 +197,14 @@ class VoiceClaudeApp(rumps.App):
             key = key.strip()
             val = val.strip()
             if key not in ("VOICE_RECORD_SECONDS", "VOICE_STT_BACKEND",
-                           "WHISPER_CPP_MODEL", "WHISPER_CPP_LANGUAGE"):
+                           "WHISPER_CPP_MODEL", "WHISPER_CPP_LANGUAGE",
+                           "VOLCENGINE_ASR_API_KEY", "VOLCENGINE_ASR_APP_ID",
+                           "VOLCENGINE_ASR_ACCESS_TOKEN",
+                           "VOLCENGINE_ASR_RESOURCE_ID", "VOLCENGINE_ASR_CLUSTER",
+                           "VOLCENGINE_ASR_LANGUAGE", "VOLCENGINE_ASR_ENDPOINT"):
+                continue
+
+            if key in credential_keys and val == keep_secret and key in cfg:
                 continue
 
             new_cfg[key] = val
@@ -418,6 +439,18 @@ class VoiceClaudeApp(rumps.App):
         lines.append(f"Record duration: {self.record_seconds}s")
         lines.append(f"Whisper model: {get_config_value('WHISPER_CPP_MODEL', '(not set)')}")
         lines.append(f"Whisper language: {get_config_value('WHISPER_CPP_LANGUAGE', 'zh')}")
+        # Volcengine ASR status
+        from voice_claude_agent.stt import _check_volcengine_credentials, _mask_credential as _ve_mask
+        ve_creds, _ve_err = _check_volcengine_credentials()
+        if ve_creds:
+            lines.append("Volcengine ASR: CONFIGURED")
+            for vk in ("VOLCENGINE_ASR_API_KEY", "VOLCENGINE_ASR_APP_ID",
+                        "VOLCENGINE_ASR_ACCESS_TOKEN",
+                        "VOLCENGINE_ASR_RESOURCE_ID", "VOLCENGINE_ASR_CLUSTER",
+                        "VOLCENGINE_ASR_LANGUAGE", "VOLCENGINE_ASR_ENDPOINT"):
+                lines.append(f"  {vk}: {_ve_mask(vk, ve_creds.get(vk, ''))}")
+        else:
+            lines.append("Volcengine ASR: not configured")
         lines.append("Python path containing _sounddevice_data:")
         sounddevice_data_paths = [p for p in sys.path if "_sounddevice_data" in p or "python3.14" in p]
         if sounddevice_data_paths:
@@ -548,6 +581,14 @@ class VoiceClaudeApp(rumps.App):
             "",
         ))
         lines.append(self._check_item("STT backend", True, self.stt_backend, ""))
+
+        # Volcengine ASR health
+        from voice_claude_agent.stt import _check_volcengine_credentials
+        ve_creds, _ve_err = _check_volcengine_credentials()
+        ve_ok = bool(ve_creds)
+        ve_detail = "configured" if ve_ok else "not configured"
+        lines.append(self._check_item("Volcengine ASR", ve_ok, ve_detail,
+            "Set VOLCENGINE_ASR_API_KEY, or APP_ID + ACCESS_TOKEN" if not ve_ok else ""))
         lines.append("")
 
         all_ok = all([claude, wb, m, hm, po, sd, sk])

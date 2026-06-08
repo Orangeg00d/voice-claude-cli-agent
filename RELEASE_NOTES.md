@@ -13,9 +13,9 @@ Voice Claude Agent 是一个 macOS 本地语音 Agent。用户通过菜单栏点
 
 ## 当前 main 状态
 
-- **验收项**: 68/68 passed (F001-F068)
-- **测试数量**: 234
-- **最新阶段**: Phase 14 — Settings UI
+- **验收项**: 69/69 passed (F001-F069)
+- **测试数量**: 255
+- **最新阶段**: Phase 15 — Volcengine/Doubao ASR backend
 
 ## v0.1.0 功能清单 (67 项验收全部通过)
 
@@ -116,10 +116,17 @@ Voice Claude Agent 是一个 macOS 本地语音 Agent。用户通过菜单栏点
 - 保存后运行中的 App 立即应用 `record_seconds` 和 `stt_backend`
 - Health Check / Mic Diagnostic 显示配置路径和当前后端
 
+### Unreleased: Volcengine/Doubao ASR (F069)
+- 新增 `VOICE_STT_BACKEND=volcengine-doubao`
+- 使用官方 BigModel ASR Flash v3 endpoint
+- 支持 `VOLCENGINE_ASR_API_KEY` 以及旧版 App ID + Access Token
+- Settings UI、Health Check、Mic Diagnostic、CLI check 均脱敏展示密钥
+- 新增 `docs/VOLCENGINE_ASR_SETUP.md`
+
 ## 测试
 
 - **测试框架**: pytest
-- **当前测试数量**: 234
+- **当前测试数量**: 255
 - **v0.1.0 发布测试数量**: 223
 - **测试覆盖**: CLI 管道、录音、STT、风险分类、菜单栏生命周期、并发安全、日志格式
 

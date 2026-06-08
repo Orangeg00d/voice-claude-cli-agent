@@ -4477,3 +4477,482 @@ class TestSettingsUI:
 
         assert str(cfg_file) in alerts[-1]["message"]
         assert "STT backend: apple-speech" in alerts[-1]["message"]
+
+
+# ── Phase 15: Volcengine/Doubao ASR backend ────────────────
+
+
+class TestVolcengineDoubaoBackend:
+    """Tests for volcengine-doubao STT backend (mock only, no real network)."""
+
+    def test_no_credentials_returns_error(self, monkeypatch):
+        """When no credentials are set, _check_volcengine_credentials returns error."""
+        from voice_claude_agent.stt import _check_volcengine_credentials
+
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.get_config_value",
+            lambda key, default="": default,
+        )
+
+        creds, err = _check_volcengine_credentials()
+        assert creds == {}
+        assert "[STT error:" in err
+        assert "VOLCENGINE" in err or "volcengine" in err.lower()
+
+    def test_missing_credentials_in_transcriber(self, monkeypatch):
+        """RecordingTranscriber(backend='volcengine-doubao') returns error without creds."""
+        from voice_claude_agent.stt import RecordingTranscriber
+
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.get_config_value",
+            lambda key, default="": default,
+        )
+
+        tc = RecordingTranscriber(backend="volcengine-doubao")
+        result = tc.transcribe(b"fake pcm data")
+        assert result.startswith("[STT error:")
+
+    def test_mock_transcription_success_result_text(self, monkeypatch):
+        """Parse response where result.text contains the transcription."""
+        import json
+        from voice_claude_agent.stt import _transcribe_volcengine_doubao
+
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.get_config_value",
+            lambda key, default="": {
+                "VOLCENGINE_ASR_APP_ID": "123456",
+                "VOLCENGINE_ASR_ACCESS_TOKEN": "token-abc",
+                "VOLCENGINE_ASR_RESOURCE_ID": "volc.bigasr.auc_turbo",
+                "VOLCENGINE_ASR_CLUSTER": "volcengine_input_common",
+                "VOLCENGINE_ASR_LANGUAGE": "zh-CN",
+                "VOLCENGINE_ASR_ENDPOINT": "http://fake.test/flash",
+            }.get(key, default),
+        )
+
+        # Mock urllib_request.urlopen to return a success response
+        class _FakeResp:
+            def __enter__(self): return self
+            def __exit__(self, *a): pass
+            def read(self):
+                return json.dumps({
+                    "audio_info": {"duration": 1234},
+                    "result": {
+                        "text": "今天天气不错",
+                        "utterances": [
+                            {"text": "今天天气不错", "start_time": 0, "end_time": 1234}
+                        ],
+                    },
+                }).encode("utf-8")
+
+        def _fake_urlopen(req, timeout=None):
+            return _FakeResp()
+
+        monkeypatch.setattr("urllib.request.urlopen", _fake_urlopen)
+        monkeypatch.setattr("urllib.request.Request", lambda *a, **kw: mock.MagicMock())
+
+        result = _transcribe_volcengine_doubao(b"fake pcm data")
+        assert result == "今天天气不错"
+
+    def test_mock_transcription_success_utterances_fallback(self, monkeypatch):
+        """Parse response where result.text is empty but utterances exist."""
+        import json
+        from voice_claude_agent.stt import _transcribe_volcengine_doubao
+
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.get_config_value",
+            lambda key, default="": {
+                "VOLCENGINE_ASR_APP_ID": "123456",
+                "VOLCENGINE_ASR_ACCESS_TOKEN": "token-abc",
+            }.get(key, default),
+        )
+
+        class _FakeResp:
+            def __enter__(self): return self
+            def __exit__(self, *a): pass
+            def read(self):
+                return json.dumps({
+                    "result": {
+                        "text": "",
+                        "utterances": [
+                            {"text": "你好世界", "start_time": 0, "end_time": 500},
+                        ],
+                    },
+                }).encode("utf-8")
+
+        def _fake_urlopen(req, timeout=None):
+            return _FakeResp()
+
+        monkeypatch.setattr("urllib.request.urlopen", _fake_urlopen)
+        monkeypatch.setattr("urllib.request.Request", lambda *a, **kw: mock.MagicMock())
+
+        result = _transcribe_volcengine_doubao(b"fake pcm data")
+        assert result == "你好世界"
+
+    def test_mock_error_response(self, monkeypatch):
+        """When API returns error code, an STT error message is returned."""
+        import json
+        from voice_claude_agent.stt import _transcribe_volcengine_doubao
+
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.get_config_value",
+            lambda key, default="": {
+                "VOLCENGINE_ASR_APP_ID": "123456",
+                "VOLCENGINE_ASR_ACCESS_TOKEN": "token-abc",
+            }.get(key, default),
+        )
+
+        class _FakeResp:
+            def __enter__(self): return self
+            def __exit__(self, *a): pass
+            def read(self):
+                return json.dumps({
+                    "result": {
+                        "code": 45000001,
+                        "message": "Invalid request parameters",
+                    },
+                }).encode("utf-8")
+
+        def _fake_urlopen(req, timeout=None):
+            return _FakeResp()
+
+        monkeypatch.setattr("urllib.request.urlopen", _fake_urlopen)
+        monkeypatch.setattr("urllib.request.Request", lambda *a, **kw: mock.MagicMock())
+
+        result = _transcribe_volcengine_doubao(b"fake pcm data")
+        assert result.startswith("[STT error:")
+        assert "45000001" in result
+
+    def test_http_error(self, monkeypatch):
+        """When server returns HTTP error, a clear message is returned."""
+        from voice_claude_agent.stt import _transcribe_volcengine_doubao
+
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.get_config_value",
+            lambda key, default="": {
+                "VOLCENGINE_ASR_APP_ID": "123456",
+                "VOLCENGINE_ASR_ACCESS_TOKEN": "token-abc",
+            }.get(key, default),
+        )
+
+        from urllib import error as _url_error
+
+        def _fake_urlopen(req, timeout=None):
+            raise _url_error.HTTPError("http://fake", 403, "Forbidden", {}, None)
+
+        monkeypatch.setattr("urllib.request.urlopen", _fake_urlopen)
+        monkeypatch.setattr("urllib.request.Request", lambda *a, **kw: mock.MagicMock())
+
+        result = _transcribe_volcengine_doubao(b"fake pcm data")
+        assert result.startswith("[STT error:")
+        assert "403" in result
+
+    def test_no_network_call_without_credentials(self, monkeypatch):
+        """When credentials are missing, no network call is attempted."""
+        from voice_claude_agent.stt import _transcribe_volcengine_doubao
+
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.get_config_value",
+            lambda key, default="": default,
+        )
+
+        called = []
+        def _fake_urlopen(req, timeout=None):
+            called.append(True)
+            raise RuntimeError("should not be called")
+
+        monkeypatch.setattr("urllib.request.urlopen", _fake_urlopen)
+        monkeypatch.setattr("urllib.request.Request", lambda *a, **kw: mock.MagicMock())
+
+        result = _transcribe_volcengine_doubao(b"fake pcm data")
+        assert result.startswith("[STT error:")
+        assert called == []
+
+    def test_old_console_headers_present(self, monkeypatch):
+        """Request headers include old-console X-Api-App-Key and X-Api-Access-Key."""
+        import json
+        from voice_claude_agent.stt import _transcribe_volcengine_doubao
+
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.get_config_value",
+            lambda key, default="": {
+                "VOLCENGINE_ASR_APP_ID": "my-app-id",
+                "VOLCENGINE_ASR_ACCESS_TOKEN": "my-token",
+            }.get(key, default),
+        )
+
+        captured_body = []
+
+        class _FakeResp:
+            def __enter__(self): return self
+            def __exit__(self, *a): pass
+            def read(self):
+                return json.dumps({
+                    "result": {"code": 20000000, "text": "ok"},
+                }).encode("utf-8")
+
+        def _fake_request(url, data=None, headers=None, method=None):
+            captured_body.append({"data": data, "headers": headers})
+            return mock.MagicMock()
+
+        def _fake_urlopen(req, timeout=None):
+            return _FakeResp()
+
+        monkeypatch.setattr("urllib.request.Request", _fake_request)
+        monkeypatch.setattr("urllib.request.urlopen", _fake_urlopen)
+
+        result = _transcribe_volcengine_doubao(b"fake data")
+        assert result == "ok"
+        assert len(captured_body) >= 1
+        hdrs = captured_body[0]["headers"]
+        assert hdrs.get("X-Api-App-Key") == "my-app-id"
+        assert hdrs.get("X-Api-Access-Key") == "my-token"
+        assert hdrs.get("X-Api-Sequence") == "-1"
+        # Verify request body format
+        body = json.loads(captured_body[0]["data"])
+        assert body["user"]["uid"] == "my-app-id"
+        assert "data" in body["audio"]
+        assert body["request"]["model_name"] == "bigmodel"
+
+    def test_new_console_api_key_header_present(self, monkeypatch):
+        """Request headers support new-console X-Api-Key authentication."""
+        import json
+        from voice_claude_agent.stt import _transcribe_volcengine_doubao
+
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.get_config_value",
+            lambda key, default="": {
+                "VOLCENGINE_ASR_API_KEY": "my-api-key",
+                "VOLCENGINE_ASR_RESOURCE_ID": "volc.bigasr.auc_turbo",
+                "VOLCENGINE_ASR_ENDPOINT": "http://fake.test/flash",
+            }.get(key, default),
+        )
+
+        captured = []
+
+        class _FakeResp:
+            def __enter__(self): return self
+            def __exit__(self, *a): pass
+            def read(self):
+                return json.dumps({"result": {"code": 20000000, "text": "ok"}}).encode("utf-8")
+
+        def _fake_request(url, data=None, headers=None, method=None):
+            captured.append({"url": url, "data": data, "headers": headers, "method": method})
+            return mock.MagicMock()
+
+        monkeypatch.setattr("urllib.request.Request", _fake_request)
+        monkeypatch.setattr("urllib.request.urlopen", lambda req, timeout=None: _FakeResp())
+
+        result = _transcribe_volcengine_doubao(b"fake data")
+
+        assert result == "ok"
+        assert captured[0]["url"] == "http://fake.test/flash"
+        assert captured[0]["headers"]["X-Api-Key"] == "my-api-key"
+        assert "X-Api-Access-Key" not in captured[0]["headers"]
+        assert captured[0]["headers"]["X-Api-Sequence"] == "-1"
+
+    def test_volcengine_backend_available_with_creds(self, monkeypatch):
+        """_volcengine_backend_available returns True when creds are configured."""
+        from voice_claude_agent.stt import _volcengine_backend_available
+
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.get_config_value",
+            lambda key, default="": {
+                "VOLCENGINE_ASR_APP_ID": "a",
+                "VOLCENGINE_ASR_ACCESS_TOKEN": "b",
+            }.get(key, default),
+        )
+        assert _volcengine_backend_available() is True
+
+    def test_volcengine_backend_not_available_without_creds(self, monkeypatch):
+        """_volcengine_backend_available returns False when creds are missing."""
+        from voice_claude_agent.stt import _volcengine_backend_available
+
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.get_config_value",
+            lambda key, default="": default,
+        )
+        assert _volcengine_backend_available() is False
+
+    def test_list_backends_includes_volcengine_when_configured(self, monkeypatch):
+        """list_available_backends includes volcengine-doubao when creds are set."""
+        from voice_claude_agent.stt import list_available_backends
+
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.get_config_value",
+            lambda key, default="": {
+                "VOLCENGINE_ASR_APP_ID": "a",
+                "VOLCENGINE_ASR_ACCESS_TOKEN": "b",
+            }.get(key, default),
+        )
+        backends = list_available_backends()
+        assert "volcengine-doubao" in backends
+
+    def test_list_backends_excludes_volcengine_when_not_configured(self, monkeypatch):
+        """list_available_backends excludes volcengine-doubao when creds missing."""
+        from voice_claude_agent.stt import list_available_backends
+
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.get_config_value",
+            lambda key, default="": default,
+        )
+        backends = list_available_backends()
+        assert "volcengine-doubao" not in backends
+
+    def test_mask_credential_hides_middle(self):
+        """_mask_credential shows only first 3 and last 3 characters."""
+        from voice_claude_agent.stt import _mask_credential
+
+        result = _mask_credential("KEY", "abcdefghijklmnop")
+        assert result == "abc**********nop"
+        assert "defghij" not in result
+
+    def test_mask_credential_short(self):
+        """_mask_credential masks entire short values."""
+        from voice_claude_agent.stt import _mask_credential
+
+        assert _mask_credential("K", "abc") == "***"
+
+    def test_mask_credential_empty(self):
+        """_mask_credential returns (not set) for empty values."""
+        from voice_claude_agent.stt import _mask_credential
+
+        assert _mask_credential("K", "") == "(not set)"
+
+    def test_config_mask_credential(self):
+        """config.mask_credential masks credential values."""
+        from voice_claude_agent.config import mask_credential
+
+        result = mask_credential("my-secret-token-12345")
+        assert result.startswith("my-s")
+        assert result.endswith("2345")
+        assert "ecret-token-1" not in result
+
+    def test_settings_ui_masks_access_token(self, tmp_path, monkeypatch):
+        """Settings UI shows masked Access Token values."""
+        import json
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({
+            "VOICE_RECORD_SECONDS": "10",
+            "VOLCENGINE_ASR_API_KEY": "api-key-secret-value",
+            "VOLCENGINE_ASR_APP_ID": "my-app-12345",
+            "VOLCENGINE_ASR_ACCESS_TOKEN": "secret-token-value",
+        }), encoding="utf-8")
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+        monkeypatch.setattr(app_mod, "load_config", lambda: json.loads(cfg_file.read_text(encoding="utf-8")))
+
+        windows = []
+
+        def _fake_window_init(self, **kwargs):
+            windows.append(kwargs)
+
+        class _FakeResp:
+            clicked = False
+            text = None
+
+        monkeypatch.setattr("rumps.Window.__init__", _fake_window_init)
+        monkeypatch.setattr("rumps.Window.run", lambda self: _FakeResp)
+
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._show_settings(app.settings_item)
+
+        assert windows
+        assert "secret-token-value" not in windows[0]["message"]
+        assert "secret-token-value" not in windows[0]["default_text"]
+        assert "api-key-secret-value" not in windows[0]["message"]
+        assert "api-key-secret-value" not in windows[0]["default_text"]
+        assert "<keep existing secret>" in windows[0]["default_text"]
+
+    def test_health_check_includes_volcengine_status(self, monkeypatch):
+        """Health Check shows Volcengine ASR configuration status."""
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+        monkeypatch.setattr("voice_claude_agent.config.find_claude_executable", lambda: "/usr/bin/claude")
+        monkeypatch.setattr("voice_claude_agent.config.check_apple_speech_available", lambda: True)
+        monkeypatch.setattr("voice_claude_agent.config.check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr("voice_claude_agent.stt._find_whisper_cpp_binary", lambda: "/usr/bin/whisper-cli")
+        monkeypatch.setattr("voice_claude_agent.stt._resolve_whisper_model", lambda: ("/tmp/model.bin", ""))
+        monkeypatch.setattr(
+            "voice_claude_agent.stt._check_volcengine_credentials",
+            lambda: ({"VOLCENGINE_ASR_APP_ID": "a", "VOLCENGINE_ASR_ACCESS_TOKEN": "b"}, ""),
+        )
+
+        import sounddevice as sd
+        monkeypatch.setattr(sd, "query_devices", lambda **kw: {"name": "test"})
+
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._run_health_check(app.health_item)
+
+        msg = alerts[-1]["message"]
+        assert "Volcengine ASR" in msg
+
+    def test_mic_diagnostic_includes_volcengine_status(self, monkeypatch):
+        """Mic Diagnostic shows Volcengine ASR configuration status (masked)."""
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: None)
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.get_config_value",
+            lambda key, default="": {
+                "VOLCENGINE_ASR_APP_ID": "my-app-key-12345",
+                "VOLCENGINE_ASR_ACCESS_TOKEN": "my-very-long-secret",
+                "VOLCENGINE_ASR_RESOURCE_ID": "volc.bigasr.auc_turbo",
+            }.get(key, default),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.app.get_config_value",
+            lambda key, default="": default,
+        )
+
+        alerts = []
+        app = VoiceClaudeApp(stt_backend="text-input", _alert_patch=lambda **kw: alerts.append(kw))
+        app._run_mic_diagnostic(app.diagnostic_item)
+
+        msg = alerts[-1]["message"]
+        assert "Volcengine ASR" in msg
+        assert "CONFIGURED" in msg
+        # Credentials must NOT appear in plain text
+        assert "my-app-key-12345" not in msg
+        assert "my-very-long-secret" not in msg
+
+    def test_check_command_shows_volcengine_status(self, monkeypatch):
+        """CLI check command shows volcengine-doubao configuration status."""
+        import subprocess as _sp
+
+        from click.testing import CliRunner
+        from voice_claude_agent.cli import main
+
+        monkeypatch.setattr(
+            "voice_claude_agent.cli.find_claude_executable",
+            lambda: "/usr/bin/claude",
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.cli.list_available_backends",
+            lambda: ["text-input", "whisper-cli", "apple-speech"],
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._check_volcengine_credentials",
+            lambda: ({}, "missing"),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._volcengine_backend_available",
+            lambda: False,
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.cli.check_mic_permission",
+            lambda: (True, ""),
+        )
+        monkeypatch.setattr(_sp, "run", lambda *a, **kw: type("R", (), {"returncode": 0, "stdout": "v2.1", "stderr": ""})())
+
+        runner = CliRunner()
+        result = runner.invoke(main, ["check"])
+        assert result.exit_code == 0
+        assert "Volcengine ASR" in result.output
+        assert "not configured" in result.output

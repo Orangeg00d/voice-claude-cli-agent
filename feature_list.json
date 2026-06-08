@@ -934,6 +934,24 @@
       ],
       "passes": true,
       "evidence": "Added Settings... and Reset Settings menu items with rumps.Window dialog: view config from ~/.voice-claude-agent/config.json, edit (key=value per line), validate (record_seconds positive int, stt_backend in valid set), save+reload immediately via _reload_from_config(). Reset Settings deletes config.json and restores runtime defaults. Health Check and Mic Diagnostic show config path/current backend. MANUAL_TEST_PHASE14.md documents manual acceptance. 11 F068 tests cover menu, save+reload, reset, validation, Health Check config path, and Mic Diagnostic config/backend. 234/234 tests, lint clean."
+    },
+    {
+      "id": "F069",
+      "priority": 69,
+      "category": "voice",
+      "description": "Volcengine/Doubao BigModel ASR Flash backend",
+      "steps": [
+        "Add VOICE_STT_BACKEND=volcengine-doubao",
+        "Use official v3 flash endpoint /api/v3/auc/bigmodel/recognize/flash",
+        "Support new-console X-Api-Key and old-console App ID + Access Token credentials",
+        "Send base64 WAV audio with request.model_name=bigmodel",
+        "Parse result.text and fall back to result.utterances[].text",
+        "Do not call network when required credentials are missing",
+        "Mask secrets in Settings UI, Health Check, Mic Diagnostic, and CLI check",
+        "Document setup in docs/VOLCENGINE_ASR_SETUP.md"
+      ],
+      "passes": true,
+      "evidence": "Added volcengine-doubao backend using official BigModel ASR Flash endpoint https://openspeech.bytedance.com/api/v3/auc/bigmodel/recognize/flash. Supports VOLCENGINE_ASR_API_KEY (X-Api-Key) and legacy VOLCENGINE_ASR_APP_ID + VOLCENGINE_ASR_ACCESS_TOKEN (X-Api-App-Key/X-Api-Access-Key), X-Api-Resource-Id, X-Api-Request-Id, and X-Api-Sequence=-1. Sends base64 WAV audio with request.model_name=bigmodel; parses result.text with utterances fallback. Settings UI, Health Check, Mic Diagnostic, CLI check expose config status with masked secrets and keep existing secrets out of editable default text. Added docs/VOLCENGINE_ASR_SETUP.md. 21 focused Volcengine tests; 255/255 tests, lint clean."
     }
   ]
 }

@@ -2163,3 +2163,24 @@
 - `./init.sh check` passed.
 - `./init.sh lint` passed.
 - `./init.sh test -q` passed: 234/234.
+
+## 2026-06-08 18:45 — Codex Review: F069 Volcengine/Doubao ASR
+
+### Finding
+- Claude's first Volcengine ASR attempt used a guessed `/api/v1/asr` HMAC path and could not be accepted.
+- The second attempt moved closer but still documented `/api/v1/auc/submit` and did not implement the official v3 flash endpoint.
+- The final attempt implemented the v3 flash endpoint and tests, but still needed API-key mode, Settings secret protection, and documentation alignment.
+
+### Completed
+- Implemented `VOLCENGINE_ASR_API_KEY` support using the `X-Api-Key` header.
+- Kept legacy `VOLCENGINE_ASR_APP_ID` + `VOLCENGINE_ASR_ACCESS_TOKEN` support using `X-Api-App-Key` and `X-Api-Access-Key`.
+- Confirmed request body shape: `user`, `audio.data`, and `request.model_name=bigmodel`.
+- Ensured Settings UI uses `<keep existing secret>` for existing ASR secrets instead of pre-filling plaintext credentials.
+- Updated CLI/Mic Diagnostic/Health Check credential displays and setup docs.
+- Added F069 to `feature_list.json` and updated README, RELEASE_NOTES, and developer application status.
+
+### Verification
+- F069 focused tests passed: 21/21.
+- `./init.sh check` passed.
+- `./init.sh lint` passed.
+- `./init.sh test -q` passed: 255/255.

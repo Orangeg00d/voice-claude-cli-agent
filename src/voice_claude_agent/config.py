@@ -94,10 +94,25 @@ CONFIG_KEYS = {
     "VOICE_STT_BACKEND",
     "WHISPER_CPP_MODEL",
     "WHISPER_CPP_LANGUAGE",
+    "VOLCENGINE_ASR_API_KEY",
+    "VOLCENGINE_ASR_APP_ID",
+    "VOLCENGINE_ASR_ACCESS_TOKEN",
+    "VOLCENGINE_ASR_RESOURCE_ID",
+    "VOLCENGINE_ASR_CLUSTER",
+    "VOLCENGINE_ASR_LANGUAGE",
+    "VOLCENGINE_ASR_ENDPOINT",
 }
 
 
-# ── F059: Local config file ─────────────────────────────────
+# ── F069: Mask credential values for safe display ──────────
+
+def mask_credential(value: str) -> str:
+    """Mask a credential value, showing only first 4 and last 4 characters."""
+    if not value:
+        return "(not set)"
+    if len(value) <= 6:
+        return "*" * len(value)
+    return value[:4] + "*" * max(0, len(value) - 8) + value[-4:]
 
 def get_config_path() -> Path:
     return Path.home() / ".voice-claude-agent" / "config.json"
