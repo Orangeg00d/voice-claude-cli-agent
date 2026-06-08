@@ -1024,6 +1024,22 @@
       ],
       "passes": true,
       "evidence": "Added TTS Voice submenu with five common Volcengine/Doubao voices. Menu title shows the current voice label; selected submenu item is marked. Selecting moon_bigtts voices writes VOLCENGINE_TTS_VOICE_TYPE and VOLCENGINE_TTS_RESOURCE_ID=seed-tts-1.0. Selecting BV voices preserves existing Resource ID and shows a Resource ID matching warning. Config writes preserve existing API keys and reload immediately; Preview TTS Voice reads the updated config. Health Check and Mic Diagnostic show current TTS voice. Added docs/VOLCENGINE_TTS_SETUP.md TTS Voice section. 8 F073 tests cover menu display, config save, secret preservation, moon/BV resource behavior, Preview integration, diagnostics, and Settings reload. 297/297 tests, lint clean, check clean."
+    },
+    {
+      "id": "F074",
+      "priority": 74,
+      "category": "logging",
+      "description": "View Logs shows actual per-run STT/TTS backend metadata",
+      "steps": [
+        "View Logs shows current STT/TTS configuration summary",
+        "last_result includes stt_backend, tts_backend, tts_voice_type, and tts_resource_id",
+        "sessions.jsonl preserves the same backend metadata per run",
+        "tts_done app_event includes stt_backend, tts_backend, tts_voice_type, tts_resource_id, duration, and fallback status",
+        "View Logs displays recent tts_done backend/fallback metadata inline",
+        "Tests cover View Logs display and pipeline persistence"
+      ],
+      "passes": true,
+      "evidence": "Enhanced _run_pipeline with stt_backend_used and persisted stt_backend, tts_voice_type, and tts_resource_id to sessions.jsonl and last_result.json. Menu bar _record_and_execute passes self.stt_backend and writes tts_done app_events with STT/TTS backend, voice, resource, duration, and fallback status. View Logs now shows current config plus per-run last_result metadata, and recent app_events inline tts/fallback details. Added/updated tests for View Logs display, session schema parity, and pipeline metadata persistence. 298/298 tests, lint clean, check clean."
     }
   ]
 }

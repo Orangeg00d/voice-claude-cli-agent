@@ -2372,3 +2372,39 @@
 
 ### Next Recommended Task
 - Manual test: use TTS Voice → 清润男声, then Preview TTS Voice; verify the preview voice changes without full Trigger Recording.
+
+## 2026-06-08 19:25 — Phase 20 (F074): Runtime Backend Metadata in View Logs
+
+### Finding
+- Claude's F074 pass only displayed the current STT/TTS configuration at the top of View Logs.
+- That was useful but insufficient for auditing old runs: after changing Settings, old log entries would appear to use the new current config unless each run persisted its own metadata.
+- `feature_list.json`, docs/status, and `agent-progress.md` were not updated in Claude's first pass.
+
+### Completed
+- Added optional `stt_backend_used` to `_run_pipeline()`.
+- Persisted `stt_backend`, `tts_voice_type`, and `tts_resource_id` in `sessions.jsonl` and `last_result.json` alongside existing TTS backend/duration/fallback fields.
+- Menu bar `_record_and_execute()` passes `self.stt_backend` into `_run_pipeline()`.
+- `tts_done` app_events now include STT backend, TTS backend, voice type, resource ID, duration, and fallback status.
+- View Logs now shows both current config and per-run Last result metadata.
+- View Logs recent app_events render inline `stt=...`, `tts=...`, `voice=...`, and `fallback=...` details when present.
+- Updated README, RELEASE_NOTES, DEVELOPER_PROGRAM_APPLICATION, and `feature_list.json` to F001-F074 / 298 tests.
+
+### Verification
+- Focused F074/session tests passed: 4/4.
+- `./init.sh lint` passed.
+- Full `pytest tests/ -vv -x` passed: 298/298.
+- `python setup.py py2app` built successfully.
+
+### Files Changed
+- src/voice_claude_agent/cli.py
+- src/voice_claude_agent/app.py
+- src/voice_claude_agent/logging_store.py
+- tests/test_core.py
+- feature_list.json
+- README.md
+- RELEASE_NOTES.md
+- DEVELOPER_PROGRAM_APPLICATION.md
+- agent-progress.md
+
+### Next Recommended Task
+- Manual test: run Trigger Recording, then View Logs. Confirm Last result shows `stt_backend`, `tts_voice_type`, `tts_resource_id`, and `tts_fallback_used` for that actual run.

@@ -27,7 +27,12 @@ from voice_claude_agent.stt import (
     list_available_backends,
 )
 from voice_claude_agent.summarizer import summarize, summarize_for_record
-from voice_claude_agent.tts import FakeSpeaker, VolcengineDoubaoSpeaker, create_speaker, _resolve_tts_backend
+from voice_claude_agent.tts import (
+    FakeSpeaker,
+    VolcengineDoubaoSpeaker,
+    create_speaker,
+    _resolve_tts_backend,
+)
 from voice_claude_agent.wake import ManualWakeTrigger
 
 _STT_BACKEND_HELP = "STT backend: text-input (dev), whisper-cli, apple-speech (macOS), or volcengine-doubao (cloud ASR)"
@@ -248,6 +253,7 @@ def _run_pipeline(
     input_mode: str,
     tts_fake: bool,
     confirmation_override: bool | None = None,
+    stt_backend_used: str = "",
 ) -> None:
     if tts_fake:
         speaker = FakeSpeaker()
@@ -287,6 +293,8 @@ def _run_pipeline(
     result_cwd = result.cwd if isinstance(getattr(result, "cwd", ""), str) else ""
 
     tts_backend_used = "fake" if tts_fake else _resolve_tts_backend()
+    tts_voice_type = get_config_value("VOLCENGINE_TTS_VOICE_TYPE", "")
+    tts_resource_id = get_config_value("VOLCENGINE_TTS_RESOURCE_ID", "")
 
     if result.timed_out:
         click.echo(click.style("Claude CLI timed out.", fg="red"))
@@ -311,7 +319,24 @@ def _run_pipeline(
             "summary": "Timed out",
             "spoken_summary": "Claude CLI 执行超时，请检查任务或重试。",
             "spoken": True,
+            "stt_backend": stt_backend_used,
             "tts_backend": tts_backend_used,
+            "tts_voice_type": tts_voice_type,
+            "tts_resource_id": tts_resource_id,
+            "tts_duration_seconds": tts_duration_seconds,
+            "tts_fallback_used": tts_fallback_used,
+        })
+        write_last_result({
+            "prompt": prompt,
+            "claude_cwd": result_cwd,
+            "exit_code": result.exit_code,
+            "summary": "Timed out",
+            "spoken_summary": "Claude CLI 执行超时，请检查任务或重试。",
+            "risk_level": risk_level.value,
+            "stt_backend": stt_backend_used,
+            "tts_backend": tts_backend_used,
+            "tts_voice_type": tts_voice_type,
+            "tts_resource_id": tts_resource_id,
             "tts_duration_seconds": tts_duration_seconds,
             "tts_fallback_used": tts_fallback_used,
         })
@@ -350,7 +375,10 @@ def _run_pipeline(
         "summary": summary,
         "spoken_summary": spoken_summary,
         "spoken": True,
+        "stt_backend": stt_backend_used,
         "tts_backend": tts_backend_used,
+        "tts_voice_type": tts_voice_type,
+        "tts_resource_id": tts_resource_id,
         "tts_duration_seconds": tts_duration_seconds,
         "tts_fallback_used": tts_fallback_used,
     })
@@ -362,7 +390,10 @@ def _run_pipeline(
         "summary": summary,
         "spoken_summary": spoken_summary,
         "risk_level": risk_level.value,
+        "stt_backend": stt_backend_used,
         "tts_backend": tts_backend_used,
+        "tts_voice_type": tts_voice_type,
+        "tts_resource_id": tts_resource_id,
         "tts_duration_seconds": tts_duration_seconds,
         "tts_fallback_used": tts_fallback_used,
     })
@@ -407,6 +438,7 @@ def voice(duration: int, fake: bool, stt_backend: str | None):
     if fake:
         recorder = FakeRecorder(b"test audio data")
         transcriber = TextInputTranscriber()
+        stt_backend = "text-input"
     else:
         permission, detail = check_mic_permission()
         _warn_mic(permission, detail)
@@ -439,7 +471,7 @@ def voice(duration: int, fake: bool, stt_backend: str | None):
         click.echo("No speech detected. Aborting.")
         return
 
-    _run_pipeline(text, input_mode="voice", tts_fake=False)
+    _run_pipeline(text, input_mode="voice", tts_fake=False, stt_backend_used=stt_backend or "")
 
 
 @main.command()
@@ -452,7 +484,7 @@ def demo_voice(stub_text: str):
     transcript = transcriber.transcribe(recorder.get_audio())
     click.echo(f"Transcription: {transcript}")
 
-    _run_pipeline(transcript, input_mode="voice", tts_fake=False)
+    _run_pipeline(transcript, input_mode="voice", tts_fake=False, stt_backend_used="fake")
 
 
 @main.command()
@@ -470,6 +502,7 @@ def wake(fake: bool, once: bool, stt_backend: str | None):
     if fake:
         recorder = FakeRecorder(b"stub wake audio")
         transcriber = FakeTranscriber("请回复 OK")
+        stt_backend = "fake"
     else:
         permission, detail = check_mic_permission()
         _warn_mic(permission, detail)
@@ -545,7 +578,7 @@ def wake(fake: bool, once: bool, stt_backend: str | None):
                 continue
 
             # 4. Run pipeline
-            _run_pipeline(transcript, input_mode="voice", tts_fake=False)
+            _run_pipeline(transcript, input_mode="voice", tts_fake=False, stt_backend_used=stt_backend or "")
 
             if _stop_if_once(once, iteration):
                 break

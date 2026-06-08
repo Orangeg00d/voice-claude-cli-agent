@@ -1987,7 +1987,8 @@ class TestSessionLogParity:
             "risk_level", "confirmation_required", "confirmation_received",
             "claude_command", "claude_cwd", "exit_code", "claude_stdout",
             "claude_stderr", "summary", "spoken_summary", "spoken",
-            "tts_backend", "tts_duration_seconds", "tts_fallback_used",
+            "stt_backend", "tts_backend", "tts_voice_type", "tts_resource_id",
+            "tts_duration_seconds", "tts_fallback_used",
         }
         assert set(cli_entry.keys()) == expected_keys
         assert set(menu_entry.keys()) == expected_keys
@@ -2928,7 +2929,7 @@ class TestLastTranscriptSummary:
             lambda: last_result,
         )
 
-        def fake_pipeline(prompt, input_mode, tts_fake, confirmation_override=None):
+        def fake_pipeline(prompt, input_mode, tts_fake, confirmation_override=None, stt_backend_used=""):
             last_result.write_text(json.dumps(
                 {"prompt": prompt, "exit_code": 0, "summary": "Claude says hi"}
             ), encoding="utf-8")
@@ -2961,7 +2962,7 @@ class TestLastTranscriptSummary:
             lambda: last_result,
         )
 
-        def fake_pipeline(prompt, input_mode, tts_fake, confirmation_override=None):
+        def fake_pipeline(prompt, input_mode, tts_fake, confirmation_override=None, stt_backend_used=""):
             last_result.write_text(json.dumps(
                 {"prompt": prompt, "exit_code": 0, "summary": "Fresh summary"}
             ), encoding="utf-8")
@@ -4251,6 +4252,7 @@ class TestVoiceConfirmation:
             input_mode="voice",
             tts_fake=False,
             confirmation_override=True,
+            stt_backend_used="text-input",
         )
         speaker_mock.speak.assert_called_once()
 
@@ -4305,6 +4307,7 @@ class TestVoiceConfirmation:
             input_mode="voice",
             tts_fake=False,
             confirmation_override=None,
+            stt_backend_used="text-input",
         )
 
     def test_high_risk_reject_skips_pipeline(self, tmp_path, monkeypatch):
@@ -5748,6 +5751,53 @@ class TestTTSVoiceSelector:
 
         assert app.tts_voice_item.title == "TTS Voice: 清润男声"
 
+    def test_view_logs_shows_stt_tts_voice_config(self, monkeypatch, tmp_path):
+        """View Logs shows current STT backend, TTS backend, and TTS voice type."""
+        import json as _json
+
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(_json.dumps({
+            "VOICE_TTS_BACKEND": "volcengine-doubao",
+            "VOLCENGINE_TTS_VOICE_TYPE": "zh_male_qingrun_moon_bigtts",
+        }), encoding="utf-8")
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+
+        # Mock app_events and last_result paths
+        events_path = tmp_path / "app_events.jsonl"
+        events_path.write_text('{"timestamp":"2026-06-08T10:00:00+08:00","event":"tts_preview_start","backend":"volcengine-doubao","text_length":5}\n{"timestamp":"2026-06-08T10:00:02+08:00","event":"tts_preview_done","backend":"volcengine-doubao","tts_backend_used":"volcengine-doubao","tts_fallback_used":false,"duration":1.5}\n', encoding="utf-8")
+
+        last_path = tmp_path / "last_result.json"
+        last_path.write_text(_json.dumps({
+            "prompt": "测试", "exit_code": 0,
+            "summary": "完成", "tts_backend": "volcengine-doubao",
+            "stt_backend": "volcengine-doubao",
+            "tts_voice_type": "zh_male_qingrun_moon_bigtts",
+            "tts_resource_id": "seed-tts-1.0",
+            "tts_duration_seconds": 1.5, "tts_fallback_used": False,
+        }), encoding="utf-8")
+
+        monkeypatch.setattr(app_mod, "get_agent_state_dir", lambda: tmp_path)
+        monkeypatch.setattr("voice_claude_agent.config.get_agent_state_dir", lambda: tmp_path)
+
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._show_logs(app.logs_item)
+
+        msg = alerts[-1]["message"]
+        assert "STT backend:" in msg
+        assert "TTS backend: volcengine-doubao" in msg
+        assert "TTS voice type: zh_male_qingrun_moon_bigtts" in msg
+        assert "tts_preview_done tts=volcengine-doubao fallback=False" in msg
+        assert "stt_backend: volcengine-doubao" in msg
+        assert "tts_voice_type: zh_male_qingrun_moon_bigtts" in msg
+        assert "tts_resource_id: seed-tts-1.0" in msg
+
 
 # ── F071: Volcengine/Doubao TTS backend (continued) ──────────
 
@@ -6084,14 +6134,31 @@ class TestVolcengineDoubaoTTS:
                 timed_out=False,
             )),
         )
+        monkeypatch.setattr(
+            "voice_claude_agent.config.get_config_path",
+            lambda: tmp_path / "config.json",
+        )
+        (tmp_path / "config.json").write_text(
+            json.dumps({
+                "VOLCENGINE_TTS_VOICE_TYPE": "zh_male_qingrun_moon_bigtts",
+                "VOLCENGINE_TTS_RESOURCE_ID": "seed-tts-1.0",
+            }),
+            encoding="utf-8",
+        )
 
         from voice_claude_agent.cli import _run_pipeline
-        _run_pipeline("test", input_mode="text", tts_fake=True)
+        _run_pipeline("test", input_mode="text", tts_fake=True, stt_backend_used="text-input")
 
         session = json.loads((tmp_path / "sessions.jsonl").read_text().splitlines()[0])
         last_result = json.loads((tmp_path / "last_result.json").read_text())
+        assert session["stt_backend"] == "text-input"
         assert session["tts_backend"] == "fake"
+        assert session["tts_voice_type"] == "zh_male_qingrun_moon_bigtts"
+        assert session["tts_resource_id"] == "seed-tts-1.0"
         assert isinstance(session["tts_duration_seconds"], float)
         assert session["tts_fallback_used"] is False
+        assert last_result["stt_backend"] == "text-input"
         assert last_result["tts_backend"] == "fake"
+        assert last_result["tts_voice_type"] == "zh_male_qingrun_moon_bigtts"
+        assert last_result["tts_resource_id"] == "seed-tts-1.0"
         assert isinstance(last_result["tts_duration_seconds"], float)

@@ -13,9 +13,9 @@ Voice Claude Agent 是一个 macOS local-first 语音 Agent。用户通过菜单
 
 ## 当前 main 状态
 
-- **验收项**: 73/73 passed (F001-F073)
-- **测试数量**: 297
-- **最新阶段**: Phase 19 — TTS voice selector
+- **验收项**: 74/74 passed (F001-F074)
+- **测试数量**: 298
+- **最新阶段**: Phase 20 — runtime backend logs
 
 ## v0.1.0 功能清单 (67 项验收全部通过)
 
@@ -153,10 +153,16 @@ Voice Claude Agent 是一个 macOS local-first 语音 Agent。用户通过菜单
 - 选择 BV 系列时保留已有 Resource ID，并提示用户确认匹配关系
 - Health Check / Mic Diagnostic 显示当前 TTS voice type
 
+### Unreleased: Runtime Backend Logs (F074)
+- View Logs 顶部显示当前 STT/TTS 配置
+- Last result 显示当轮实际 `stt_backend`、`tts_backend`、`tts_voice_type`、`tts_resource_id`
+- app_events 的 `tts_done` 显示 STT/TTS backend、音色和 fallback 状态
+- sessions / last_result 记录 STT backend、TTS voice type、TTS resource ID
+
 ## 测试
 
 - **测试框架**: pytest
-- **当前测试数量**: 297
+- **当前测试数量**: 298
 - **v0.1.0 发布测试数量**: 223
 - **测试覆盖**: CLI 管道、录音、STT、风险分类、菜单栏生命周期、并发安全、日志格式
 

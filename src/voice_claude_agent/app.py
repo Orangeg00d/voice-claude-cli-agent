@@ -501,6 +501,14 @@ class VoiceClaudeApp(rumps.App):
         lines = ["=== View Logs ===", ""]
         state_dir = get_agent_state_dir()
 
+        # ── Current config summary ──
+        from voice_claude_agent.tts import _resolve_tts_backend
+        lines.append("Current STT/TTS Configuration:")
+        lines.append(f"  STT backend: {self.stt_backend}")
+        lines.append(f"  TTS backend: {_resolve_tts_backend()}")
+        lines.append(f"  TTS voice type: {self._current_tts_voice_type()}")
+        lines.append("")
+
         # ── app_events ──
         events_path = state_dir / "app_events.jsonl"
         if events_path.exists():
@@ -521,6 +529,15 @@ class VoiceClaudeApp(rumps.App):
                         extra += f" bytes={ev['audio_bytes']}"
                     if "reason" in ev:
                         extra += f" reason={ev['reason']}"
+                    if "stt_backend" in ev:
+                        extra += f" stt={ev['stt_backend']}"
+                    tts_event_backend = ev.get("tts_backend", ev.get("tts_backend_used"))
+                    if tts_event_backend:
+                        extra += f" tts={tts_event_backend}"
+                    if "tts_voice_type" in ev and ev["tts_voice_type"]:
+                        extra += f" voice={ev['tts_voice_type']}"
+                    if "tts_fallback_used" in ev:
+                        extra += f" fallback={ev['tts_fallback_used']}"
                     lines.append(f"  {ts} {evt}{extra}")
             except Exception as e:
                 lines.append(f"Error reading app_events: {e}")
@@ -540,6 +557,12 @@ class VoiceClaudeApp(rumps.App):
                     lines.append(f"  claude_cwd: {data.get('claude_cwd')}")
                 if data.get("tts_backend"):
                     lines.append(f"  tts_backend: {data.get('tts_backend')}")
+                if data.get("stt_backend"):
+                    lines.append(f"  stt_backend: {data.get('stt_backend')}")
+                if data.get("tts_voice_type"):
+                    lines.append(f"  tts_voice_type: {data.get('tts_voice_type')}")
+                if data.get("tts_resource_id"):
+                    lines.append(f"  tts_resource_id: {data.get('tts_resource_id')}")
                 if data.get("tts_duration_seconds") is not None:
                     lines.append(f"  tts_duration_seconds: {data.get('tts_duration_seconds')}")
                 if data.get("tts_fallback_used") is not None:
@@ -1080,6 +1103,7 @@ class VoiceClaudeApp(rumps.App):
                 input_mode="voice",
                 tts_fake=False,
                 confirmation_override=True if _req_conf(risk) else None,
+                stt_backend_used=self.stt_backend,
             )
 
             # Capture summary from last_result.json written by _run_pipeline
@@ -1104,7 +1128,10 @@ class VoiceClaudeApp(rumps.App):
             # TTS is handled inside _run_pipeline via create_speaker().
             self._append_runtime_event(
                 "tts_done",
+                stt_backend=self.stt_backend,
                 tts_backend=last_data.get("tts_backend", "macos-say"),
+                tts_voice_type=last_data.get("tts_voice_type", ""),
+                tts_resource_id=last_data.get("tts_resource_id", ""),
                 tts_duration_seconds=last_data.get("tts_duration_seconds"),
                 tts_fallback_used=last_data.get("tts_fallback_used", False),
             )
