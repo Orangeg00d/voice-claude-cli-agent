@@ -3,9 +3,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![macOS](https://img.shields.io/badge/platform-macOS-lightgrey)](https://www.apple.com/macos/)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-green)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-260%20passing-brightgreen)](tests/)
+[![Tests](https://img.shields.io/badge/tests-274%20passing-brightgreen)](tests/)
 
-一个面向 macOS 的本地语音 Agent 项目。目标是让用户通过语音唤醒发出开发指令，由本地 Claude CLI 执行任务，并在完成后用语音播报结果。
+一个面向 macOS 的 local-first 语音 Agent 项目。目标是让用户通过语音唤醒发出开发指令，由本地 Claude CLI 执行任务，并在完成后用语音播报结果；STT/TTS 默认可本地运行，也可按需切换到 Volcengine/Doubao 云端后端。
 
 ## 快速开始
 
@@ -54,12 +54,13 @@ JSON
 
 ## Current Status
 
-Phases 1-16 已完成，共 70 项验收 (F001-F070) 全部通过，260 个测试，lint clean。Phase 10 完成了真实使用验收中的稳定性、中文体验、连续触发保护与高风险动作语音确认；Phase 11 完成发布前审计、最终人工验收手册和开发者计划申请材料；Phase 12 完成 MIT License、仓库安全/贡献说明和依赖工具索引；Phase 13 完成 GitHub Release 草稿、README badges 和仓库元数据建议；Phase 14 增加菜单栏 Settings UI，用于查看、编辑、重置本地配置；Phase 15 增加 Volcengine/Doubao BigModel ASR Flash 云端语音识别后端；Phase 16 固定 Claude CLI 工作目录，避免语音指令进入错误项目上下文。
+Phases 1-17 已完成，共 71 项验收 (F001-F071) 全部通过，274 个测试，lint clean。Phase 10 完成了真实使用验收中的稳定性、中文体验、连续触发保护与高风险动作语音确认；Phase 11 完成发布前审计、最终人工验收手册和开发者计划申请材料；Phase 12 完成 MIT License、仓库安全/贡献说明和依赖工具索引；Phase 13 完成 GitHub Release 草稿、README badges 和仓库元数据建议；Phase 14 增加菜单栏 Settings UI，用于查看、编辑、重置本地配置；Phase 15 增加 Volcengine/Doubao BigModel ASR Flash 云端语音识别后端；Phase 16 固定 Claude CLI 工作目录，避免语音指令进入错误项目上下文；Phase 17 增加 Volcengine/Doubao TTS 云端语音合成后端，并在失败时自动 fallback 到 macOS say。
 
 核心能力：
 - CLI 文本/语音命令执行，高风险动作二次确认；菜单栏语音流程支持说“同意/取消”确认高风险动作
 - 菜单栏 App (rumps) + py2app .app 构建
 - whisper.cpp 离线语音转文字
+- Volcengine/Doubao 云端 ASR 和可选 TTS
 - 录音诊断、错误恢复、并发安全
 - 结构化日志 (app_events + sessions + last_result)
 - `--fake` 模式无需麦克风即可测试
@@ -75,7 +76,7 @@ macOS 常驻进程 (CLI 原型)
   -> 确认 (高风险动作 yes/no)
   -> Claude CLI 执行 (claude -p, subprocess)
   -> 结果摘要
-  -> Text-to-Speech (macOS say)
+  -> Text-to-Speech (macOS say 或 Volcengine/Doubao TTS)
   -> JSONL 日志
 ```
 
@@ -197,7 +198,7 @@ MIT License — 详见 [LICENSE](LICENSE)。欢迎通过 [CONTRIBUTING.md](CONTR
 
 - 平台：macOS。
 - 第一版语言：Python。
-- 第一版 TTS：macOS `say`。
+- 第一版 TTS：macOS `say`；可选 Volcengine/Doubao TTS。
 - 第一版 STT：可插拔接口，MVP 提供 text-input / whisper-cli / apple-speech 三种后端。
 - 第一版唤醒：按键/命令行触发 (ManualWakeTrigger)。
 - 最终形态：macOS 常驻 App。
@@ -207,7 +208,7 @@ MIT License — 详见 [LICENSE](LICENSE)。欢迎通过 [CONTRIBUTING.md](CONTR
 
 ## 开发状态
 
-Current main — F001-F070 (Phase 1-16) 全部通过。260 个测试。详情见 `feature_list.json`、`RELEASE_NOTES.md`。
+Current main — F001-F071 (Phase 1-17) 全部通过。274 个测试。详情见 `feature_list.json`、`RELEASE_NOTES.md`。
 
 v0.1.0 Release — F001-F067 (Phase 1-13)，223 个测试，已发布到 GitHub Releases。
 

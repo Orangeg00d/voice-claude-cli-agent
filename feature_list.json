@@ -967,6 +967,25 @@
       ],
       "passes": true,
       "evidence": "Added get_claude_workdir() and VOICE_CLAUDE_WORKDIR. run_claude() now resolves the workdir, passes cwd to subprocess.run, records cwd on ClaudeRunResult, and returns exit_code=-3 without invoking Claude if the directory is missing or invalid. Sessions and last_result include claude_cwd; View Logs, Mic Diagnostic, Health Check, CLI check, and Settings UI display/edit the workdir. Added F070 regression tests for cwd passing, invalid workdir skipping subprocess, Settings save, Health Check display, and log schema parity. 260/260 tests, lint clean."
+    },
+    {
+      "id": "F071",
+      "priority": 71,
+      "category": "voice",
+      "description": "Volcengine/Doubao TTS backend with automatic fallback to macOS say",
+      "steps": [
+        "Add VolcengineDoubaoSpeaker in tts.py calling Volcengine TTS HTTP streaming API",
+        "Add config: VOICE_TTS_BACKEND, VOLCENGINE_TTS_API_KEY, VOLCENGINE_TTS_RESOURCE_ID, VOLCENGINE_TTS_VOICE_TYPE, VOLCENGINE_TTS_AUDIO_FORMAT",
+        "VolcengineDoubaoSpeaker writes temp file and plays via afplay; falls back to MacOSSaySpeaker on any failure",
+        "Fallback events logged to app_events.jsonl",
+        "Settings UI supports TTS config with masked API keys",
+        "Health Check and Mic Diagnostic show TTS backend status",
+        "View Logs records tts_backend",
+        "Create docs/VOLCENGINE_TTS_SETUP.md",
+        "Tests mock network requests, verify fallback, verify masking, verify Health Check and Mic Diagnostic output"
+      ],
+      "passes": true,
+      "evidence": "tts.py rewritten with VolcengineDoubaoSpeaker using POST /api/v3/tts/unidirectional (streaming JSON Lines). create_speaker() factory selects MacOSSaySpeaker or VolcengineDoubaoSpeaker via VOICE_TTS_BACKEND. TTS failures auto-fallback to macOS say with _log_tts_fallback() and _fallback_called tracking. Success terminal code 20000000 is accepted, not treated as failure. Sessions, last_result, View Logs, and app_events include tts_backend, tts_duration_seconds, and tts_fallback_used. Settings UI, Health Check, and Mic Diagnostic display TTS backend/config with masked API keys. docs/VOLCENGINE_TTS_SETUP.md created. Codex added endpoint config coverage and stronger fallback/metrics tests. 274/274 tests, lint clean, check clean."
     }
   ]
 }

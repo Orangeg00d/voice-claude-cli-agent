@@ -9,8 +9,9 @@ and the results are read aloud via macOS Text-to-Speech.
 
 ## Key Differentiators
 
-1. **Fully local audio pipeline** — Recording (sounddevice), STT (whisper.cpp),
-   and TTS (macOS say) all run on-device. No audio data leaves the machine.
+1. **Local-first audio pipeline** — Recording (sounddevice), STT (whisper.cpp),
+   and TTS (macOS say) can all run on-device, with optional Volcengine/Doubao
+   cloud ASR/TTS when the user configures API keys.
 2. **Menu-bar native macOS experience** — Built with rumps/PyObjC, ships as
    a standalone .app bundle via py2app. No Docker, no Electron, no web UI.
 3. **Safety-first design** — Three-tier risk classification (read-only /
@@ -31,23 +32,23 @@ and the results are read aloud via macOS Text-to-Speech.
 | CLI framework | Click | Standard Python CLI |
 | Audio recording | sounddevice + numpy | Cross-platform PortAudio bindings |
 | STT | whisper.cpp (CLI) | Offline, fast, Apple Silicon optimized |
-| TTS | macOS `say` | Native, zero-config |
+| TTS | macOS `say` + optional Volcengine/Doubao TTS | Native fallback plus higher-quality cloud voice |
 | Menu bar UI | rumps + PyObjC | Lightweight macOS system tray |
 | Packaging | py2app | Native .app bundle |
-| Testing | pytest (260 tests) | Full pipeline + UI + concurrency + cloud STT + workdir coverage |
+| Testing | pytest (274 tests) | Full pipeline + UI + concurrency + cloud STT/TTS + workdir coverage |
 
 ## Project Status
 
 - **Version**: v0.1.0
-- **Features**: 70 acceptance items (F001-F070), all passing on current `main`
-- **Tests**: 260 (pytest), passing with `./init.sh test`
+- **Features**: 71 acceptance items (F001-F071), all passing on current `main`
+- **Tests**: 274 (pytest), passing with `./init.sh test`
 - **Lint**: ruff clean
 - **Code**: ~6000 lines (src + tests), 20+ source modules
 
 ## Privacy Design
 
 See [PRIVACY.md](PRIVACY.md) for full details. Summary:
-- Audio recording, STT, TTS, and logging are all local
+- Audio recording, default STT/TTS, and logging are local; optional Volcengine/Doubao ASR/TTS sends audio or text to the configured cloud API
 - Transcripts are passed to Claude CLI, which may send them to Anthropic per
   the user's Claude CLI configuration
 - No telemetry, no analytics, no network calls from the agent itself

@@ -36,6 +36,9 @@ def write_session(entry: dict) -> Path:
         "summary": entry.get("summary", ""),
         "spoken_summary": entry.get("spoken_summary", entry.get("summary", "")),
         "spoken": entry.get("spoken", False),
+        "tts_backend": entry.get("tts_backend", ""),
+        "tts_duration_seconds": entry.get("tts_duration_seconds"),
+        "tts_fallback_used": entry.get("tts_fallback_used", False),
     }
 
     with open(log_path, "a", encoding="utf-8") as f:

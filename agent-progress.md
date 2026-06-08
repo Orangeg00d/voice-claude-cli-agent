@@ -2204,3 +2204,26 @@
 - `./init.sh check` passed.
 - `./init.sh lint` passed.
 - `pytest tests/ -vv -x` passed: 260/260.
+
+## 2026-06-08 21:10 — Codex Review: F071 Volcengine/Doubao TTS
+
+### Finding
+- Claude's F071 implementation added the Volcengine/Doubao TTS backend, but several details needed hardening before acceptance.
+- `VOLCENGINE_TTS_ENDPOINT` was read by the TTS code but missing from config allowlists and Settings UI.
+- TTS fallback tracking was computed before playback and `_fallback_called` was never set, so logs could not prove whether the app really used Doubao TTS or fell back to macOS `say`.
+- The Volcengine success terminal code `20000000` was treated as an API error, which could cause a successful stream to fallback unnecessarily.
+- Session logging did not persist TTS backend metadata because `write_session()` dropped the new fields.
+
+### Completed
+- Added `VOLCENGINE_TTS_ENDPOINT` to config, Settings UI, and Mic Diagnostic display.
+- Added `X-Api-App-Key` header and accepted `code=20000000` as normal stream completion.
+- Added `_fallback_called` tracking on `VolcengineDoubaoSpeaker`.
+- Moved TTS metric capture to after playback and persisted `tts_backend`, `tts_duration_seconds`, and `tts_fallback_used` in sessions, last_result, View Logs, and app_events.
+- Strengthened F071 tests for missing credentials fallback, terminal success code handling, endpoint config loading, and pipeline TTS metrics.
+- Updated Volcengine TTS setup documentation and F071 evidence.
+
+### Verification
+- F071 focused tests passed: 14/14.
+- `./init.sh check` passed.
+- `./init.sh lint` passed.
+- `./init.sh test` passed: 274/274.

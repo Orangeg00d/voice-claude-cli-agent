@@ -2,7 +2,7 @@
 
 ## 概述
 
-Voice Claude Agent 是一个 macOS 本地语音 Agent。用户通过菜单栏点击触发录音，语音经 whisper.cpp 转文字后交给 Claude CLI 执行，结果通过 macOS `say` 播报。
+Voice Claude Agent 是一个 macOS local-first 语音 Agent。用户通过菜单栏点击触发录音，语音经 whisper.cpp 或可选 Volcengine/Doubao ASR 转文字后交给 Claude CLI 执行，结果通过 macOS `say` 或可选 Volcengine/Doubao TTS 播报。
 
 ## 版本信息
 
@@ -13,9 +13,9 @@ Voice Claude Agent 是一个 macOS 本地语音 Agent。用户通过菜单栏点
 
 ## 当前 main 状态
 
-- **验收项**: 70/70 passed (F001-F070)
-- **测试数量**: 260
-- **最新阶段**: Phase 16 — Claude CLI workdir pinning
+- **验收项**: 71/71 passed (F001-F071)
+- **测试数量**: 274
+- **最新阶段**: Phase 17 — Volcengine/Doubao TTS backend
 
 ## v0.1.0 功能清单 (67 项验收全部通过)
 
@@ -129,10 +129,18 @@ Voice Claude Agent 是一个 macOS 本地语音 Agent。用户通过菜单栏点
 - 无效目录会阻止执行并返回明确错误
 - Settings UI、Health Check、Mic Diagnostic、View Logs 显示 Claude workdir
 
+### Unreleased: Volcengine/Doubao TTS (F071)
+- 新增 `VOICE_TTS_BACKEND=volcengine-doubao`
+- 使用 Volcengine/Doubao TTS HTTP Chunked V3 单向流式接口
+- 支持 `VOLCENGINE_TTS_API_KEY`、Resource ID、Voice Type、Audio Format、Endpoint 配置
+- TTS 失败自动 fallback 到 macOS `say`
+- sessions、last_result、View Logs、app_events 记录 `tts_backend`、`tts_duration_seconds`、`tts_fallback_used`
+- 新增 `docs/VOLCENGINE_TTS_SETUP.md`
+
 ## 测试
 
 - **测试框架**: pytest
-- **当前测试数量**: 260
+- **当前测试数量**: 274
 - **v0.1.0 发布测试数量**: 223
 - **测试覆盖**: CLI 管道、录音、STT、风险分类、菜单栏生命周期、并发安全、日志格式
 

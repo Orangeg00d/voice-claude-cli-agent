@@ -150,6 +150,7 @@ class VoiceClaudeApp(rumps.App):
         setting_keys = [
             "VOICE_RECORD_SECONDS",
             "VOICE_STT_BACKEND",
+            "VOICE_TTS_BACKEND",
             "VOICE_CLAUDE_WORKDIR",
             "WHISPER_CPP_MODEL",
             "WHISPER_CPP_LANGUAGE",
@@ -160,8 +161,14 @@ class VoiceClaudeApp(rumps.App):
             "VOLCENGINE_ASR_CLUSTER",
             "VOLCENGINE_ASR_LANGUAGE",
             "VOLCENGINE_ASR_ENDPOINT",
+            "VOLCENGINE_TTS_API_KEY",
+            "VOLCENGINE_TTS_RESOURCE_ID",
+            "VOLCENGINE_TTS_VOICE_TYPE",
+            "VOLCENGINE_TTS_AUDIO_FORMAT",
+            "VOLCENGINE_TTS_ENDPOINT",
         ]
-        credential_keys = {"VOLCENGINE_ASR_API_KEY", "VOLCENGINE_ASR_ACCESS_TOKEN"}
+        credential_keys = {"VOLCENGINE_ASR_API_KEY", "VOLCENGINE_ASR_ACCESS_TOKEN",
+                           "VOLCENGINE_TTS_API_KEY"}
         keep_secret = "<keep existing secret>"
 
         def _masked(key, val):
@@ -199,12 +206,16 @@ class VoiceClaudeApp(rumps.App):
             key = key.strip()
             val = val.strip()
             if key not in ("VOICE_RECORD_SECONDS", "VOICE_STT_BACKEND",
+                           "VOICE_TTS_BACKEND",
                            "VOICE_CLAUDE_WORKDIR",
                            "WHISPER_CPP_MODEL", "WHISPER_CPP_LANGUAGE",
                            "VOLCENGINE_ASR_API_KEY", "VOLCENGINE_ASR_APP_ID",
                            "VOLCENGINE_ASR_ACCESS_TOKEN",
                            "VOLCENGINE_ASR_RESOURCE_ID", "VOLCENGINE_ASR_CLUSTER",
-                           "VOLCENGINE_ASR_LANGUAGE", "VOLCENGINE_ASR_ENDPOINT"):
+                           "VOLCENGINE_ASR_LANGUAGE", "VOLCENGINE_ASR_ENDPOINT",
+                           "VOLCENGINE_TTS_API_KEY", "VOLCENGINE_TTS_RESOURCE_ID",
+                           "VOLCENGINE_TTS_VOICE_TYPE", "VOLCENGINE_TTS_AUDIO_FORMAT",
+                           "VOLCENGINE_TTS_ENDPOINT"):
                 continue
 
             if key in credential_keys and val == keep_secret and key in cfg:
@@ -398,6 +409,8 @@ class VoiceClaudeApp(rumps.App):
                         extra = f" @{ev['elapsed']}"
                     if "audio_bytes" in ev:
                         extra += f" bytes={ev['audio_bytes']}"
+                    if "reason" in ev:
+                        extra += f" reason={ev['reason']}"
                     lines.append(f"  {ts} {evt}{extra}")
             except Exception as e:
                 lines.append(f"Error reading app_events: {e}")
@@ -415,6 +428,12 @@ class VoiceClaudeApp(rumps.App):
                 lines.append(f"  prompt: {data.get('prompt', '?')}")
                 if data.get("claude_cwd"):
                     lines.append(f"  claude_cwd: {data.get('claude_cwd')}")
+                if data.get("tts_backend"):
+                    lines.append(f"  tts_backend: {data.get('tts_backend')}")
+                if data.get("tts_duration_seconds") is not None:
+                    lines.append(f"  tts_duration_seconds: {data.get('tts_duration_seconds')}")
+                if data.get("tts_fallback_used") is not None:
+                    lines.append(f"  tts_fallback_used: {data.get('tts_fallback_used')}")
                 lines.append(f"  exit_code: {data.get('exit_code', '?')}")
                 summary = data.get("summary", data.get("spoken_summary", "?"))
                 lines.append(f"  summary: {summary[:200]}")
@@ -443,6 +462,18 @@ class VoiceClaudeApp(rumps.App):
         lines.append(f"Config path: {get_config_path()}")
         lines.append(f"STT backend: {self.stt_backend}")
         lines.append(f"Claude workdir: {get_claude_workdir()}")
+        # TTS backend status
+        from voice_claude_agent.tts import _resolve_tts_backend, _check_volcengine_tts_credentials, _mask_tts_credential
+        lines.append(f"TTS backend: {_resolve_tts_backend()}")
+        tts_creds, _tts_err = _check_volcengine_tts_credentials()
+        if tts_creds:
+            lines.append("Volcengine TTS: CONFIGURED")
+            for tk in ("VOLCENGINE_TTS_API_KEY", "VOLCENGINE_TTS_RESOURCE_ID",
+                        "VOLCENGINE_TTS_VOICE_TYPE", "VOLCENGINE_TTS_AUDIO_FORMAT",
+                        "VOLCENGINE_TTS_ENDPOINT"):
+                lines.append(f"  {tk}: {_mask_tts_credential(tk, tts_creds.get(tk, ''))}")
+        else:
+            lines.append("Volcengine TTS: not configured")
         lines.append(f"Record duration: {self.record_seconds}s")
         lines.append(f"Whisper model: {get_config_value('WHISPER_CPP_MODEL', '(not set)')}")
         lines.append(f"Whisper language: {get_config_value('WHISPER_CPP_LANGUAGE', 'zh')}")
@@ -588,6 +619,16 @@ class VoiceClaudeApp(rumps.App):
             "",
         ))
         lines.append(self._check_item("STT backend", True, self.stt_backend, ""))
+
+        # TTS backend health
+        from voice_claude_agent.tts import _resolve_tts_backend, _check_volcengine_tts_credentials
+        tts_backend = _resolve_tts_backend()
+        tts_creds, _tts_err = _check_volcengine_tts_credentials()
+        tts_healthy = tts_backend == "macos-say" or bool(tts_creds)
+        tts_detail = f"{tts_backend}" + (" (configured)" if tts_healthy else " (API key missing)")
+        lines.append(self._check_item("TTS backend", tts_healthy, tts_detail,
+            "Set VOLCENGINE_TTS_API_KEY or use VOICE_TTS_BACKEND=macos-say" if not tts_healthy else ""))
+        lines.append("")
 
         claude_workdir = get_claude_workdir()
         lines.append(self._check_item(
@@ -842,6 +883,7 @@ class VoiceClaudeApp(rumps.App):
                 last_data = {}
             self._last_transcript = transcript
             self._last_summary = last_data.get("summary", "")
+            self._last_tts_backend = last_data.get("tts_backend", "macos-say")
             self.transcript_item.title = f"Last Transcript: {transcript[:60]}{'...' if len(transcript) > 60 else ''}"
             self.summary_item.title = f"Last Summary: {self._last_summary[:60]}{'...' if len(self._last_summary) > 60 else ''}"
             self._append_runtime_event(
@@ -850,8 +892,13 @@ class VoiceClaudeApp(rumps.App):
                 duration=f"{_time.monotonic() - claude_start:.3f}s",
             )
 
-            # TTS is handled inside _run_pipeline via MacOSSaySpeaker
-            self._append_runtime_event("tts_done")
+            # TTS is handled inside _run_pipeline via create_speaker().
+            self._append_runtime_event(
+                "tts_done",
+                tts_backend=last_data.get("tts_backend", "macos-say"),
+                tts_duration_seconds=last_data.get("tts_duration_seconds"),
+                tts_fallback_used=last_data.get("tts_fallback_used", False),
+            )
 
             self.trigger_item.title = "Done ✓"
             self._append_runtime_event(

@@ -1,6 +1,7 @@
 """CLI entry point for Voice Claude Agent."""
 
 import sys
+import time
 
 import click
 
@@ -26,7 +27,7 @@ from voice_claude_agent.stt import (
     list_available_backends,
 )
 from voice_claude_agent.summarizer import summarize, summarize_for_record
-from voice_claude_agent.tts import MacOSSaySpeaker, FakeSpeaker
+from voice_claude_agent.tts import FakeSpeaker, VolcengineDoubaoSpeaker, create_speaker, _resolve_tts_backend
 from voice_claude_agent.wake import ManualWakeTrigger
 
 _STT_BACKEND_HELP = "STT backend: text-input (dev), whisper-cli, apple-speech (macOS), or volcengine-doubao (cloud ASR)"
@@ -248,7 +249,10 @@ def _run_pipeline(
     tts_fake: bool,
     confirmation_override: bool | None = None,
 ) -> None:
-    speaker = FakeSpeaker() if tts_fake else MacOSSaySpeaker()
+    if tts_fake:
+        speaker = FakeSpeaker()
+    else:
+        speaker = create_speaker()
 
     # 1. Risk classification
     risk_level = classify_risk(prompt)
@@ -282,9 +286,14 @@ def _run_pipeline(
     result = run_claude(wrapped)
     result_cwd = result.cwd if isinstance(getattr(result, "cwd", ""), str) else ""
 
+    tts_backend_used = "fake" if tts_fake else _resolve_tts_backend()
+
     if result.timed_out:
         click.echo(click.style("Claude CLI timed out.", fg="red"))
+        tts_start = time.monotonic()
         speaker.speak("Claude CLI 执行超时，请检查任务或重试。")
+        tts_duration_seconds = round(time.monotonic() - tts_start, 3)
+        tts_fallback_used = isinstance(speaker, VolcengineDoubaoSpeaker) and getattr(speaker, "_fallback_called", False)
         if tts_fake:
             assert isinstance(speaker, FakeSpeaker)
             click.echo(f"TTS (fake): {speaker.spoken[-1]}")
@@ -302,6 +311,9 @@ def _run_pipeline(
             "summary": "Timed out",
             "spoken_summary": "Claude CLI 执行超时，请检查任务或重试。",
             "spoken": True,
+            "tts_backend": tts_backend_used,
+            "tts_duration_seconds": tts_duration_seconds,
+            "tts_fallback_used": tts_fallback_used,
         })
         return
 
@@ -314,7 +326,16 @@ def _run_pipeline(
     spoken_summary = summarize(combined, result.exit_code, result.duration_seconds)
     click.echo(f"Summary: {spoken_summary}")
 
-    # 5. Log to JSONL
+    # 5. TTS speak
+    tts_start = time.monotonic()
+    speaker.speak(spoken_summary)
+    tts_duration_seconds = round(time.monotonic() - tts_start, 3)
+    tts_fallback_used = isinstance(speaker, VolcengineDoubaoSpeaker) and getattr(speaker, "_fallback_called", False)
+    if tts_fake:
+        assert isinstance(speaker, FakeSpeaker)
+        click.echo(f"TTS (fake): {speaker.spoken[-1]}")
+
+    # 6. Log to JSONL
     write_session({
         "input_mode": input_mode,
         "transcript": prompt,
@@ -329,6 +350,9 @@ def _run_pipeline(
         "summary": summary,
         "spoken_summary": spoken_summary,
         "spoken": True,
+        "tts_backend": tts_backend_used,
+        "tts_duration_seconds": tts_duration_seconds,
+        "tts_fallback_used": tts_fallback_used,
     })
 
     write_last_result({
@@ -338,13 +362,10 @@ def _run_pipeline(
         "summary": summary,
         "spoken_summary": spoken_summary,
         "risk_level": risk_level.value,
+        "tts_backend": tts_backend_used,
+        "tts_duration_seconds": tts_duration_seconds,
+        "tts_fallback_used": tts_fallback_used,
     })
-
-    # 6. TTS speak
-    speaker.speak(spoken_summary)
-    if tts_fake:
-        assert isinstance(speaker, FakeSpeaker)
-        click.echo(f"TTS (fake): {speaker.spoken[-1]}")
 
 
 @main.command()
