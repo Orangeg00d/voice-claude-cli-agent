@@ -2336,3 +2336,39 @@
 - Preview does not call Claude CLI, does not write sessions — purely TTS playback.
 - Codex review fixed a logging gap: real VolcengineDoubaoSpeaker fallback does not raise, so preview now also records `tts_preview_failed` when `_fallback_called=True`.
 - rumps.Window dialog may have slightly different rendering in py2app vs terminal context.
+
+## 2026-06-08 18:55 — Phase 19 (F073): TTS Voice Selector
+
+### Finding
+- Claude's first F073 pass only modified `src/voice_claude_agent/app.py`, left an untracked `app.py.bak`, and did not update tests, docs, `feature_list.json`, or `agent-progress.md`.
+- Implementation also missed Health Check / Mic Diagnostic voice display and did not warn when selecting BV voices that may need a different Volcengine Resource ID.
+
+### Completed
+- Added `TTS Voice` submenu with five common voice choices: 爽快思思、清润男声、标准女声、标准男声、VV 女声（方言）。
+- Menu title shows the current voice label, and the selected submenu item is marked.
+- Selecting `moon_bigtts` voices writes `VOLCENGINE_TTS_VOICE_TYPE` and sets `VOLCENGINE_TTS_RESOURCE_ID=seed-tts-1.0`.
+- Selecting BV voices preserves the existing Resource ID and shows a warning to confirm Resource ID compatibility in the Volcengine console.
+- Config writes preserve existing API keys and reload the running App immediately.
+- `Preview TTS Voice` uses the updated voice config without restart.
+- Health Check and Mic Diagnostic now display the current TTS voice type.
+- Updated `docs/VOLCENGINE_TTS_SETUP.md`, `feature_list.json`, README, release notes, and developer application status.
+- Removed generated `src/voice_claude_agent/app.py.bak`.
+
+### Verification
+- Focused F072/F073 tests passed: 16/16.
+- `./init.sh lint` passed.
+- Full `pytest tests/ -vv -x` passed: 297/297.
+- `python setup.py py2app` built successfully.
+
+### Files Changed
+- src/voice_claude_agent/app.py
+- tests/test_core.py
+- docs/VOLCENGINE_TTS_SETUP.md
+- feature_list.json
+- README.md
+- RELEASE_NOTES.md
+- DEVELOPER_PROGRAM_APPLICATION.md
+- agent-progress.md
+
+### Next Recommended Task
+- Manual test: use TTS Voice → 清润男声, then Preview TTS Voice; verify the preview voice changes without full Trigger Recording.

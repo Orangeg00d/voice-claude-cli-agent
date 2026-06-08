@@ -5557,6 +5557,198 @@ class TestTTSPreviewVoice:
         assert app.preview_tts_item.title == "Preview TTS Voice"
 
 
+# ── F073: TTS Voice Selector ─────────────────────────────────
+
+
+class TestTTSVoiceSelector:
+    """Tests for choosing Volcengine/Doubao TTS voices from the menu bar app."""
+
+    def test_tts_voice_menu_item_exists_and_shows_current_voice(self, monkeypatch, tmp_path):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(
+            json.dumps({"VOLCENGINE_TTS_VOICE_TYPE": "zh_male_qingrun_moon_bigtts"}),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+
+        app = VoiceClaudeApp()
+
+        assert app.tts_voice_item.title == "TTS Voice: 清润男声"
+        assert "清润男声" in list(app.tts_voice_item.keys())
+
+    def test_select_voice_updates_config_and_preserves_secret(self, monkeypatch, tmp_path):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(
+            json.dumps({
+                "VOLCENGINE_TTS_API_KEY": "secret-key",
+                "VOLCENGINE_TTS_VOICE_TYPE": "zh_female_shuangkuaisisi_moon_bigtts",
+            }),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+        alerts = []
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._on_select_tts_voice("zh_male_qingrun_moon_bigtts", True)(app.tts_voice_item)
+
+        saved = json.loads(cfg_file.read_text(encoding="utf-8"))
+        assert saved["VOLCENGINE_TTS_API_KEY"] == "secret-key"
+        assert saved["VOLCENGINE_TTS_VOICE_TYPE"] == "zh_male_qingrun_moon_bigtts"
+        assert app.tts_voice_item.title == "TTS Voice: 清润男声"
+        assert alerts[-1]["title"] == "TTS Voice Changed"
+
+    def test_select_moon_bigtts_sets_seed_tts_1_resource(self, monkeypatch, tmp_path):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(
+            json.dumps({"VOLCENGINE_TTS_RESOURCE_ID": "seed-tts-2.0"}),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: None)
+        app._save_voice_type("zh_male_qingrun_moon_bigtts", True)
+
+        saved = json.loads(cfg_file.read_text(encoding="utf-8"))
+        assert saved["VOLCENGINE_TTS_VOICE_TYPE"] == "zh_male_qingrun_moon_bigtts"
+        assert saved["VOLCENGINE_TTS_RESOURCE_ID"] == "seed-tts-1.0"
+
+    def test_select_bv_voice_does_not_overwrite_resource_id(self, monkeypatch, tmp_path):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(
+            json.dumps({"VOLCENGINE_TTS_RESOURCE_ID": "custom-resource"}),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+        alerts = []
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._on_select_tts_voice("BV701_streaming", False)(app.tts_voice_item)
+
+        saved = json.loads(cfg_file.read_text(encoding="utf-8"))
+        assert saved["VOLCENGINE_TTS_VOICE_TYPE"] == "BV701_streaming"
+        assert saved["VOLCENGINE_TTS_RESOURCE_ID"] == "custom-resource"
+        assert "Resource ID" in alerts[-1]["message"]
+
+    def test_preview_uses_updated_voice_config(self, monkeypatch, tmp_path):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+        from voice_claude_agent.config import get_config_value
+
+        cfg_file = tmp_path / "config.json"
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+        events_path = tmp_path / "app_events.jsonl"
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_app_events_log_path",
+            lambda: events_path,
+        )
+        spoken_voices = []
+
+        class _FakeSpeaker:
+            def speak(self, text):
+                spoken_voices.append(get_config_value("VOLCENGINE_TTS_VOICE_TYPE"))
+
+        monkeypatch.setattr("voice_claude_agent.tts.create_speaker", lambda: _FakeSpeaker())
+        monkeypatch.setattr("voice_claude_agent.tts._resolve_tts_backend", lambda: "volcengine-doubao")
+
+        class _Clicked:
+            clicked = True
+            text = "测试"
+
+        monkeypatch.setattr("rumps.Window.run", lambda self: _Clicked)
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: None)
+        app._save_voice_type("zh_male_qingrun_moon_bigtts", True)
+        app._preview_tts_voice(app.preview_tts_item)
+
+        assert spoken_voices == ["zh_male_qingrun_moon_bigtts"]
+
+    def test_health_check_displays_current_tts_voice(self, monkeypatch, tmp_path):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(
+            json.dumps({"VOLCENGINE_TTS_VOICE_TYPE": "zh_male_qingrun_moon_bigtts"}),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+        monkeypatch.setattr("voice_claude_agent.config.find_claude_executable", lambda: "/usr/bin/claude")
+        monkeypatch.setattr("voice_claude_agent.config.check_apple_speech_available", lambda: True)
+        monkeypatch.setattr("voice_claude_agent.stt._find_whisper_cpp_binary", lambda: "/usr/bin/whisper-cli")
+        monkeypatch.setattr("voice_claude_agent.stt._resolve_whisper_model", lambda: ("/tmp/model.bin", ""))
+        monkeypatch.setattr("voice_claude_agent.stt._check_volcengine_credentials", lambda: ({}, ""))
+        monkeypatch.setattr("voice_claude_agent.tts._check_volcengine_tts_credentials", lambda: ({}, ""))
+
+        import sounddevice as sd
+        monkeypatch.setattr(sd, "query_devices", lambda **kw: {"name": "test"})
+
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._run_health_check(app.health_item)
+
+        assert "TTS voice" in alerts[-1]["message"]
+        assert "zh_male_qingrun_moon_bigtts" in alerts[-1]["message"]
+
+    def test_mic_diagnostic_displays_current_tts_voice(self, monkeypatch, tmp_path):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(
+            json.dumps({"VOLCENGINE_TTS_VOICE_TYPE": "BV120_streaming"}),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+        monkeypatch.setattr("voice_claude_agent.stt._check_volcengine_credentials", lambda: ({}, ""))
+        monkeypatch.setattr("voice_claude_agent.tts._check_volcengine_tts_credentials", lambda: ({}, ""))
+
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._run_mic_diagnostic(app.diagnostic_item)
+
+        assert "TTS voice: BV120_streaming" in alerts[-1]["message"]
+
+    def test_reload_from_settings_updates_tts_voice_menu(self, monkeypatch, tmp_path):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(
+            json.dumps({"VOLCENGINE_TTS_VOICE_TYPE": "zh_female_shuangkuaisisi_moon_bigtts"}),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: None)
+        cfg_file.write_text(
+            json.dumps({"VOLCENGINE_TTS_VOICE_TYPE": "zh_male_qingrun_moon_bigtts"}),
+            encoding="utf-8",
+        )
+        app._reload_from_config({"VOLCENGINE_TTS_VOICE_TYPE": "zh_male_qingrun_moon_bigtts"})
+
+        assert app.tts_voice_item.title == "TTS Voice: 清润男声"
+
+
 # ── F071: Volcengine/Doubao TTS backend (continued) ──────────
 
 

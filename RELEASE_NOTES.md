@@ -13,9 +13,9 @@ Voice Claude Agent 是一个 macOS local-first 语音 Agent。用户通过菜单
 
 ## 当前 main 状态
 
-- **验收项**: 72/72 passed (F001-F072)
-- **测试数量**: 289
-- **最新阶段**: Phase 18 — TTS voice preview
+- **验收项**: 73/73 passed (F001-F073)
+- **测试数量**: 297
+- **最新阶段**: Phase 19 — TTS voice selector
 
 ## v0.1.0 功能清单 (67 项验收全部通过)
 
@@ -146,10 +146,17 @@ Voice Claude Agent 是一个 macOS local-first 语音 Agent。用户通过菜单
 - 记录 `tts_preview_start`、`tts_preview_failed`、`tts_preview_done` app_events
 - Volcengine TTS fallback 会在预览日志中显式标记
 
+### Unreleased: TTS Voice Selector (F073)
+- 菜单栏新增 `TTS Voice` 子菜单
+- 支持爽快思思、清润男声、标准女声、标准男声、VV 女声（方言）
+- 选择 `moon_bigtts` 系列时自动设置 `VOLCENGINE_TTS_RESOURCE_ID=seed-tts-1.0`
+- 选择 BV 系列时保留已有 Resource ID，并提示用户确认匹配关系
+- Health Check / Mic Diagnostic 显示当前 TTS voice type
+
 ## 测试
 
 - **测试框架**: pytest
-- **当前测试数量**: 289
+- **当前测试数量**: 297
 - **v0.1.0 发布测试数量**: 223
 - **测试覆盖**: CLI 管道、录音、STT、风险分类、菜单栏生命周期、并发安全、日志格式
 

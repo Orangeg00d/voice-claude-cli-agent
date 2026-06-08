@@ -1005,6 +1005,25 @@
       ],
       "passes": true,
       "evidence": "Added 'Preview TTS Voice' menu item with _preview_tts_voice callback. Input dialog via rumps.Window with default text. Uses create_speaker() for current backend; VolcengineDoubaoSpeaker fallback to MacOSSaySpeaker with tts_preview_failed event. App-events: tts_preview_start (backend, text_length), tts_preview_failed when fallback occurs, and tts_preview_done (backend, tts_backend_used, tts_fallback_used, duration). Title resets in finally block. 8 tests: menu item exists, cancel no-op, empty input uses default, no Claude/session, explicit exception fallback recorded, internal Volcengine fallback recorded, title restores after play, title stays after cancel. Updated docs/VOLCENGINE_TTS_SETUP.md with preview instructions. 289/289 tests, lint clean, check clean."
+    },
+    {
+      "id": "F073",
+      "priority": 73,
+      "category": "app",
+      "description": "TTS Voice selector menu for switching common Volcengine/Doubao voices",
+      "steps": [
+        "MenuItem TTS Voice exists in the menu bar app",
+        "Submenu includes 爽快思思、清润男声、标准女声、标准男声、VV 女声",
+        "Current selected voice appears in the TTS Voice menu title and submenu marker",
+        "Selecting a voice updates ~/.voice-claude-agent/config.json without clearing secrets",
+        "Selecting moon_bigtts voices sets VOLCENGINE_TTS_RESOURCE_ID=seed-tts-1.0",
+        "Selecting BV voices preserves the existing Resource ID and warns the user to verify matching Resource ID",
+        "Preview TTS Voice uses the updated VOLCENGINE_TTS_VOICE_TYPE immediately",
+        "Health Check and Mic Diagnostic display the current TTS voice type",
+        "docs/VOLCENGINE_TTS_SETUP.md documents the TTS Voice menu"
+      ],
+      "passes": true,
+      "evidence": "Added TTS Voice submenu with five common Volcengine/Doubao voices. Menu title shows the current voice label; selected submenu item is marked. Selecting moon_bigtts voices writes VOLCENGINE_TTS_VOICE_TYPE and VOLCENGINE_TTS_RESOURCE_ID=seed-tts-1.0. Selecting BV voices preserves existing Resource ID and shows a Resource ID matching warning. Config writes preserve existing API keys and reload immediately; Preview TTS Voice reads the updated config. Health Check and Mic Diagnostic show current TTS voice. Added docs/VOLCENGINE_TTS_SETUP.md TTS Voice section. 8 F073 tests cover menu display, config save, secret preservation, moon/BV resource behavior, Preview integration, diagnostics, and Settings reload. 297/297 tests, lint clean, check clean."
     }
   ]
 }

@@ -104,7 +104,29 @@ JSON
 
 预览不会调用 Claude CLI，也不会写 session。
 
-### 6.3 检查配置状态
+### 6.3 选择音色 (TTS Voice)
+
+菜单栏 App 提供 **TTS Voice** 子菜单，可以直接切换常用音色，不需要手动编辑 `config.json`：
+
+| 菜单显示 | 写入的 `VOLCENGINE_TTS_VOICE_TYPE` |
+|---|---|
+| 爽快思思（女声） | `zh_female_shuangkuaisisi_moon_bigtts` |
+| 清润男声 | `zh_male_qingrun_moon_bigtts` |
+| 标准女声 | `BV701_streaming` |
+| 标准男声 | `BV120_streaming` |
+| VV 女声（方言） | `zh_female_vv_uranus_bigtts` |
+
+选择 `moon_bigtts` 系列音色时，App 会自动设置：
+
+```text
+VOLCENGINE_TTS_RESOURCE_ID=seed-tts-1.0
+```
+
+选择 `BV701_streaming` / `BV120_streaming` 时，App 不会覆盖已有 Resource ID。如果预览时发生 fallback，请到火山控制台确认该音色需要的 Resource ID。
+
+切换后可立即使用 **Preview TTS Voice** 验证效果，不需要重启 App。
+
+### 6.4 检查配置状态
 
 ```bash
 voice-claude-agent check

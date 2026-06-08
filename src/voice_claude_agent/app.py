@@ -32,6 +32,8 @@ class VoiceClaudeApp(rumps.App):
       Start Wake        — begins the continuous wake loop
       Stop Wake         — stops the wake loop
       Trigger Recording — fires a single record → STT → Claude → TTS cycle
+      TTS Voice         — select TTS voice type submenu
+      Preview TTS Voice — preview current TTS voice
       Mic Diagnostic    — shows detailed mic/recording diagnostic info
       Mic Status        — shows current microphone permission
       Quit              — exits the application (stops wake loop first)
@@ -89,6 +91,11 @@ class VoiceClaudeApp(rumps.App):
         self.preview_tts_item = rumps.MenuItem(
             "Preview TTS Voice", callback=self._preview_tts_voice
         )
+
+        # F073: TTS Voice submenu
+        self.tts_voice_item = rumps.MenuItem(self._build_tts_voice_title())
+        self._refresh_tts_voice_submenu()
+
         self.diagnostic_item = rumps.MenuItem(
             "Mic Diagnostic", callback=self._run_mic_diagnostic
         )
@@ -120,6 +127,7 @@ class VoiceClaudeApp(rumps.App):
             self.stop_item,
             self.trigger_item,
             self.preview_tts_item,
+            self.tts_voice_item,
             None,
             self.diagnostic_item,
             self.mic_status_item,
@@ -139,6 +147,75 @@ class VoiceClaudeApp(rumps.App):
         self._update_mic_status()
         self._sync_menu_titles()
         self._validate_stt_backend()
+
+    # ── F073: TTS voice options ────────────────────────────────
+
+    TTS_VOICES = [
+        ("爽快思思（女声）", "zh_female_shuangkuaisisi_moon_bigtts", True),
+        ("清润男声", "zh_male_qingrun_moon_bigtts", True),
+        ("标准女声", "BV701_streaming", False),
+        ("标准男声", "BV120_streaming", False),
+        ("VV 女声（方言）", "zh_female_vv_uranus_bigtts", True),
+    ]
+
+    @staticmethod
+    def _voice_label(voice_type: str) -> str:
+        for label, vt, _moon in VoiceClaudeApp.TTS_VOICES:
+            if vt == voice_type:
+                return label
+        return voice_type
+
+    def _current_tts_voice_type(self) -> str:
+        from voice_claude_agent.tts import _VOLCENGINE_TTS_DEFAULT_VOICE_TYPE
+        v = get_config_value("VOLCENGINE_TTS_VOICE_TYPE", "").strip()
+        return v or _VOLCENGINE_TTS_DEFAULT_VOICE_TYPE
+
+    def _build_tts_voice_title(self) -> str:
+        label = self._voice_label(self._current_tts_voice_type())
+        return f"TTS Voice: {label}"
+
+    def _save_voice_type(self, voice_type: str, is_moon_bigtts: bool) -> None:
+        import json
+
+        cfg = load_config()
+        cfg["VOLCENGINE_TTS_VOICE_TYPE"] = voice_type
+        if is_moon_bigtts:
+            cfg["VOLCENGINE_TTS_RESOURCE_ID"] = "seed-tts-1.0"
+        cfg_path = get_config_path()
+        cfg_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = cfg_path.with_name(f"{cfg_path.name}.tmp")
+        tmp_path.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        tmp_path.replace(cfg_path)
+        self._reload_from_config(cfg)
+
+    def _on_select_tts_voice(self, voice_type: str, is_moon_bigtts: bool) -> callable:
+        def _cb(sender: rumps.MenuItem) -> None:
+            self._save_voice_type(voice_type, is_moon_bigtts)
+            self._update_tts_voice_menu_title()
+            self._refresh_tts_voice_submenu()
+            message = f"Voice set to: {self._voice_label(voice_type)}"
+            if not is_moon_bigtts:
+                message += (
+                    "\n\nThis voice may require a matching Volcengine Resource ID. "
+                    "If preview falls back, confirm VOLCENGINE_TTS_RESOURCE_ID in the console."
+                )
+            self._alert_on_main(title="TTS Voice Changed", message=message)
+        return _cb
+
+    def _update_tts_voice_menu_title(self) -> None:
+        if hasattr(self, "tts_voice_item") and self.tts_voice_item is not None:
+            self.tts_voice_item.title = self._build_tts_voice_title()
+
+    def _refresh_tts_voice_submenu(self) -> None:
+        if not hasattr(self, "tts_voice_item") or self.tts_voice_item is None:
+            return
+        current = self._current_tts_voice_type()
+        for key in list(self.tts_voice_item.keys()):
+            del self.tts_voice_item[key]
+        for label, vt, is_moon in self.TTS_VOICES:
+            display = f"✓ {label}" if vt == current else label
+            mi = rumps.MenuItem(display, callback=self._on_select_tts_voice(vt, is_moon))
+            self.tts_voice_item[label] = mi
 
     # ── F068: Settings UI ───────────────────────────────────
 
@@ -319,6 +396,8 @@ class VoiceClaudeApp(rumps.App):
         self.stt_backend = "text-input"
         if "VOICE_STT_BACKEND" in cfg and cfg["VOICE_STT_BACKEND"] in self._VALID_BACKENDS:
             self.stt_backend = cfg["VOICE_STT_BACKEND"]
+        self._update_tts_voice_menu_title()
+        self._refresh_tts_voice_submenu()
 
     # ── STT backend validation ───────────────────────────────
 
@@ -496,6 +575,7 @@ class VoiceClaudeApp(rumps.App):
         # TTS backend status
         from voice_claude_agent.tts import _resolve_tts_backend, _check_volcengine_tts_credentials, _mask_tts_credential
         lines.append(f"TTS backend: {_resolve_tts_backend()}")
+        lines.append(f"TTS voice: {self._current_tts_voice_type()}")
         tts_creds, _tts_err = _check_volcengine_tts_credentials()
         if tts_creds:
             lines.append("Volcengine TTS: CONFIGURED")
@@ -662,6 +742,7 @@ class VoiceClaudeApp(rumps.App):
         tts_detail = f"{tts_backend}" + (" (configured)" if tts_healthy else " (API key missing)")
         lines.append(self._check_item("TTS backend", tts_healthy, tts_detail,
             "Set VOLCENGINE_TTS_API_KEY or use VOICE_TTS_BACKEND=macos-say" if not tts_healthy else ""))
+        lines.append(self._check_item("TTS voice", True, self._current_tts_voice_type(), ""))
         tts_env_override = os.environ.get("VOICE_TTS_BACKEND", "").strip()
         if tts_env_override:
             lines.append(f"  env override: VOICE_TTS_BACKEND={tts_env_override}")
