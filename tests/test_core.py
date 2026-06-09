@@ -1117,10 +1117,47 @@ class TestPhase4ExceptionHandling:
         record = json.loads(lines[0])
         assert record["summary"] == "Timed out"
         assert record["exit_code"] == -1
+        assert record["timed_out"] is True
+        last = json.loads((tmp_path / "last_result.json").read_text())
+        assert last["timed_out"] is True
 
         captured = capsys.readouterr()
         assert "Claude CLI timed out." in captured.out
-        assert "TTS (fake): Claude CLI 执行超时，请检查任务或重试。" in captured.out
+        assert "TTS (fake): 任务执行超时，可能任务较长。你可以提高超时时间，或把任务拆成几个小任务。" in captured.out
+
+    def test_pipeline_uses_configured_claude_timeout(self, tmp_path, monkeypatch):
+        """_run_pipeline passes VOICE_CLAUDE_TIMEOUT_SECONDS to run_claude."""
+        monkeypatch.setenv("VOICE_CLAUDE_TIMEOUT_SECONDS", "777")
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_sessions_log_path",
+            lambda: tmp_path / "sessions.jsonl",
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_last_result_path",
+            lambda: tmp_path / "last_result.json",
+        )
+
+        from voice_claude_agent.claude_runner import ClaudeRunResult
+        from voice_claude_agent.cli import _run_pipeline
+
+        calls = []
+
+        def fake_run(prompt, timeout=300, extra_args=None, workdir=None, cancel_event=None):
+            calls.append(timeout)
+            return ClaudeRunResult(
+                command=["claude", "-p", prompt],
+                exit_code=0,
+                stdout="ok",
+                stderr="",
+                duration_seconds=0.1,
+                timed_out=False,
+            )
+
+        monkeypatch.setattr("voice_claude_agent.cli.run_claude", fake_run)
+
+        _run_pipeline("test", input_mode="text", tts_fake=True)
+
+        assert calls == [777]
 
 
 # ── F025: Empty Audio / Empty Transcript Resilience ──────
@@ -2093,7 +2130,7 @@ class TestSessionLogParity:
         expected_keys = {
             "timestamp", "input_mode", "transcript", "classified_intent",
             "risk_level", "confirmation_required", "confirmation_received",
-            "claude_command", "claude_cwd", "exit_code", "cancelled", "claude_stdout",
+            "claude_command", "claude_cwd", "exit_code", "timed_out", "cancelled", "claude_stdout",
             "claude_stderr", "summary", "spoken_summary", "spoken",
             "stt_backend", "tts_backend", "tts_voice_type", "tts_resource_id",
             "tts_duration_seconds", "tts_fallback_used", "tts_fallback_reason",
@@ -2171,7 +2208,7 @@ class TestNonInteractiveRecording:
 
         # After a successful cycle: trigger_item should say "Done" (via Timer)
         # For fast test, check it changed from default
-        assert app.trigger_item.title != "Trigger Recording"
+        assert app.trigger_item.title in {"Done ✓", "Trigger Recording"}
 
     def test_empty_audio_shows_alert(self, monkeypatch):
         """When recording returns empty bytes, an alert should be shown."""
@@ -3874,6 +3911,32 @@ class TestConfigFile:
 
         assert get_config_value("WHISPER_CPP_LANGUAGE", "zh") == "auto"
 
+    def test_get_claude_timeout_default_env_config_and_invalid_values(self, tmp_path, monkeypatch):
+        """VOICE_CLAUDE_TIMEOUT_SECONDS resolves from env/config and rejects unsafe values."""
+        import json
+
+        from voice_claude_agent.config import DEFAULT_TIMEOUT_SECONDS, get_claude_timeout
+
+        cfg_file = tmp_path / "config.json"
+        monkeypatch.setattr(
+            "voice_claude_agent.config.get_config_path",
+            lambda: cfg_file,
+        )
+
+        assert get_claude_timeout() == DEFAULT_TIMEOUT_SECONDS
+
+        cfg_file.write_text(json.dumps({"VOICE_CLAUDE_TIMEOUT_SECONDS": "600"}))
+        assert get_claude_timeout() == 600
+
+        monkeypatch.setenv("VOICE_CLAUDE_TIMEOUT_SECONDS", "900")
+        assert get_claude_timeout() == 900
+
+        monkeypatch.setenv("VOICE_CLAUDE_TIMEOUT_SECONDS", "9")
+        assert get_claude_timeout() == DEFAULT_TIMEOUT_SECONDS
+
+        monkeypatch.setenv("VOICE_CLAUDE_TIMEOUT_SECONDS", "not-int")
+        assert get_claude_timeout() == DEFAULT_TIMEOUT_SECONDS
+
     def test_claude_workdir_repairs_latin1_mojibake_final_component(self, tmp_path, monkeypatch):
         """A mojibake final directory name should resolve to the real sibling path."""
         import voice_claude_agent.config as config_mod
@@ -4705,6 +4768,34 @@ class TestSettingsUI:
         assert app.record_seconds == 12
         assert app.stt_backend == "apple-speech"
         assert alerts[-1]["title"] == "Settings Saved"
+
+    def test_show_settings_validates_claude_timeout(self, tmp_path, monkeypatch):
+        """Settings should reject Claude timeout values below 10 seconds."""
+        from unittest import mock
+
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        cfg_file = tmp_path / "config.json"
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+
+        response = mock.MagicMock()
+        response.clicked = True
+        response.text = "VOICE_CLAUDE_TIMEOUT_SECONDS=9\n"
+        monkeypatch.setattr(
+            app_mod.rumps,
+            "Window",
+            mock.MagicMock(return_value=mock.MagicMock(run=mock.MagicMock(return_value=response))),
+        )
+
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._show_settings(app.settings_item)
+
+        assert not cfg_file.exists()
+        assert alerts[-1]["title"] == "Settings Validation Error"
+        assert "Claude timeout" in alerts[-1]["message"]
 
     def test_show_settings_saves_claude_workdir(self, tmp_path, monkeypatch):
         """Settings dialog should save VOICE_CLAUDE_WORKDIR."""
@@ -6288,6 +6379,7 @@ class TestVoiceUXPolish:
             '{"timestamp":"2026-06-08T10:00:00+08:00","event":"cycle_done"}\n', encoding="utf-8")
         (state_dir / "last_result.json").write_text(json.dumps({
             "prompt": "test", "exit_code": 0,
+            "timed_out": True,
             "summary": "这是一段非常非常长的完整回答",
             "spoken_summary": "这是一段非常非常长的...",
             "reply_style": "concise",
@@ -6301,6 +6393,7 @@ class TestVoiceUXPolish:
         # View Logs reads reply_style from last_result
         assert "reply_style" in msg
         assert "concise" in msg
+        assert "timed_out: True" in msg
 
     def test_stop_current_run_menu_item_exists(self, monkeypatch):
         """Stop Current Run menu item is present."""

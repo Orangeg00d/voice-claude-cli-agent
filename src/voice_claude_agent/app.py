@@ -332,6 +332,7 @@ class VoiceClaudeApp(rumps.App):
         # Step 1: show current config
         setting_keys = [
             "VOICE_RECORD_SECONDS",
+            "VOICE_CLAUDE_TIMEOUT_SECONDS",
             "VOICE_STT_BACKEND",
             "VOICE_TTS_BACKEND",
             "VOICE_CLAUDE_WORKDIR",
@@ -397,7 +398,8 @@ class VoiceClaudeApp(rumps.App):
             key, _, val = line.partition("=")
             key = key.strip()
             val = val.strip()
-            if key not in ("VOICE_RECORD_SECONDS", "VOICE_STT_BACKEND",
+            if key not in ("VOICE_RECORD_SECONDS", "VOICE_CLAUDE_TIMEOUT_SECONDS",
+                           "VOICE_STT_BACKEND",
                            "VOICE_TTS_BACKEND",
                            "VOICE_CLAUDE_WORKDIR",
                            "WHISPER_CPP_MODEL", "WHISPER_CPP_LANGUAGE",
@@ -434,6 +436,17 @@ class VoiceClaudeApp(rumps.App):
                         new_cfg["VOICE_RECORD_SECONDS"] = str(secs)
                 except ValueError:
                     errors.append("Record seconds must be an integer.")
+
+        if "VOICE_CLAUDE_TIMEOUT_SECONDS" in new_cfg:
+            if new_cfg["VOICE_CLAUDE_TIMEOUT_SECONDS"]:
+                try:
+                    secs = int(new_cfg["VOICE_CLAUDE_TIMEOUT_SECONDS"])
+                    if secs < 10:
+                        errors.append("Claude timeout must be at least 10 seconds.")
+                    else:
+                        new_cfg["VOICE_CLAUDE_TIMEOUT_SECONDS"] = str(secs)
+                except ValueError:
+                    errors.append("Claude timeout must be an integer.")
 
         if "VOICE_STT_BACKEND" in new_cfg:
             if new_cfg["VOICE_STT_BACKEND"] and new_cfg["VOICE_STT_BACKEND"] not in self._VALID_BACKENDS:
@@ -725,6 +738,8 @@ class VoiceClaudeApp(rumps.App):
                     lines.append(f"  claude_cwd: {data.get('claude_cwd')}")
                 if data.get("cancelled") is not None:
                     lines.append(f"  cancelled: {data.get('cancelled')}")
+                if data.get("timed_out") is not None:
+                    lines.append(f"  timed_out: {data.get('timed_out')}")
                 if data.get("tts_cancelled") is not None:
                     lines.append(f"  tts_cancelled: {data.get('tts_cancelled')}")
                 if data.get("reply_style"):
@@ -932,6 +947,12 @@ class VoiceClaudeApp(rumps.App):
         # F062: Record duration
         lines.append(self._check_item(
             "Record duration", True, f"{self.record_seconds}s", ""))
+        lines.append("")
+
+        # F085: Claude timeout
+        from voice_claude_agent.config import get_claude_timeout
+        lines.append(self._check_item(
+            "Claude timeout", True, f"{get_claude_timeout()}s", ""))
         lines.append("")
 
         cfg = load_config()
@@ -1376,7 +1397,7 @@ class VoiceClaudeApp(rumps.App):
             claude_start = _time.monotonic()
             self._append_runtime_event("claude_start", elapsed=f"{claude_start - cycle_start:.3f}s")
 
-            # F075: note the start time so View Logs can show running duration
+            # F075 / F086: note the start time so View Logs can show running duration
             self._claude_invocation_start = claude_start
 
             try:
@@ -1415,6 +1436,12 @@ class VoiceClaudeApp(rumps.App):
                 elapsed=f"{_time.monotonic() - cycle_start:.3f}s",
                 duration=f"{_time.monotonic() - claude_start:.3f}s",
             )
+            if last_data.get("timed_out") is True or last_data.get("summary") == "Timed out":
+                self._append_runtime_event(
+                    "claude_timeout",
+                    elapsed=f"{_time.monotonic() - cycle_start:.3f}s",
+                    duration=f"{_time.monotonic() - claude_start:.3f}s",
+                )
 
             # TTS is handled inside _run_pipeline via create_speaker().
             self._append_runtime_event(

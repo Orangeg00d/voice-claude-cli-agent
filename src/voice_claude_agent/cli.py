@@ -11,6 +11,7 @@ from voice_claude_agent.config import (
     get_agent_state_dir,
     get_claude_workdir,
     get_config_value,
+    get_claude_timeout,
 )
 from voice_claude_agent.claude_runner import run_claude, reset_cancel_event
 from voice_claude_agent.logging_store import write_session, write_last_result
@@ -302,7 +303,7 @@ def _run_pipeline(
     click.echo(
         f"Running: claude -p \"{wrapped[:80]}{'...' if len(wrapped) > 80 else ''}\""
     )
-    result = run_claude(wrapped)
+    result = run_claude(wrapped, timeout=get_claude_timeout())
     result_cwd = result.cwd if isinstance(getattr(result, "cwd", ""), str) else ""
     result_cancelled = getattr(result, "cancelled", False) is True
 
@@ -313,7 +314,7 @@ def _run_pipeline(
     if result.timed_out or result_cancelled:
         if result.timed_out:
             label = "Timed out"
-            spoken_label = "Claude CLI 执行超时，请检查任务或重试。"
+            spoken_label = "任务执行超时，可能任务较长。你可以提高超时时间，或把任务拆成几个小任务。"
             click.echo(click.style("Claude CLI timed out.", fg="red"))
         else:
             label = "Cancelled"
@@ -341,6 +342,7 @@ def _run_pipeline(
             "claude_command": result.command,
             "claude_cwd": result_cwd,
             "exit_code": result.exit_code,
+            "timed_out": result.timed_out,
             "claude_stdout": result.stdout,
             "claude_stderr": result.stderr,
             "summary": label,
@@ -362,6 +364,7 @@ def _run_pipeline(
             "prompt": prompt,
             "claude_cwd": result_cwd,
             "exit_code": result.exit_code,
+            "timed_out": result.timed_out,
             "summary": label,
             "spoken_summary": spoken_label,
             "risk_level": risk_level.value,
@@ -425,6 +428,7 @@ def _run_pipeline(
         "claude_command": result.command,
         "claude_cwd": result_cwd,
         "exit_code": result.exit_code,
+        "timed_out": result.timed_out,
         "claude_stdout": result.stdout,
         "claude_stderr": result.stderr,
         "summary": summary,
@@ -447,6 +451,7 @@ def _run_pipeline(
         "prompt": prompt,
         "claude_cwd": result_cwd,
         "exit_code": result.exit_code,
+        "timed_out": result.timed_out,
         "summary": summary,
         "spoken_summary": spoken_summary,
         "risk_level": risk_level.value,

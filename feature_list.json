@@ -1201,6 +1201,52 @@
       ],
       "passes": true,
       "evidence": "MANUAL_TEST_CURRENT.md created with 10 sections: Health Check, Trigger Recording, Volcengine ASR, Volcengine TTS, Preview TTS Voice, Stop Current Run, View Logs, Reload Config, multi-round stability, and app exit. Each section lists expected results (checklist) and common failure troubleshooting. README links the manual."
+    },
+    {
+      "id": "F085",
+      "priority": 85,
+      "category": "ux",
+      "description": "Claude CLI timeout is configurable",
+      "steps": [
+        "Add VOICE_CLAUDE_TIMEOUT_SECONDS to recognized config keys",
+        "Default timeout remains 300 seconds",
+        "Environment variable and config.json can override the timeout",
+        "Values below 10 seconds or non-integers fall back or are rejected in Settings",
+        "Settings UI lists and validates VOICE_CLAUDE_TIMEOUT_SECONDS",
+        "Health Check displays current Claude timeout",
+        "_run_pipeline passes the resolved timeout to run_claude"
+      ],
+      "passes": true,
+      "evidence": "Added get_claude_timeout() with env/config/default priority and minimum 10 second validation. Settings UI displays and validates VOICE_CLAUDE_TIMEOUT_SECONDS. Health Check shows Claude timeout. _run_pipeline calls run_claude(..., timeout=get_claude_timeout()). Tests cover default/env/config/invalid values, Settings validation, and pipeline timeout propagation."
+    },
+    {
+      "id": "F086",
+      "priority": 86,
+      "category": "observability",
+      "description": "Long-running Claude timeout state is visible in logs",
+      "steps": [
+        "Claude running start/end continues to be captured with app_events",
+        "Timed out runs persist timed_out=true in sessions.jsonl and last_result.json",
+        "View Logs displays timed_out for the last result",
+        "Menu app writes a claude_timeout app_event when last_result indicates timeout",
+        "Existing View Logs running-duration display remains available while Claude is running"
+      ],
+      "passes": true,
+      "evidence": "logging_store now persists timed_out. _run_pipeline writes timed_out for timeout and normal paths. View Logs displays timed_out. The menu app writes claude_timeout when the last result indicates timeout. Tests cover session/last_result timed_out persistence and View Logs display."
+    },
+    {
+      "id": "F087",
+      "priority": 87,
+      "category": "ux",
+      "description": "Claude timeout spoken message is more actionable",
+      "steps": [
+        "Timeout TTS explains the task may be long",
+        "Timeout TTS suggests increasing timeout or splitting the task",
+        "summary remains 'Timed out' for searchable logs",
+        "last_result/session keep the timeout state"
+      ],
+      "passes": true,
+      "evidence": "Timeout branch now speaks '任务执行超时，可能任务较长。你可以提高超时时间，或把任务拆成几个小任务。' while preserving summary='Timed out'. Tests cover the spoken timeout message and persisted timeout state."
     }
   ]
 }

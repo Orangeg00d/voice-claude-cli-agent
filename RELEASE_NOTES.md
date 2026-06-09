@@ -13,9 +13,9 @@ Voice Claude Agent 是一个 macOS local-first 语音 Agent。用户通过菜单
 
 ## 当前 main 状态
 
-- **验收项**: 84/84 passed (F001-F084)
-- **测试数量**: 341
-- **最新阶段**: Phase 23 — stability, observability, and config ergonomics
+- **验收项**: 87/87 passed (F001-F087)
+- **测试数量**: 344
+- **最新阶段**: Phase 24 — long-running Claude task UX
 
 ## v0.1.0 功能清单 (67 项验收全部通过)
 
@@ -207,10 +207,28 @@ Voice Claude Agent 是一个 macOS local-first 语音 Agent。用户通过菜单
 - 10 个验收场景：Health Check、Trigger Recording、Volcengine ASR/TTS、Preview TTS、Stop Current Run、View Logs、Reload Config、多轮稳定性、App 退出
 - 每个场景包含预期结果清单和常见失败排查
 
+### Phase 24: Long-Running Task UX (F085-F087)
+
+**F085 — 可配置 Claude CLI 超时时间**
+- 新增 `VOICE_CLAUDE_TIMEOUT_SECONDS`
+- 默认仍为 300 秒
+- Settings UI 支持编辑并校验最小 10 秒
+- Health Check 显示当前 Claude timeout
+
+**F086 — 超时状态可观测**
+- `sessions.jsonl` / `last_result.json` 持久化 `timed_out`
+- View Logs 显示 `timed_out`
+- 菜单栏流程在 timeout 时写入 `claude_timeout` app event
+
+**F087 — 超时语音提示优化**
+- 超时播报提示任务可能较长
+- 建议提高 timeout 或拆分任务
+- 日志 summary 仍保留 `Timed out`，便于检索
+
 ## 测试
 
 - **测试框架**: pytest
-- **当前测试数量**: 341
+- **当前测试数量**: 344
 - **v0.1.0 发布测试数量**: 223
 - **测试覆盖**: CLI 管道、录音、STT、风险分类、菜单栏生命周期、并发安全、日志格式
 

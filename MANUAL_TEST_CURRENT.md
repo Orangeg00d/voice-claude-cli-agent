@@ -132,7 +132,26 @@
 - [ ] 配置文件不存在时仍可正常 reload（使用默认值）
 - [ ] 配置文件 JSON 格式错误时显示"Reload Config Failed"错误提示，不崩溃
 
-## 9. 多轮稳定性
+## 9. Claude Timeout
+
+在 Settings 或 `~/.voice-claude-agent/config.json` 中设置：
+
+```json
+{
+  "VOICE_CLAUDE_TIMEOUT_SECONDS": "600"
+}
+```
+
+点击 `Reload Config`，再点击 `Health Check`。
+
+### 预期结果
+- [ ] Health Check 显示 `Claude timeout — 600s`
+- [ ] Settings 中输入小于 10 的值会提示校验错误
+- [ ] 长任务超时时，语音提示建议提高 timeout 或拆分任务
+- [ ] View Logs / last_result 显示 `timed_out: True`
+- [ ] app_events 中可看到 `claude_timeout`
+
+## 10. 多轮稳定性
 
 重复执行 Trigger Recording 3-5 次。
 
@@ -143,7 +162,7 @@
 - [ ] app_events 日志无重复/交叉的 cycle 事件
 - [ ] sessions.jsonl 每轮一条记录
 
-## 10. App 退出
+## 11. App 退出
 
 点击 `Quit`。
 

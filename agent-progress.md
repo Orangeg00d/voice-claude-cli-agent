@@ -2623,3 +2623,31 @@
 
 ### Risks / Notes
 - Full test suite may have intermittent hangs with some real-hardware tests (mic, sounddevice). Focused tests all pass cleanly.
+
+## 2026-06-09 15:25 — Codex Review: Phase 24 Long Task UX (F085-F087)
+
+### Finding
+- Claude partially implemented Phase 24 in code, but did not update `feature_list.json`, README, RELEASE_NOTES, DEVELOPER_PROGRAM_APPLICATION, or this progress log.
+- Initial implementation added `VOICE_CLAUDE_TIMEOUT_SECONDS`, used it in `_run_pipeline()`, displayed it in Health Check, and improved timeout TTS wording.
+- Missing acceptance details:
+  - Settings UI listed the timeout key but did not validate it.
+  - session/last_result did not persist `timed_out`.
+  - View Logs did not display `timed_out`.
+  - menu app did not write a `claude_timeout` app_event.
+  - tests did not cover config/env/settings/health/pipeline timeout behavior.
+
+### Completed
+- Added Settings validation for `VOICE_CLAUDE_TIMEOUT_SECONDS` with minimum 10 seconds.
+- Added `timed_out` to session schema and last_result writes.
+- View Logs now displays `timed_out`.
+- Menu app writes `claude_timeout` when last_result indicates a timeout.
+- Added tests for timeout default/env/config/invalid handling, Settings validation, pipeline timeout propagation, timed_out persistence, and View Logs display.
+- Added F085-F087 to `feature_list.json`.
+- Updated README, RELEASE_NOTES, and DEVELOPER_PROGRAM_APPLICATION to F001-F087 / 344 tests.
+
+### Verification
+- Focused Phase 24 tests passed: 5/5.
+- `./init.sh lint` passed.
+- Full test suite passed: 344/344.
+- `.venv/bin/python setup.py py2app` passed.
+- Rebuilt, ad-hoc signed, and reinstalled `~/Applications/VoiceClaudeAgent.app`.

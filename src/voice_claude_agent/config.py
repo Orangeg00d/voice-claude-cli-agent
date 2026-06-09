@@ -97,6 +97,7 @@ CONFIG_KEYS = {
     "VOICE_REPLY_STYLE",
     "VOICE_TTS_SUMMARY_MAX_CHARS",
     "VOICE_CLAUDE_WORKDIR",
+    "VOICE_CLAUDE_TIMEOUT_SECONDS",
     "WHISPER_CPP_MODEL",
     "WHISPER_CPP_LANGUAGE",
     "VOLCENGINE_ASR_API_KEY",
@@ -212,3 +213,19 @@ def get_claude_workdir() -> Path:
 
 
 DEFAULT_TIMEOUT_SECONDS = 300
+
+
+def get_claude_timeout() -> int:
+    """Resolve Claude CLI timeout: VOICE_CLAUDE_TIMEOUT_SECONDS → config.json → default 300.
+
+    Rejects values below 10 seconds (falls back to default).
+    """
+    raw = get_config_value("VOICE_CLAUDE_TIMEOUT_SECONDS", "")
+    if raw:
+        try:
+            val = int(raw)
+            if val >= 10:
+                return val
+        except ValueError:
+            pass
+    return DEFAULT_TIMEOUT_SECONDS
