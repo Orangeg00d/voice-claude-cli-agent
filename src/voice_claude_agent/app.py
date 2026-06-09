@@ -124,8 +124,15 @@ class VoiceClaudeApp(rumps.App):
             "Reset Settings", callback=self._show_reset_settings
         )
 
+        # F083: Reload Config
+        self.reload_config_item = rumps.MenuItem("Reload Config", callback=self._reload_config_menu)
+
         # F079: Stop Current Run
         self.stop_current_item = rumps.MenuItem("Stop Current Run", callback=self._stop_current_run)
+
+        # F082: Current Status
+        self._current_status = "Idle"
+        self.status_item = rumps.MenuItem(f"Current Status: {self._current_status}")
 
         self.menu = [
             self.start_item,
@@ -135,11 +142,14 @@ class VoiceClaudeApp(rumps.App):
             self.preview_tts_item,
             self.tts_voice_item,
             None,
-            self.diagnostic_item,
+            self.status_item,
             self.mic_status_item,
+            None,
+            self.diagnostic_item,
             None,
             self.settings_item,
             self.reset_settings_item,
+            self.reload_config_item,
             None,
             self.transcript_item,
             self.summary_item,
@@ -155,6 +165,12 @@ class VoiceClaudeApp(rumps.App):
         self._validate_stt_backend()
 
     # ── F073: TTS voice options ────────────────────────────────
+
+    # F082: status update helper
+    def _set_status(self, status: str) -> None:
+        self._current_status = status
+        if hasattr(self, "status_item") and self.status_item is not None:
+            self.status_item.title = f"Current Status: {status}"
 
     TTS_VOICES = [
         ("爽快思思（女声）", "zh_female_shuangkuaisisi_moon_bigtts", True),
@@ -468,6 +484,37 @@ class VoiceClaudeApp(rumps.App):
             self.stt_backend = cfg["VOICE_STT_BACKEND"]
         self._update_tts_voice_menu_title()
         self._refresh_tts_voice_submenu()
+        self._validate_stt_backend()
+
+    # ── F083: Reload Config ──────────────────────────────────
+
+    def _reload_config_menu(self, sender: rumps.MenuItem) -> None:
+        """Re-read ~/.voice-claude-agent/config.json and refresh runtime state."""
+        import json as _json
+
+        cfg_path = get_config_path()
+        if cfg_path.exists():
+            try:
+                raw = cfg_path.read_text(encoding="utf-8")
+                cfg = _json.loads(raw)
+                if not isinstance(cfg, dict):
+                    raise ValueError("Config must be a JSON object.")
+            except (OSError, _json.JSONDecodeError, ValueError) as e:
+                self._alert_on_main(
+                    title="Reload Config Failed",
+                    message=f"Could not read config.json: {e}",
+                )
+                self._set_status("Error")
+                return
+        else:
+            cfg = {}
+
+        self._reload_from_config(cfg)
+        self._update_mic_status()
+        self._alert_on_main(
+            title="Config Reloaded",
+            message=f"Reloaded from {cfg_path}\n{len(cfg)} setting(s) active.",
+        )
 
     # ── STT backend validation ───────────────────────────────
 
@@ -1106,6 +1153,7 @@ class VoiceClaudeApp(rumps.App):
             self.mic_status_item.title = "Mic: TTS cancelled"
             if hasattr(self, "trigger_item"):
                 self.trigger_item.title = "Trigger Recording"
+            self._set_status("Cancelled")
 
         if not tts_speaking:
             request_cancel()
@@ -1113,6 +1161,7 @@ class VoiceClaudeApp(rumps.App):
             self.mic_status_item.title = "Mic: Run cancelled"
             if hasattr(self, "trigger_item"):
                 self.trigger_item.title = "Cancelling..."
+            self._set_status("Cancelled")
 
         self._alert_on_main(
             title="Stop Current Run",
@@ -1153,10 +1202,12 @@ class VoiceClaudeApp(rumps.App):
 
         cycle_start = _time.monotonic()
         self._append_runtime_event("trigger")
+        self._set_status("Recording")
         try:
             recorder = self._open_mic_or_alert()
             if recorder is None:
                 self._append_runtime_event("record_open_failed")
+                self._set_status("Error")
                 return
 
             self.trigger_item.title = "Recording..."
@@ -1176,9 +1227,11 @@ class VoiceClaudeApp(rumps.App):
                         f"{diag}"
                     ),
                 )
+                self._set_status("Error")
                 return
 
             self.trigger_item.title = "Transcribing..."
+            self._set_status("Transcribing")
             stt_start = _time.monotonic()
             self._append_runtime_event("stt_start", elapsed=f"{stt_start - cycle_start:.3f}s")
             transcriber = RecordingTranscriber(backend=self.stt_backend)
@@ -1196,6 +1249,7 @@ class VoiceClaudeApp(rumps.App):
                     title="No Speech Detected",
                     message="No speech was detected in the recording.",
                 )
+                self._set_status("Error")
                 return
 
             if transcript.startswith("[STT error:"):
@@ -1209,6 +1263,7 @@ class VoiceClaudeApp(rumps.App):
                         "VOICE_STT_BACKEND=whisper-cli after installing whisper.cpp."
                     ),
                 )
+                self._set_status("Error")
                 return
 
             # ── F064: Voice confirmation for high-risk actions ──
@@ -1269,6 +1324,7 @@ class VoiceClaudeApp(rumps.App):
             # ── End F064 ────────────────────────────────────────
 
             self.trigger_item.title = "Running Claude..."
+            self._set_status("Claude running")
             claude_start = _time.monotonic()
             self._append_runtime_event("claude_start", elapsed=f"{claude_start - cycle_start:.3f}s")
 
@@ -1319,6 +1375,7 @@ class VoiceClaudeApp(rumps.App):
             )
 
             self.trigger_item.title = "Done ✓"
+            self._set_status("Idle")
             self._append_runtime_event(
                 "cycle_done",
                 total_elapsed=f"{_time.monotonic() - cycle_start:.3f}s",
@@ -1326,6 +1383,7 @@ class VoiceClaudeApp(rumps.App):
             threading.Timer(1.5, lambda: setattr(self.trigger_item, "title", "Trigger Recording")).start()
         except Exception as e:
             self.mic_status_item.title = "Mic: Runtime error"
+            self._set_status("Error")
             self._append_runtime_event(f"record_cycle_error {type(e).__name__}: {e}")
             self._alert_on_main(title="Recording Runtime Error", message=str(e))
         finally:

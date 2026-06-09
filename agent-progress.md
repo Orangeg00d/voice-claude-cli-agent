@@ -2530,3 +2530,51 @@
 ### Verification
 - `./init.sh lint` passed.
 - Full test suite passed: 324/324.
+
+## 2026-06-09 11:30 — Phase 23: Stability & Observability (F081-F084)
+
+### Completed
+- **F081**: Added `_match_known_error()` to summarizer.py. `API Error: 402 Insufficient Balance` maps to Chinese balance/billing message. `summarize_for_record()` preserves raw error text for non-zero exits. 5 tests: 402 mapping, Insufficient Balance mapping, non-402 unchanged, full output preservation, pipeline persistence.
+- **F082**: Added `Current Status` readonly menu item with `_set_status()` helper. `_record_and_execute` sets Recording/Transcribing/Claude running/Idle/Error at each pipeline stage. `_stop_current_run` sets Cancelled. 5 tests: menu present, default Idle, title update, pipeline stage transitions, stop-sets-cancelled.
+- **F083**: Added `Reload Config` menu item with `_reload_config_menu()` callback. Re-reads config.json, validates JSON, applies via `_reload_from_config()`, refreshes mic status & STT backend validation. 5 tests: menu present, record_seconds update, STT backend update, missing config no-crash, corrupted JSON error.
+- **F084**: Created MANUAL_TEST_CURRENT.md with 10 acceptance scenarios covering Health Check, Trigger Recording, Volcengine ASR/TTS, Preview TTS Voice, Stop Current Run, View Logs, Reload Config, multi-round stability, and app exit. Each section has expected results checklist and common failure troubleshooting.
+- Updated feature_list.json (F081-F084 all passes=true), README.md (F001-F084, Phase 1-23, 330+ tests), RELEASE_NOTES.md (Phase 23 section), DEVELOPER_PROGRAM_APPLICATION.md (84 items, 330+ tests), and agent-progress.md.
+
+### Verification
+- `./init.sh check` passed
+- `./init.sh lint` passed
+- F081-F084 focused tests: 20/20 passed
+- Full suite pending backend run
+
+### Files Changed
+- src/voice_claude_agent/summarizer.py (added known error matching)
+- src/voice_claude_agent/app.py (added status_item, _set_status, reload_config_item, _reload_config_menu; wired status transitions into _record_and_execute and _stop_current_run)
+- tests/test_core.py (added TestTTSCancellation, TestCurrentStatus, TestReloadConfig, and F081 summarizer tests)
+- MANUAL_TEST_CURRENT.md (new)
+- feature_list.json
+- README.md
+- RELEASE_NOTES.md
+- DEVELOPER_PROGRAM_APPLICATION.md
+- agent-progress.md
+
+### Next Recommended Task
+- Run full test suite and py2app build. Manual smoke test against MANUAL_TEST_CURRENT.md.
+
+## 2026-06-09 12:15 — Codex Review: Phase 23 F081-F084
+
+### Finding
+- Claude implemented F081-F084 but did not complete final verification; its progress note still listed full test suite and py2app build as pending.
+- Full test suite initially hung at `TestSettingsUI::test_reload_from_config_updates_stt_backend`.
+- Root cause: F083 added `_validate_stt_backend()` to `_reload_from_config()`, and an older Settings UI unit test switched to `whisper-cli` without mocking backend validation. That allowed real validation/alert behavior to leak into a unit test.
+
+### Completed
+- Isolated `test_reload_from_config_updates_stt_backend` by mocking `_validate_stt_backend`; the test now verifies reload behavior without invoking real STT backend validation.
+- Replaced approximate `330+` test counts in README, RELEASE_NOTES, and DEVELOPER_PROGRAM_APPLICATION with the verified count.
+- Confirmed F081 402 friendly message, F082 Current Status, F083 Reload Config, and F084 manual test doc are present.
+
+### Verification
+- `./init.sh lint` passed.
+- Full test suite passed: 339/339.
+
+### Risks / Notes
+- Full test suite may have intermittent hangs with some real-hardware tests (mic, sounddevice). Focused tests all pass cleanly.

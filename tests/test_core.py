@@ -172,6 +172,51 @@ class TestSummarizer:
         summary = summarize("\n\n  \n", exit_code=0, duration_seconds=1.0)
         assert len(summary) > 0
 
+    # F081: 402 balance error → Chinese-friendly message
+    def test_402_balance_error_maps_to_chinese(self):
+        summary = summarize("API Error: 402 Insufficient Balance", exit_code=1, duration_seconds=0.5)
+        assert "余额" in summary or "计费" in summary
+        assert "402" not in summary
+
+    def test_insufficient_balance_no_api_prefix(self):
+        summary = summarize("Insufficient Balance", exit_code=1, duration_seconds=0.5)
+        assert "余额" in summary or "计费" in summary
+
+    def test_other_nonzero_unchanged(self):
+        summary = summarize("Some other error", exit_code=2, duration_seconds=0.5)
+        assert "退出码" in summary
+        assert "Some other error" in summary
+
+    def test_402_not_in_log_full_output(self):
+        """summarize_for_record preserves raw output including 402."""
+        from voice_claude_agent.summarizer import summarize_for_record
+        raw = "API Error: 402 Insufficient Balance"
+        result = summarize_for_record(raw, exit_code=1, duration_seconds=0.5)
+        # Full record preserves the original text
+        assert "402" in result
+
+    def test_402_pipeline_persists_original_stderr(self, monkeypatch, tmp_path):
+        """_run_pipeline writes 402 error to stderr in session/log."""
+        monkeypatch.setattr("voice_claude_agent.cli.run_claude",
+            lambda prompt, timeout=300, extra_args=None, workdir=None, cancel_event=None: type("R", (), {"command": [], "exit_code": 1, "stdout": "", "stderr": "API Error: 402 Insufficient Balance", "duration_seconds": 0.1, "timed_out": False, "cancelled": False, "cwd": ""})())
+        monkeypatch.setattr("voice_claude_agent.cli._resolve_tts_backend", lambda: "macos-say")
+        monkeypatch.setattr("voice_claude_agent.cli.create_speaker", lambda: type("S", (), {"speak": lambda self, t: None})())
+
+        sessions_path = tmp_path / "sessions.jsonl"
+        last_path = tmp_path / "last_result.json"
+        monkeypatch.setattr("voice_claude_agent.logging_store.get_sessions_log_path", lambda: sessions_path)
+        monkeypatch.setattr("voice_claude_agent.logging_store.get_last_result_path", lambda: last_path)
+
+        from voice_claude_agent.cli import _run_pipeline
+        _run_pipeline("test", input_mode="text", tts_fake=False)
+
+        session = json.loads(sessions_path.read_text().splitlines()[0])
+        # stderr preserved as-is
+        assert "402" in session.get("claude_stderr", "")
+        # spoken summary uses Chinese message
+        spoken = session.get("spoken_summary", "")
+        assert "余额" in spoken or "计费" in spoken
+
 
 # ── Logging Store Tests ───────────────────────────────────
 class TestLoggingStore:
@@ -4726,11 +4771,12 @@ class TestSettingsUI:
         app._reload_from_config({"VOICE_RECORD_SECONDS": "15"})
         assert app.record_seconds == 15
 
-    def test_reload_from_config_updates_stt_backend(self):
+    def test_reload_from_config_updates_stt_backend(self, monkeypatch):
         """_reload_from_config should update stt_backend."""
         from voice_claude_agent.app import VoiceClaudeApp
 
         app = VoiceClaudeApp(stt_backend="text-input")
+        monkeypatch.setattr(app, "_validate_stt_backend", lambda: None)
         app._reload_from_config({"VOICE_STT_BACKEND": "whisper-cli"})
         assert app.stt_backend == "whisper-cli"
 
@@ -6916,3 +6962,196 @@ class TestTTSCancellation:
 
         last = json.loads(last_path.read_text())
         assert last.get("tts_cancelled") is True
+
+
+# ── F081: Claude CLI 402 Balance Error Friendly Message ───────
+# (tests are in TestSummarizer above)
+
+
+# ── F082: Current Status Menu Item ──────────────────────────
+
+
+class TestCurrentStatus:
+    """F082: Current Status menu item tracks pipeline stages."""
+
+    @staticmethod
+    def _mock_app(monkeypatch, tmp_path):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text("{}")
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+
+        state_dir = tmp_path / "agent_state"
+        state_dir.mkdir(parents=True, exist_ok=True)
+        monkeypatch.setattr("voice_claude_agent.config.get_agent_state_dir", lambda: state_dir)
+        monkeypatch.setattr("voice_claude_agent.config.get_app_events_log_path", lambda: state_dir / "app_events.jsonl")
+
+        app = VoiceClaudeApp()
+        return app
+
+    def test_status_menu_item_present(self, monkeypatch, tmp_path):
+        app = self._mock_app(monkeypatch, tmp_path)
+        titles = set()
+        for m in app.menu:
+            if m is not None:
+                t = m.title
+                titles.add(t() if callable(t) else t)
+        assert "Current Status: Idle" in titles
+
+    def test_status_defaults_to_idle(self, monkeypatch, tmp_path):
+        app = self._mock_app(monkeypatch, tmp_path)
+        assert app._current_status == "Idle"
+        assert app.status_item.title == "Current Status: Idle"
+
+    def test_set_status_updates_title(self, monkeypatch, tmp_path):
+        app = self._mock_app(monkeypatch, tmp_path)
+        app._set_status("Recording")
+        assert app.status_item.title == "Current Status: Recording"
+        app._set_status("Idle")
+        assert app.status_item.title == "Current Status: Idle"
+
+    def test_record_and_execute_sets_statuses(self, monkeypatch, tmp_path):
+        """_record_and_execute transitions through Recording/Transcribing/Claude running/Idle."""
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text("{}")
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+
+        state_dir = tmp_path / "agent_state"
+        state_dir.mkdir(parents=True, exist_ok=True)
+        monkeypatch.setattr("voice_claude_agent.config.get_agent_state_dir", lambda: state_dir)
+        monkeypatch.setattr("voice_claude_agent.config.get_app_events_log_path", lambda: state_dir / "app_events.jsonl")
+        monkeypatch.setattr("voice_claude_agent.config.get_last_result_path", lambda: state_dir / "last_result.json")
+
+        status_log = []
+
+        class FakeRec:
+            def start(self): pass
+            def stop(self): pass
+            def get_audio(self): return b"fake audio"
+
+        monkeypatch.setattr("voice_claude_agent.stt.RecordingTranscriber",
+            lambda backend="": type("T", (), {"transcribe": lambda self, a: "hello"})())
+
+        monkeypatch.setattr("voice_claude_agent.cli._run_pipeline",
+            lambda transcript, input_mode, tts_fake, confirmation_override=None, stt_backend_used="", on_tts_start=None: (
+                on_tts_start() if on_tts_start else None,
+                (state_dir / "last_result.json").write_text('{"summary":"ok"}'),
+            ))
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: None)
+        app._open_mic_or_alert = lambda: FakeRec()
+        app._record_with_timeout = lambda r: (b"audio", "ok")
+        app._set_status = lambda s: status_log.append(s)
+        app._append_runtime_event = lambda *a, **kw: None
+
+        app._record_and_execute()
+        assert "Recording" in status_log
+        assert "Transcribing" in status_log
+        assert "Claude running" in status_log
+        assert status_log[-1] == "Idle"
+
+    def test_stop_current_run_sets_status_cancelled(self, monkeypatch, tmp_path):
+        """Stop Current Run sets Current Status to Cancelled."""
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text("{}")
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+
+        monkeypatch.setattr("voice_claude_agent.claude_runner.request_cancel", lambda: None)
+        monkeypatch.setattr("voice_claude_agent.claude_runner.is_cancelled", lambda: False)
+        monkeypatch.setattr("voice_claude_agent.tts.is_tts_speaking", lambda: False)
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: None)
+        app._cycle_in_progress = True
+        app._stop_current_run(app.stop_current_item)
+        assert app.status_item.title == "Current Status: Cancelled"
+
+
+# ── F083: Reload Config Menu Item ──────────────────────────
+
+
+class TestReloadConfig:
+    """F083: Reload Config re-reads config.json and refreshes runtime state."""
+
+    def test_reload_config_menu_item_present(self, monkeypatch, tmp_path):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text("{}")
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+        app = VoiceClaudeApp()
+        titles = set()
+        for m in app.menu:
+            if m is not None:
+                t = m.title
+                titles.add(t() if callable(t) else t)
+        assert "Reload Config" in titles
+
+    def test_reload_updates_record_seconds(self, monkeypatch, tmp_path):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text('{"VOICE_RECORD_SECONDS":"3"}')
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: None)
+        app.record_seconds = 5
+        app._reload_config_menu(app.reload_config_item)
+        assert app.record_seconds == 3
+
+    def test_reload_updates_stt_backend(self, monkeypatch, tmp_path):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text('{"VOICE_STT_BACKEND":"text-input"}')
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: None)
+        app.stt_backend = "whisper-cli"
+        app._reload_config_menu(app.reload_config_item)
+        assert app.stt_backend == "text-input"
+
+    def test_reload_missing_config_no_crash(self, monkeypatch, tmp_path):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+        cfg_file = tmp_path / "nonexistent.json"
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._reload_config_menu(app.reload_config_item)
+        assert any("Reloaded" in a["message"] for a in alerts if "message" in a)
+
+    def test_reload_corrupted_config_shows_error(self, monkeypatch, tmp_path):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text("not json")
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._reload_config_menu(app.reload_config_item)
+        assert any("Reload Config Failed" in a.get("title", "") for a in alerts)

@@ -9,6 +9,26 @@ import re
 MAX_RESULT_CHARS_FOR_READOUT = 300  # voice-friendly limit (was 500)
 _TTS_TRUNCATION_NOTE = "（回复较长，完整内容可在菜单栏 Last Summary 查看）"
 
+# ── F081: known Claude CLI error patterns ─────────────────
+_KNOWN_ERROR_PATTERNS = [
+    (
+        "API Error: 402",
+        "Claude CLI 检测到账户余额不足或计费不可用。请检查 Claude 账号的 API 计费状态。",
+    ),
+    (
+        "Insufficient Balance",
+        "Claude CLI 检测到账户余额不足或计费不可用。请检查 Claude 账号的 API 计费状态。",
+    ),
+]
+
+
+def _match_known_error(text: str) -> str | None:
+    """Return a user-friendly Chinese message for known Claude CLI errors."""
+    for pattern, message in _KNOWN_ERROR_PATTERNS:
+        if pattern in text:
+            return message
+    return None
+
 
 def _strip_code_blocks(text: str) -> str:
     """Remove code fences and their content for TTS readability."""
@@ -46,6 +66,10 @@ def summarize(result_text: str, exit_code: int, duration_seconds: float, max_cha
 
     if exit_code != 0:
         preview = result_text.strip()[:200]
+        # F081: check for known error patterns
+        known = _match_known_error(result_text)
+        if known:
+            return known
         if not preview:
             return f"Claude CLI 执行失败，退出码 {exit_code}，无输出。"
         return f"Claude CLI 执行失败，退出码 {exit_code}。输出预览：{preview}"
@@ -67,5 +91,8 @@ def summarize(result_text: str, exit_code: int, duration_seconds: float, max_cha
 def summarize_for_record(result_text: str, exit_code: int, duration_seconds: float) -> str:
     """Generate the full summary persisted to logs and Last Summary."""
     if exit_code == 0 and result_text.strip():
+        return result_text.strip()
+    # For non-zero exits, return raw text so logs keep the original error
+    if exit_code != 0 and result_text.strip():
         return result_text.strip()
     return summarize(result_text, exit_code, duration_seconds)

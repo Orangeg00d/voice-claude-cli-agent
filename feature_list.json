@@ -1142,6 +1142,65 @@
       ],
       "passes": true,
       "evidence": "MacOSSaySpeaker and VolcengineDoubaoSpeaker now use subprocess.Popen, register playback PIDs, and unregister them after completion. cancel_all_tts() drains tracked PIDs, terminates them with SIGTERM, and marks TTS as cancelled. Stop Current Run now handles active TTS separately from Claude CLI cancellation, writes tts_cancelled app_events, and updates the menu status. _run_pipeline persists tts_cancelled into sessions.jsonl and last_result.json, and View Logs displays it. Codex fixed schema parity, old subprocess mocks that could accidentally call real Claude/say during tests, cancellation flag marking, and PID test isolation. 324/324 tests passed, lint clean."
+    },
+    {
+      "id": "F081",
+      "priority": 81,
+      "category": "ux",
+      "description": "Claude CLI 402 balance error maps to Chinese-friendly message",
+      "steps": [
+        "When Claude CLI output contains 'API Error: 402 Insufficient Balance', summary/spoken_summary use a Chinese message",
+        "Raw stdout/stderr are preserved in sessions.jsonl and last_result.json",
+        "View Logs retains exit_code and original error preview",
+        "Test covers 402 error mapping and pipeline persistence"
+      ],
+      "passes": true,
+      "evidence": "Added _match_known_error() and _KNOWN_ERROR_PATTERNS to summarizer.py. 402 and Insufficient Balance patterns map to Chinese message about balance/billing. summarize_for_record() now preserves raw error text for non-zero exits. 5 tests cover 402 mapping, Insufficient Balance mapping, non-402 unchanged, full output preservation, and pipeline persistence."
+    },
+    {
+      "id": "F082",
+      "priority": 82,
+      "category": "app",
+      "description": "Current Status menu item shows pipeline stage in real-time",
+      "steps": [
+        "Read-only menu item 'Current Status' appears in the menu bar",
+        "Stages: Idle → Recording → Transcribing → Claude running → Speaking → Idle",
+        "Cancelled/Error states shown on Stop Current Run or failure",
+        "Trigger Recording flow updates Current Status at each stage",
+        "Tests cover status transitions and Stop/Error states"
+      ],
+      "passes": true,
+      "evidence": "Added 'Current Status' menu item and _set_status() helper. _record_and_execute now sets status at each stage: Recording, Transcribing, Claude running, Idle (success), Error (failures). _stop_current_run sets Cancelled. 5 tests: menu present, default Idle, title update, pipeline stage transitions, and stop-sets-cancelled."
+    },
+    {
+      "id": "F083",
+      "priority": 83,
+      "category": "app",
+      "description": "Reload Config menu item re-reads config.json and refreshes runtime",
+      "steps": [
+        "Add 'Reload Config' menu item",
+        "Re-reads ~/.voice-claude-agent/config.json",
+        "Refreshes STT/TTS backend, voice, record seconds, workdir",
+        "Shows 'Config Reloaded' success alert",
+        "Shows 'Reload Config Failed' error on invalid JSON, no crash",
+        "Tests cover menu presence, record_seconds update, STT backend update, missing config, corrupted config"
+      ],
+      "passes": true,
+      "evidence": "Added 'Reload Config' menu item and _reload_config_menu() callback. Reads config.json, validates JSON, applies via _reload_from_config(), updates mic status, shows success/failure alert. _reload_from_config now also calls _validate_stt_backend() for whisper-cli checks. 5 tests: menu present, record_seconds update, STT backend update, missing config no-crash, corrupted JSON shows error."
+    },
+    {
+      "id": "F084",
+      "priority": 84,
+      "category": "docs",
+      "description": "MANUAL_TEST_CURRENT.md documents full manual acceptance walkthrough",
+      "steps": [
+        "Create/update MANUAL_TEST_CURRENT.md",
+        "Cover Health Check, Trigger Recording, Volcengine ASR, Volcengine TTS, Preview TTS Voice, Stop Current Run, View Logs, Reload Config",
+        "Each section has expected results and common failure troubleshooting",
+        "Update README and agent-progress.md"
+      ],
+      "passes": true,
+      "evidence": "MANUAL_TEST_CURRENT.md created with 10 sections: Health Check, Trigger Recording, Volcengine ASR, Volcengine TTS, Preview TTS Voice, Stop Current Run, View Logs, Reload Config, multi-round stability, and app exit. Each section lists expected results (checklist) and common failure troubleshooting. README links the manual."
     }
   ]
 }

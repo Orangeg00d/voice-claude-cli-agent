@@ -13,9 +13,9 @@ Voice Claude Agent 是一个 macOS local-first 语音 Agent。用户通过菜单
 
 ## 当前 main 状态
 
-- **验收项**: 80/80 passed (F001-F080)
-- **测试数量**: 324
-- **最新阶段**: Phase 22 — voice UX, Seed TTS 2.0 voices, and Stop Current Run
+- **验收项**: 84/84 passed (F001-F084)
+- **测试数量**: 339
+- **最新阶段**: Phase 23 — stability, observability, and config ergonomics
 
 ## v0.1.0 功能清单 (67 项验收全部通过)
 
@@ -188,10 +188,29 @@ Voice Claude Agent 是一个 macOS local-first 语音 Agent。用户通过菜单
 - `sessions.jsonl` / `last_result.json` 持久化 `tts_cancelled`
 - View Logs 显示 `tts_cancelled` 状态
 
+### Phase 23: Stability & Observability (F081-F084)
+
+**F081 — Claude CLI 402 余额错误中文提示**
+- `API Error: 402 Insufficient Balance` 自动映射为中文计费提示
+- Raw stdout/stderr 完整保留在 session 日志中
+
+**F082 — Current Status 菜单项**
+- 新增只读 `Current Status` 菜单项
+- 状态覆盖 Idle → Recording → Transcribing → Claude running → Speaking → Cancelled/Error
+- Trigger Recording 流程每个阶段更新状态，完成后恢复 Idle
+
+**F083 — Reload Config 菜单项**
+- 新增 `Reload Config`：重新读取 config.json 并刷新运行配置
+- 成功弹窗确认，无效 JSON 显示错误不崩溃
+
+**F084 — MANUAL_TEST_CURRENT.md**
+- 10 个验收场景：Health Check、Trigger Recording、Volcengine ASR/TTS、Preview TTS、Stop Current Run、View Logs、Reload Config、多轮稳定性、App 退出
+- 每个场景包含预期结果清单和常见失败排查
+
 ## 测试
 
 - **测试框架**: pytest
-- **当前测试数量**: 324
+- **当前测试数量**: 339
 - **v0.1.0 发布测试数量**: 223
 - **测试覆盖**: CLI 管道、录音、STT、风险分类、菜单栏生命周期、并发安全、日志格式
 
