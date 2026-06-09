@@ -2484,3 +2484,28 @@
 
 ### Next Recommended Task
 - Rebuild and reinstall the menu app, then manually select 东方浩然 or 阿虎 and run Preview TTS Voice. Confirm View Logs shows `tts_resource_id: seed-tts-2.0` and `tts_fallback_used: False`.
+
+## 2026-06-09 09:35 — Codex Review: F079 Stop Current Run
+
+### Finding
+- Claude implemented the main cancellation path with `subprocess.Popen` polling and a shared cancel event.
+- Initial F079 pass had a UX bug: clicking Stop Current Run while idle still requested cancellation, wrote `cycle_cancelled`, and showed a success message.
+- Session logs accepted `cancelled` from `_run_pipeline()` but `write_session()` did not persist it.
+- F079 was not yet recorded in `feature_list.json`, README, RELEASE_NOTES, or developer status docs.
+
+### Completed
+- Stop Current Run now no-ops when no cycle/Claude invocation is active and shows `No active run is currently executing.`
+- Active Stop Current Run writes `cycle_cancelled`, sets menu title to `Cancelling...`, and requests shared cancellation.
+- `run_claude()` cancellation returns `exit_code=-5`, `cancelled=True`, and terminates/kills the subprocess.
+- `_run_pipeline()` handles cancelled results alongside timeouts with summary `Cancelled` and spoken summary `任务已被取消。`.
+- `sessions.jsonl`, `last_result.json`, and View Logs now expose `cancelled` status.
+- Updated tests for active cancel, idle no-op, idempotence, runner cancellation, and schema parity.
+- Updated `feature_list.json`, README, RELEASE_NOTES, DEVELOPER_PROGRAM_APPLICATION, and this progress log to F001-F079.
+
+### Verification
+- Focused F079/Voice UX/session tests passed: 14/14.
+- Full test suite passed: 316/316.
+- `./init.sh lint` passed.
+
+### Scope Note
+- F079 currently cancels the active Claude CLI subprocess. It does not yet interrupt an already-started TTS playback subprocess; that should be a separate future feature if needed.

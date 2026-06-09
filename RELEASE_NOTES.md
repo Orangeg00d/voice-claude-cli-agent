@@ -13,9 +13,9 @@ Voice Claude Agent 是一个 macOS local-first 语音 Agent。用户通过菜单
 
 ## 当前 main 状态
 
-- **验收项**: 78/78 passed (F001-F078)
-- **测试数量**: 310
-- **最新阶段**: Phase 22 — voice UX and Seed TTS 2.0 voices
+- **验收项**: 79/79 passed (F001-F079)
+- **测试数量**: 316
+- **最新阶段**: Phase 22 — voice UX, Seed TTS 2.0 voices, and Stop Current Run
 
 ## v0.1.0 功能清单 (67 项验收全部通过)
 
@@ -174,10 +174,17 @@ Voice Claude Agent 是一个 macOS local-first 语音 Agent。用户通过菜单
 - TTS Voice 菜单新增阿虎 `zh_male_wennuanahu_uranus_bigtts`
 - 选择东方浩然/阿虎时自动写入 `VOLCENGINE_TTS_RESOURCE_ID=seed-tts-2.0`
 
+### Unreleased: Stop Current Run (F079)
+- 菜单栏新增 `Stop Current Run`
+- 运行中的 Claude CLI 子进程可通过 shared cancel event 取消
+- 取消后 `last_result` / session 记录 `cancelled=true`，摘要为 `Cancelled`
+- `app_events` 记录 `cycle_cancelled`，空闲点击不会误写取消事件
+- View Logs 显示 `cancelled` 状态
+
 ## 测试
 
 - **测试框架**: pytest
-- **当前测试数量**: 310
+- **当前测试数量**: 316
 - **v0.1.0 发布测试数量**: 223
 - **测试覆盖**: CLI 管道、录音、STT、风险分类、菜单栏生命周期、并发安全、日志格式
 

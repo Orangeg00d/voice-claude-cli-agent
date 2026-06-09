@@ -31,6 +31,7 @@ def write_session(entry: dict) -> Path:
         "claude_command": entry.get("claude_command", []),
         "claude_cwd": entry.get("claude_cwd", ""),
         "exit_code": entry.get("exit_code", -1),
+        "cancelled": entry.get("cancelled", False),
         "claude_stdout": entry.get("claude_stdout", ""),
         "claude_stderr": entry.get("claude_stderr", ""),
         "summary": entry.get("summary", ""),

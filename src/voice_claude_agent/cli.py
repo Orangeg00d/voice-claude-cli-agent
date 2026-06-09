@@ -12,7 +12,7 @@ from voice_claude_agent.config import (
     get_claude_workdir,
     get_config_value,
 )
-from voice_claude_agent.claude_runner import run_claude
+from voice_claude_agent.claude_runner import run_claude, reset_cancel_event
 from voice_claude_agent.logging_store import write_session, write_last_result
 from voice_claude_agent.recorder import SoundDeviceRecorder, FakeRecorder
 from voice_claude_agent.risk import classify_risk, requires_confirmation
@@ -284,6 +284,7 @@ def _run_pipeline(
             confirmation_received = True
 
     # 3. Execute Claude CLI
+    reset_cancel_event()
     # F062: prepend zh-CN constraint
     # F076: reply style
     reply_style = get_config_value("VOICE_REPLY_STYLE", "normal")
@@ -299,15 +300,24 @@ def _run_pipeline(
     )
     result = run_claude(wrapped)
     result_cwd = result.cwd if isinstance(getattr(result, "cwd", ""), str) else ""
+    result_cancelled = getattr(result, "cancelled", False) is True
 
     tts_backend_used = "fake" if tts_fake else _resolve_tts_backend()
     tts_voice_type = get_config_value("VOLCENGINE_TTS_VOICE_TYPE", "")
     tts_resource_id = get_config_value("VOLCENGINE_TTS_RESOURCE_ID", "")
 
-    if result.timed_out:
-        click.echo(click.style("Claude CLI timed out.", fg="red"))
+    if result.timed_out or result_cancelled:
+        if result.timed_out:
+            label = "Timed out"
+            spoken_label = "Claude CLI 执行超时，请检查任务或重试。"
+            click.echo(click.style("Claude CLI timed out.", fg="red"))
+        else:
+            label = "Cancelled"
+            spoken_label = "任务已被取消。"
+            click.echo(click.style("Claude CLI cancelled.", fg="red"))
+
         tts_start = time.monotonic()
-        speaker.speak("Claude CLI 执行超时，请检查任务或重试。")
+        speaker.speak(spoken_label)
         tts_duration_seconds = round(time.monotonic() - tts_start, 3)
         tts_fallback_used = isinstance(speaker, VolcengineDoubaoSpeaker) and getattr(speaker, "_fallback_called", False)
         tts_fallback_reason = getattr(speaker, "_fallback_reason", "") if tts_fallback_used else ""
@@ -326,8 +336,8 @@ def _run_pipeline(
             "exit_code": result.exit_code,
             "claude_stdout": result.stdout,
             "claude_stderr": result.stderr,
-            "summary": "Timed out",
-            "spoken_summary": "Claude CLI 执行超时，请检查任务或重试。",
+            "summary": label,
+            "spoken_summary": spoken_label,
             "spoken": True,
             "reply_style": reply_style,
             "stt_backend": stt_backend_used,
@@ -338,13 +348,14 @@ def _run_pipeline(
             "tts_fallback_used": tts_fallback_used,
             "tts_fallback_reason": tts_fallback_reason,
             "tts_fallback_detail": tts_fallback_detail,
+            "cancelled": result_cancelled,
         })
         write_last_result({
             "prompt": prompt,
             "claude_cwd": result_cwd,
             "exit_code": result.exit_code,
-            "summary": "Timed out",
-            "spoken_summary": "Claude CLI 执行超时，请检查任务或重试。",
+            "summary": label,
+            "spoken_summary": spoken_label,
             "risk_level": risk_level.value,
             "reply_style": reply_style,
             "stt_backend": stt_backend_used,
@@ -355,6 +366,7 @@ def _run_pipeline(
             "tts_fallback_used": tts_fallback_used,
             "tts_fallback_reason": tts_fallback_reason,
             "tts_fallback_detail": tts_fallback_detail,
+            "cancelled": result_cancelled,
         })
         return
 
@@ -415,6 +427,7 @@ def _run_pipeline(
         "tts_fallback_used": tts_fallback_used,
         "tts_fallback_reason": tts_fallback_reason,
         "tts_fallback_detail": tts_fallback_detail,
+        "cancelled": result_cancelled,
     })
 
     write_last_result({
@@ -433,6 +446,7 @@ def _run_pipeline(
         "tts_fallback_used": tts_fallback_used,
         "tts_fallback_reason": tts_fallback_reason,
         "tts_fallback_detail": tts_fallback_detail,
+        "cancelled": result_cancelled,
     })
 
 

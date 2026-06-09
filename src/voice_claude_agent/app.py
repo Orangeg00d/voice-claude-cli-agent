@@ -124,9 +124,13 @@ class VoiceClaudeApp(rumps.App):
             "Reset Settings", callback=self._show_reset_settings
         )
 
+        # F079: Stop Current Run
+        self.stop_current_item = rumps.MenuItem("Stop Current Run", callback=self._stop_current_run)
+
         self.menu = [
             self.start_item,
             self.stop_item,
+            self.stop_current_item,
             self.trigger_item,
             self.preview_tts_item,
             self.tts_voice_item,
@@ -657,6 +661,8 @@ class VoiceClaudeApp(rumps.App):
                 lines.append(f"  prompt: {data.get('prompt', '?')}")
                 if data.get("claude_cwd"):
                     lines.append(f"  claude_cwd: {data.get('claude_cwd')}")
+                if data.get("cancelled") is not None:
+                    lines.append(f"  cancelled: {data.get('cancelled')}")
                 if data.get("reply_style"):
                     lines.append(f"  reply_style: {data.get('reply_style')}")
                 if data.get("tts_backend"):
@@ -1067,6 +1073,37 @@ class VoiceClaudeApp(rumps.App):
         if self._wake_active:
             self._stop_wake(sender)
         rumps.quit_application()
+
+    # ── F079: Stop Current Run ─────────────────────────────────
+
+    def _stop_current_run(self, sender: rumps.MenuItem) -> None:
+        """Cancel the currently running Claude CLI subprocess.
+
+        Signals the global cancel event so run_claude() returns early.
+        Safe no-op when nothing is running.
+        """
+        from voice_claude_agent.claude_runner import request_cancel, is_cancelled
+
+        if not self._cycle_in_progress and not self._claude_invocation_start:
+            self._alert_on_main(
+                title="Stop Current Run",
+                message="No active run is currently executing.",
+            )
+            return
+
+        if is_cancelled():
+            return  # already cancelled
+
+        request_cancel()
+        self._append_runtime_event("cycle_cancelled")
+        self.mic_status_item.title = "Mic: Run cancelled"
+        if hasattr(self, "trigger_item"):
+            self.trigger_item.title = "Cancelling..."
+
+        self._alert_on_main(
+            title="Stop Current Run",
+            message="Cancellation requested for the current Claude CLI run.",
+        )
 
     # ── Wake loop (background thread) ────────────────────────
 

@@ -1105,6 +1105,25 @@
       ],
       "passes": true,
       "evidence": "Added TTS_2_VOICES and _on_select_tts_voice_v2() in the menu app. 东方浩然 and 阿虎 are shown in the TTS Voice submenu and save their voice type with VOLCENGINE_TTS_RESOURCE_ID=seed-tts-2.0 while preserving existing config. docs/VOLCENGINE_TTS_SETUP.md documents both voices. Focused TTS voice tests passed and full suite passed: 310/310."
+    },
+    {
+      "id": "F079",
+      "priority": 79,
+      "category": "ux",
+      "description": "Stop Current Run cancels an active Claude CLI subprocess",
+      "steps": [
+        "Menu bar app includes Stop Current Run",
+        "Clicking Stop Current Run while a cycle is active requests cancellation through a shared cancel event",
+        "run_claude uses cancellable subprocess polling and terminates/kills the Claude CLI process when cancellation is requested",
+        "Cancelled runs return exit_code=-5 and cancelled=true",
+        "Pipeline writes summary='Cancelled' and spoken_summary='任务已被取消。'",
+        "cycle_cancelled app_event is written only when a cycle is active",
+        "Idle Stop Current Run is a no-op with a clear no-active-run message",
+        "sessions and last_result persist cancelled status, and View Logs displays cancelled",
+        "Tests cover runner cancellation, menu item, active cancellation, event logging, idempotence, and idle no-op"
+      ],
+      "passes": true,
+      "evidence": "run_claude now uses subprocess.Popen with periodic cancel_event polling. request_cancel()/reset_cancel_event()/is_cancelled() manage the shared menu-app cancellation signal. _run_pipeline resets the signal before invoking Claude and handles cancelled results alongside timeouts. Stop Current Run now only acts during an active cycle, logs cycle_cancelled, sets menu title to Cancelling..., and leaves idle clicks as no-op. Session logs, last_result, and View Logs expose cancelled status. Focused F079 tests passed."
     }
   ]
 }

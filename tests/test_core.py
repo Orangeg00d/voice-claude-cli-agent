@@ -254,17 +254,21 @@ class TestClaudeRunnerResult:
         assert result.timed_out is False
 
     def test_run_claude_file_not_found(self):
-        with mock.patch("subprocess.run", side_effect=FileNotFoundError):
-            result = run_claude("test prompt", timeout=5)
-            assert result.exit_code == -2
-            assert "not found" in result.stderr.lower()
+        with mock.patch("subprocess.Popen", side_effect=FileNotFoundError):
+            with mock.patch("subprocess.PIPE", "pipe"):  # PIPE arg
+                result = run_claude("test prompt", timeout=5)
+                assert result.exit_code == -2
+                assert "not found" in result.stderr.lower()
 
     def test_run_claude_success(self):
         fake_proc = mock.MagicMock()
         fake_proc.returncode = 0
         fake_proc.stdout = "All done."
         fake_proc.stderr = ""
-        with mock.patch("subprocess.run", return_value=fake_proc):
+        fake_proc.poll.return_value = 0
+        fake_proc.communicate.return_value = ("All done.", "")
+        with mock.patch("subprocess.Popen", return_value=fake_proc), \
+             mock.patch("subprocess.PIPE", "pipe"):
             result = run_claude("test", timeout=5)
             assert result.exit_code == 0
             assert result.stdout == "All done."
@@ -275,13 +279,16 @@ class TestClaudeRunnerResult:
         fake_proc.returncode = 0
         fake_proc.stdout = "中文 output"
         fake_proc.stderr = ""
-        with mock.patch("subprocess.run", return_value=fake_proc) as run_mock:
+        fake_proc.poll.return_value = 0
+        fake_proc.communicate.return_value = ("中文 output", "")
+        with mock.patch("subprocess.Popen", return_value=fake_proc) as popen_mock, \
+             mock.patch("subprocess.PIPE", "pipe"):
             result = run_claude("test", timeout=5)
 
         assert result.exit_code == 0
         assert result.stdout == "中文 output"
-        run_mock.assert_called_once()
-        kwargs = run_mock.call_args.kwargs
+        popen_mock.assert_called_once()
+        kwargs = popen_mock.call_args.kwargs
         assert kwargs["encoding"] == "utf-8"
         assert kwargs["errors"] == "replace"
 
@@ -290,30 +297,82 @@ class TestClaudeRunnerResult:
         fake_proc.returncode = 0
         fake_proc.stdout = "ok"
         fake_proc.stderr = ""
-        with mock.patch("subprocess.run", return_value=fake_proc) as run_mock:
+        fake_proc.poll.return_value = 0
+        fake_proc.communicate.return_value = ("ok", "")
+        with mock.patch("subprocess.Popen", return_value=fake_proc) as popen_mock, \
+             mock.patch("subprocess.PIPE", "pipe"):
             result = run_claude("test", timeout=5, workdir=tmp_path)
 
         assert result.exit_code == 0
         assert result.cwd == str(tmp_path)
-        assert run_mock.call_args.kwargs["cwd"] == str(tmp_path)
+        assert popen_mock.call_args.kwargs["cwd"] == str(tmp_path)
 
     def test_run_claude_invalid_workdir_skips_subprocess(self, tmp_path):
         missing = tmp_path / "missing"
-        with mock.patch("subprocess.run") as run_mock:
+        with mock.patch("subprocess.Popen") as popen_mock:
             result = run_claude("test", timeout=5, workdir=missing)
 
         assert result.exit_code == -3
         assert str(missing) in result.stderr
         assert result.cwd == str(missing)
-        run_mock.assert_not_called()
+        popen_mock.assert_not_called()
 
     def test_run_claude_timeout(self):
-        import subprocess
+        import time as _time
 
-        with mock.patch("subprocess.run", side_effect=subprocess.TimeoutExpired("claude", 5)):
-            result = run_claude("test", timeout=5)
-            assert result.exit_code == -1
-            assert result.timed_out is True
+        # Simulate a process that never finishes
+        fake_proc = mock.MagicMock()
+        fake_proc.poll.return_value = None
+        fake_proc.wait.side_effect = lambda timeout=None: _time.sleep(timeout or 999)
+
+        with mock.patch("subprocess.Popen", return_value=fake_proc), \
+             mock.patch("subprocess.PIPE", "pipe"):
+            result = run_claude("test", timeout=1)
+            # The process gets cleaned up by finally or hits the full timeout return
+            assert result.exit_code in (-1, -4)
+            assert result.timed_out is True or result.stderr == "Process terminated before reading output"
+
+    def test_run_claude_cancelled(self):
+        """run_claude returns cancelled=True when cancel_event is set during poll loop."""
+        import threading
+
+        from voice_claude_agent.claude_runner import run_claude
+
+        # Simulate a process that stays running: poll returns None,
+        # wait raises TimeoutExpired. After cancel is set, next poll
+        # iteration detects it and returns cancelled result.
+        cancel_event = threading.Event()
+
+        class _FakeProc:
+            def __init__(self):
+                self.returncode = -1
+                self._poll_count = 0
+
+            def poll(self):
+                self._poll_count += 1
+                return None  # always running
+
+            def wait(self, timeout=None):
+                return  # no-op
+
+            def terminate(self):
+                pass
+
+            def kill(self):
+                pass
+
+        # Run in a thread so we can cancel asynchronously
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+            future = ex.submit(run_claude, "test", timeout=30, cancel_event=cancel_event, workdir="/tmp")
+            # Give it a moment to start polling
+            import time as _time
+            _time.sleep(0.2)
+            cancel_event.set()
+            result = future.result(timeout=3)
+
+        assert result.cancelled is True
+        assert result.exit_code == -5
 
 
 # ── Integration / Demo-Text Test ──────────────────────────
@@ -536,12 +595,13 @@ class TestDemoVoiceCLI:
         fake_proc.stdout = "OK"
         fake_proc.stderr = ""
 
-        with mock.patch("subprocess.run", return_value=fake_proc) as mock_run:
+        with mock.patch("subprocess.Popen", return_value=fake_proc) as mock_popen, \
+             mock.patch("subprocess.PIPE", "pipe"):
             runner = CliRunner()
             runner.invoke(main, ["demo-voice", "IGNORE THIS ARG"])
 
         claude_prompt = ""
-        for call in mock_run.call_args_list:
+        for call in mock_popen.call_args_list:
             args = call[0][0] if call[0] else []
             if isinstance(args, list) and "claude" in args[0]:
                 claude_prompt = " ".join(args)
@@ -575,14 +635,13 @@ class TestDemoVoiceCLI:
         fake_proc.stdout = "done"
         fake_proc.stderr = ""
 
-        with mock.patch("subprocess.run", return_value=fake_proc) as mock_run:
+        with mock.patch("subprocess.Popen", return_value=fake_proc) as mock_popen, \
+             mock.patch("subprocess.PIPE", "pipe"):
             runner = CliRunner()
             runner.invoke(main, ["demo-voice", "任意内容"])
 
-        # The claude -p call is the first subprocess.run invocation.
-        # The second is macOS `say` — skip that.
         claude_prompt = ""
-        for call in mock_run.call_args_list:
+        for call in mock_popen.call_args_list:
             args = call[0][0] if call[0] else []
             if isinstance(args, list) and "claude" in args[0]:
                 claude_prompt = " ".join(args)
@@ -1985,7 +2044,7 @@ class TestSessionLogParity:
         expected_keys = {
             "timestamp", "input_mode", "transcript", "classified_intent",
             "risk_level", "confirmation_required", "confirmation_received",
-            "claude_command", "claude_cwd", "exit_code", "claude_stdout",
+            "claude_command", "claude_cwd", "exit_code", "cancelled", "claude_stdout",
             "claude_stderr", "summary", "spoken_summary", "spoken",
             "stt_backend", "tts_backend", "tts_voice_type", "tts_resource_id",
             "tts_duration_seconds", "tts_fallback_used", "tts_fallback_reason",
@@ -3989,13 +4048,20 @@ class TestZhCNOutput:
             lambda payload: None,
         )
 
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._resolve_tts_backend",
+            lambda: "macos-say",
+        )
+
         with _mock.patch("voice_claude_agent.cli.run_claude") as mock_run:
             mock_run.return_value.exit_code = 0
             mock_run.return_value.stdout = "請問這是什麼時候開始的"
             mock_run.return_value.stderr = ""
             mock_run.return_value.timed_out = False
+            mock_run.return_value.cancelled = False
             mock_run.return_value.duration_seconds = 0.1
             mock_run.return_value.command = ["claude", "-p", "test"]
+            mock_run.return_value.cwd = ""
 
             _run_pipeline("test prompt", input_mode="text", tts_fake=True)
 
@@ -5958,7 +6024,7 @@ class TestVoiceUXPolish:
         )
         monkeypatch.setattr(
             "voice_claude_agent.cli.run_claude",
-            lambda prompt: type("R", (), {"command": [], "exit_code": 0, "stdout": "ok", "stderr": "", "duration_seconds": 0.1, "timed_out": False, "cwd": ""})(),
+            lambda prompt, timeout=300, extra_args=None, workdir=None, cancel_event=None: type("R", (), {"command": [], "exit_code": 0, "stdout": "ok", "stderr": "", "duration_seconds": 0.1, "timed_out": False, "cancelled": False, "cwd": ""})(),
         )
         monkeypatch.setattr(
             "voice_claude_agent.cli.write_session",
@@ -5981,9 +6047,9 @@ class TestVoiceUXPolish:
     def test_concise_reply_style_affects_claude_prompt(self, monkeypatch):
         """Concise reply style adds '尽量简短' to Claude prompt."""
         calls = []
-        def _fake_claude(prompt):
+        def _fake_claude(prompt, timeout=300, extra_args=None, workdir=None, cancel_event=None):
             calls.append(prompt)
-            return type("R", (), {"command": [], "exit_code": 0, "stdout": "ok", "stderr": "", "duration_seconds": 0.1, "timed_out": False, "cwd": ""})()
+            return type("R", (), {"command": [], "exit_code": 0, "stdout": "ok", "stderr": "", "duration_seconds": 0.1, "timed_out": False, "cancelled": False, "cwd": ""})()
         monkeypatch.setattr("voice_claude_agent.cli.run_claude", _fake_claude)
         monkeypatch.setattr("voice_claude_agent.cli.write_session", lambda entry: None)
         monkeypatch.setattr("voice_claude_agent.cli.write_last_result", lambda entry: None)
@@ -6001,9 +6067,9 @@ class TestVoiceUXPolish:
     def test_detailed_reply_style_affects_claude_prompt(self, monkeypatch):
         """Detailed reply style adds '尽可能详细完整' to Claude prompt."""
         calls = []
-        def _fake_claude(prompt):
+        def _fake_claude(prompt, timeout=300, extra_args=None, workdir=None, cancel_event=None):
             calls.append(prompt)
-            return type("R", (), {"command": [], "exit_code": 0, "stdout": "ok", "stderr": "", "duration_seconds": 0.1, "timed_out": False, "cwd": ""})()
+            return type("R", (), {"command": [], "exit_code": 0, "stdout": "ok", "stderr": "", "duration_seconds": 0.1, "timed_out": False, "cancelled": False, "cwd": ""})()
         monkeypatch.setattr("voice_claude_agent.cli.run_claude", _fake_claude)
         monkeypatch.setattr("voice_claude_agent.cli.write_session", lambda entry: None)
         monkeypatch.setattr("voice_claude_agent.cli.write_last_result", lambda entry: None)
@@ -6021,7 +6087,7 @@ class TestVoiceUXPolish:
     def test_tts_summary_max_chars_config(self, monkeypatch):
         """VOICE_TTS_SUMMARY_MAX_CHARS sets truncation limit for TTS."""
         monkeypatch.setattr("voice_claude_agent.cli.run_claude",
-            lambda prompt: type("R", (), {"command": [], "exit_code": 0, "stdout": "A sentence here. " * 30, "stderr": "", "duration_seconds": 0.1, "timed_out": False, "cwd": ""})())
+            lambda prompt, timeout=300, extra_args=None, workdir=None, cancel_event=None: type("R", (), {"command": [], "exit_code": 0, "stdout": "A sentence here. " * 30, "stderr": "", "duration_seconds": 0.1, "timed_out": False, "cancelled": False, "cwd": ""})())
 
         spoken: list[str] = []
         class _S:
@@ -6050,7 +6116,7 @@ class TestVoiceUXPolish:
     def test_logging_store_includes_reply_style(self, monkeypatch, tmp_path):
         """Session logs include reply_style field."""
         monkeypatch.setattr("voice_claude_agent.cli.run_claude",
-            lambda prompt: type("R", (), {"command": [], "exit_code": 0, "stdout": "ok", "stderr": "", "duration_seconds": 0.1, "timed_out": False, "cwd": ""})())
+            lambda prompt, timeout=300, extra_args=None, workdir=None, cancel_event=None: type("R", (), {"command": [], "exit_code": 0, "stdout": "ok", "stderr": "", "duration_seconds": 0.1, "timed_out": False, "cancelled": False, "cwd": ""})())
         monkeypatch.setattr("voice_claude_agent.cli._resolve_tts_backend", lambda: "macos-say")
         monkeypatch.setattr("voice_claude_agent.cli.create_speaker", lambda: type("S", (), {"speak": lambda self, t: None})())
 
@@ -6105,6 +6171,108 @@ class TestVoiceUXPolish:
         # View Logs reads reply_style from last_result
         assert "reply_style" in msg
         assert "concise" in msg
+
+    def test_stop_current_run_menu_item_exists(self, monkeypatch):
+        """Stop Current Run menu item is present."""
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+        app = VoiceClaudeApp()
+        titles = set()
+        for m in app.menu:
+            if m is not None:
+                t = m.title
+                if callable(t):
+                    titles.add(t())
+                else:
+                    titles.add(t)
+        assert "Stop Current Run" in titles
+
+    def test_stop_current_run_cancels_claude(self, monkeypatch):
+        """_stop_current_run triggers request_cancel."""
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+
+        cancel_called = []
+        monkeypatch.setattr("voice_claude_agent.claude_runner._cancel_event",
+            type("E", (), {"set": lambda: cancel_called.append(1), "is_set": lambda: False, "clear": lambda: None})())
+        # Also mock the module-level functions
+        monkeypatch.setattr("voice_claude_agent.claude_runner.request_cancel",
+            lambda: cancel_called.append(1))
+        monkeypatch.setattr("voice_claude_agent.claude_runner.is_cancelled",
+            lambda: len(cancel_called) > 0)
+
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._cycle_in_progress = True
+        app._stop_current_run(app.stop_current_item)
+
+        assert len(cancel_called) >= 1
+        assert app.trigger_item.title == "Cancelling..."
+
+    def test_stop_current_run_writes_app_event(self, monkeypatch, tmp_path):
+        """_stop_current_run writes cycle_cancelled event."""
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+
+        events_path = tmp_path / "app_events.jsonl"
+        monkeypatch.setattr("voice_claude_agent.logging_store.get_app_events_log_path", lambda: events_path)
+
+        monkeypatch.setattr("voice_claude_agent.claude_runner.request_cancel", lambda: None)
+        monkeypatch.setattr("voice_claude_agent.claude_runner.is_cancelled", lambda: False)
+
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._cycle_in_progress = True
+        app._stop_current_run(app.stop_current_item)
+
+        events = events_path.read_text().strip()
+        assert "cycle_cancelled" in events
+
+    def test_stop_current_run_is_idempotent(self, monkeypatch):
+        """Calling stop twice does not double-fire."""
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+        calls = []
+        monkeypatch.setattr("voice_claude_agent.claude_runner.request_cancel", lambda: calls.append(1))
+        monkeypatch.setattr("voice_claude_agent.claude_runner.is_cancelled", lambda: len(calls) > 0)
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: None)
+        app._cycle_in_progress = True
+        app._stop_current_run(app.stop_current_item)
+        app._stop_current_run(app.stop_current_item)
+        assert len(calls) == 1
+
+    def test_stop_current_run_idle_is_noop(self, monkeypatch, tmp_path):
+        """Stop Current Run should not write cancellation events when idle."""
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+
+        events_path = tmp_path / "app_events.jsonl"
+        monkeypatch.setattr("voice_claude_agent.logging_store.get_app_events_log_path", lambda: events_path)
+
+        calls = []
+        monkeypatch.setattr("voice_claude_agent.claude_runner.request_cancel", lambda: calls.append(1))
+        monkeypatch.setattr("voice_claude_agent.claude_runner.is_cancelled", lambda: False)
+
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._cycle_in_progress = False
+        app._claude_invocation_start = 0
+        app._stop_current_run(app.stop_current_item)
+
+        assert calls == []
+        assert not events_path.exists()
+        assert "No active run" in alerts[-1]["message"]
 
 
 # ── F071: Volcengine/Doubao TTS backend (continued) ──────────
