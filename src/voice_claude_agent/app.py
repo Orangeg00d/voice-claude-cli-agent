@@ -166,11 +166,26 @@ class VoiceClaudeApp(rumps.App):
 
     # ── F073: TTS voice options ────────────────────────────────
 
+    def _run_on_main(self, fn) -> None:
+        """Run a small UI mutation on the Cocoa main thread."""
+        import threading as _threading
+
+        if _threading.current_thread() is _threading.main_thread():
+            fn()
+        else:
+            from PyObjCTools import AppHelper
+
+            AppHelper.callAfter(fn)
+
+    def _set_menu_title(self, item: rumps.MenuItem, title: str) -> None:
+        """Set a menu item title without touching AppKit from worker threads."""
+        self._run_on_main(lambda: setattr(item, "title", title))
+
     # F082: status update helper
     def _set_status(self, status: str) -> None:
         self._current_status = status
         if hasattr(self, "status_item") and self.status_item is not None:
-            self.status_item.title = f"Current Status: {status}"
+            self._set_menu_title(self.status_item, f"Current Status: {status}")
 
     TTS_VOICES = [
         ("爽快思思（女声）", "zh_female_shuangkuaisisi_moon_bigtts", True),
@@ -616,7 +631,7 @@ class VoiceClaudeApp(rumps.App):
     def _check_mic_or_alert(self) -> bool:
         has_mic, detail = check_mic_permission()
         if not has_mic:
-            self.mic_status_item.title = "Mic: Denied"
+            self._set_menu_title(self.mic_status_item, "Mic: Denied")
             self._alert_on_main(
                 title="Microphone Not Available",
                 message=(
@@ -976,12 +991,15 @@ class VoiceClaudeApp(rumps.App):
     # ── Menu title sync ──────────────────────────────────────
 
     def _sync_menu_titles(self) -> None:
-        if self._wake_active:
-            self.start_item.title = "Start Wake (running)"
-            self.start_item.set_callback(None)
-        else:
-            self.start_item.title = "Start Wake"
-            self.start_item.set_callback(self._start_wake)
+        def _apply() -> None:
+            if self._wake_active:
+                self.start_item.title = "Start Wake (running)"
+                self.start_item.set_callback(None)
+            else:
+                self.start_item.title = "Start Wake"
+                self.start_item.set_callback(self._start_wake)
+
+        self._run_on_main(_apply)
 
     # ── Start / Stop ─────────────────────────────────────────
 
@@ -1150,17 +1168,17 @@ class VoiceClaudeApp(rumps.App):
         if tts_speaking:
             cancel_all_tts()
             self._append_runtime_event("tts_cancelled")
-            self.mic_status_item.title = "Mic: TTS cancelled"
+            self._set_menu_title(self.mic_status_item, "Mic: TTS cancelled")
             if hasattr(self, "trigger_item"):
-                self.trigger_item.title = "Trigger Recording"
+                self._set_menu_title(self.trigger_item, "Trigger Recording")
             self._set_status("Cancelled")
 
         if not tts_speaking:
             request_cancel()
             self._append_runtime_event("cycle_cancelled")
-            self.mic_status_item.title = "Mic: Run cancelled"
+            self._set_menu_title(self.mic_status_item, "Mic: Run cancelled")
             if hasattr(self, "trigger_item"):
-                self.trigger_item.title = "Cancelling..."
+                self._set_menu_title(self.trigger_item, "Cancelling...")
             self._set_status("Cancelled")
 
         self._alert_on_main(
@@ -1201,6 +1219,7 @@ class VoiceClaudeApp(rumps.App):
         from voice_claude_agent.stt import RecordingTranscriber
 
         cycle_start = _time.monotonic()
+        completed_success = False
         self._append_runtime_event("trigger")
         self._set_status("Recording")
         try:
@@ -1210,7 +1229,7 @@ class VoiceClaudeApp(rumps.App):
                 self._set_status("Error")
                 return
 
-            self.trigger_item.title = "Recording..."
+            self._set_menu_title(self.trigger_item, "Recording...")
             self._append_runtime_event("record_start", elapsed=f"{_time.monotonic() - cycle_start:.3f}s")
             audio, diag = self._record_with_timeout(recorder)
             self._append_runtime_event(
@@ -1219,7 +1238,7 @@ class VoiceClaudeApp(rumps.App):
                 audio_bytes=len(audio),
             )
             if not audio:
-                self.mic_status_item.title = "Mic: No audio captured"
+                self._set_menu_title(self.mic_status_item, "Mic: No audio captured")
                 self._alert_on_main(
                     title="No Audio",
                     message=(
@@ -1230,7 +1249,7 @@ class VoiceClaudeApp(rumps.App):
                 self._set_status("Error")
                 return
 
-            self.trigger_item.title = "Transcribing..."
+            self._set_menu_title(self.trigger_item, "Transcribing...")
             self._set_status("Transcribing")
             stt_start = _time.monotonic()
             self._append_runtime_event("stt_start", elapsed=f"{stt_start - cycle_start:.3f}s")
@@ -1244,7 +1263,7 @@ class VoiceClaudeApp(rumps.App):
             )
 
             if not transcript.strip():
-                self.mic_status_item.title = "Mic: Empty transcript"
+                self._set_menu_title(self.mic_status_item, "Mic: Empty transcript")
                 self._alert_on_main(
                     title="No Speech Detected",
                     message="No speech was detected in the recording.",
@@ -1253,7 +1272,7 @@ class VoiceClaudeApp(rumps.App):
                 return
 
             if transcript.startswith("[STT error:"):
-                self.mic_status_item.title = "Mic: STT Error"
+                self._set_menu_title(self.mic_status_item, "Mic: STT Error")
                 self._alert_on_main(
                     title="STT Error",
                     message=(
@@ -1280,14 +1299,14 @@ class VoiceClaudeApp(rumps.App):
                 self._append_runtime_event("risk_high_confirm_tts")
 
                 # Record confirmation audio
-                self.trigger_item.title = "Confirm? Say 同意 or 取消..."
+                self._set_menu_title(self.trigger_item, "Confirm? Say 同意 or 取消...")
                 conf_audio, conf_diag = self._record_with_timeout(recorder)
                 self._append_runtime_event(
                     "risk_high_confirm_recorded",
                     audio_bytes=len(conf_audio) if conf_audio else 0,
                 )
                 if not conf_audio:
-                    self.mic_status_item.title = "Mic: No confirmation audio"
+                    self._set_menu_title(self.mic_status_item, "Mic: No confirmation audio")
                     self._alert_on_main(
                         title="Confirmation Failed",
                         message="No audio captured for confirmation. Action aborted.",
@@ -1306,12 +1325,12 @@ class VoiceClaudeApp(rumps.App):
                     self._append_runtime_event("risk_high_confirm_accepted")
                 elif verdict is False:
                     self._append_runtime_event("risk_high_confirm_rejected")
-                    self.mic_status_item.title = "Mic: Action rejected"
+                    self._set_menu_title(self.mic_status_item, "Mic: Action rejected")
                     speaker.speak("高风险动作已被拒绝，未执行。")
                     return
                 else:
                     self._append_runtime_event("risk_high_confirm_unclear")
-                    self.mic_status_item.title = "Mic: Confirmation unclear"
+                    self._set_menu_title(self.mic_status_item, "Mic: Confirmation unclear")
                     self._alert_on_main(
                         title="Confirmation Unclear",
                         message=(
@@ -1323,7 +1342,7 @@ class VoiceClaudeApp(rumps.App):
 
             # ── End F064 ────────────────────────────────────────
 
-            self.trigger_item.title = "Running Claude..."
+            self._set_menu_title(self.trigger_item, "Running Claude...")
             self._set_status("Claude running")
             claude_start = _time.monotonic()
             self._append_runtime_event("claude_start", elapsed=f"{claude_start - cycle_start:.3f}s")
@@ -1338,7 +1357,7 @@ class VoiceClaudeApp(rumps.App):
                     tts_fake=False,
                     confirmation_override=True if _req_conf(risk) else None,
                     stt_backend_used=self.stt_backend,
-                    on_tts_start=lambda: setattr(self.trigger_item, "title", "Speaking..."),
+                    on_tts_start=lambda: self._set_menu_title(self.trigger_item, "Speaking..."),
                 )
             finally:
                 self._claude_invocation_start = 0
@@ -1354,8 +1373,14 @@ class VoiceClaudeApp(rumps.App):
             self._last_transcript = transcript
             self._last_summary = last_data.get("summary", "")
             self._last_tts_backend = last_data.get("tts_backend", "macos-say")
-            self.transcript_item.title = f"Last Transcript: {transcript[:60]}{'...' if len(transcript) > 60 else ''}"
-            self.summary_item.title = f"Last Summary: {self._last_summary[:60]}{'...' if len(self._last_summary) > 60 else ''}"
+            self._set_menu_title(
+                self.transcript_item,
+                f"Last Transcript: {transcript[:60]}{'...' if len(transcript) > 60 else ''}",
+            )
+            self._set_menu_title(
+                self.summary_item,
+                f"Last Summary: {self._last_summary[:60]}{'...' if len(self._last_summary) > 60 else ''}",
+            )
             self._append_runtime_event(
                 "claude_done",
                 elapsed=f"{_time.monotonic() - cycle_start:.3f}s",
@@ -1374,21 +1399,22 @@ class VoiceClaudeApp(rumps.App):
                 tts_fallback_reason=last_data.get("tts_fallback_reason", ""),
             )
 
-            self.trigger_item.title = "Done ✓"
+            self._set_menu_title(self.trigger_item, "Done ✓")
             self._set_status("Idle")
             self._append_runtime_event(
                 "cycle_done",
                 total_elapsed=f"{_time.monotonic() - cycle_start:.3f}s",
             )
-            threading.Timer(1.5, lambda: setattr(self.trigger_item, "title", "Trigger Recording")).start()
+            completed_success = True
+            threading.Timer(1.5, lambda: self._set_menu_title(self.trigger_item, "Trigger Recording")).start()
         except Exception as e:
-            self.mic_status_item.title = "Mic: Runtime error"
+            self._set_menu_title(self.mic_status_item, "Mic: Runtime error")
             self._set_status("Error")
             self._append_runtime_event(f"record_cycle_error {type(e).__name__}: {e}")
             self._alert_on_main(title="Recording Runtime Error", message=str(e))
         finally:
-            if self.trigger_item.title not in {"Done ✓", "Trigger Recording"}:
-                self.trigger_item.title = "Trigger Recording"
+            if not completed_success:
+                self._set_menu_title(self.trigger_item, "Trigger Recording")
             self._cycle_in_progress = False  # F061: always clear guard on cycle end
 
     def _record_with_timeout(self, recorder) -> tuple[bytes, str]:
@@ -1475,8 +1501,8 @@ class VoiceClaudeApp(rumps.App):
 
         recorder = _safe_real_recorder()
         if recorder is None:
-            self.mic_status_item.title = "Mic: Error"
-            self.trigger_item.title = "Trigger Recording"
+            self._set_menu_title(self.mic_status_item, "Mic: Error")
+            self._set_menu_title(self.trigger_item, "Trigger Recording")
             self._alert_on_main(
                 title="Recording Failed",
                 message=(

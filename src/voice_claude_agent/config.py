@@ -3,6 +3,7 @@
 import json
 import os
 import shutil
+import unicodedata
 from pathlib import Path
 
 
@@ -158,9 +159,56 @@ def get_config_value(key: str, default: str = "") -> str:
     return str(value).strip() or default
 
 
+def _mojibake_key(text: str) -> str:
+    """Normalize mojibake-looking text for loose path-name matching."""
+    return "".join(
+        ch
+        for ch in text.replace("Â", "")
+        if not unicodedata.category(ch).startswith("C")
+    )
+
+
+def _latin1_mojibake_variants(text: str) -> set[str]:
+    """Return common variants produced by repeatedly decoding UTF-8 as Latin-1."""
+    variants: set[str] = set()
+    current = text
+    for _ in range(3):
+        try:
+            current = current.encode("utf-8").decode("latin1")
+        except UnicodeError:
+            break
+        variants.add(current)
+    return variants
+
+
+def _repair_mojibake_path(path: Path) -> Path:
+    """Repair a configured path if only the final directory name is mojibake.
+
+    This is intentionally conservative: it only runs when the configured path
+    does not exist and only substitutes a real sibling directory whose name
+    matches a Latin-1 mojibake variant of the requested final component.
+    """
+    if path.exists():
+        return path
+
+    parent = path.parent
+    if not parent.exists() or not parent.is_dir():
+        return path
+
+    target_key = _mojibake_key(path.name)
+    for candidate in parent.iterdir():
+        if not candidate.is_dir():
+            continue
+        for variant in _latin1_mojibake_variants(candidate.name):
+            if _mojibake_key(variant) == target_key:
+                return candidate
+    return path
+
+
 def get_claude_workdir() -> Path:
     """Resolve the working directory used for Claude CLI subprocesses."""
-    return Path(get_config_value("VOICE_CLAUDE_WORKDIR", str(get_project_root()))).expanduser()
+    path = Path(get_config_value("VOICE_CLAUDE_WORKDIR", str(get_project_root()))).expanduser()
+    return _repair_mojibake_path(path)
 
 
 DEFAULT_TIMEOUT_SECONDS = 300

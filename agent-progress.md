@@ -2576,5 +2576,28 @@
 - `./init.sh lint` passed.
 - Full test suite passed: 339/339.
 
+## 2026-06-09 14:20 — Codex Hotfix: Phase 23 Runtime Regression
+
+### Finding
+- User confirmed `Reload Config` worked, but the next voice run returned `exit_code=-3` and app restart caused recording to appear stuck.
+- Logs showed two distinct runtime failures:
+  - `claude_cwd` was sometimes persisted as a mojibake path: `/Users/orange/Documents/Claude/Projects/Ã¨Â¯­Ã©Â³Ã¥Â©Ã§`.
+  - App event recorded `NSInternalInconsistencyException - Modifications to the layout engine must not be performed from a background thread...`.
+- Root cause for the UI failure: F082 status/title updates touched rumps/AppKit menu items from the background recording thread, especially `on_tts_start=lambda: setattr(self.trigger_item, "title", "Speaking...")`.
+
+### Completed
+- Added `_run_on_main()` and `_set_menu_title()` helpers to route menu title/status mutations through `PyObjCTools.AppHelper.callAfter` when called from worker threads.
+- Replaced background-thread menu mutations in the recording pipeline, TTS start callback, Stop Current Run, and wake title sync.
+- Removed a background-thread read of `trigger_item.title` in the recording `finally` block by using a plain Python success flag.
+- Added conservative workdir mojibake repair in `get_claude_workdir()`: when a configured path does not exist, the final component is matched against Latin-1 mojibake variants of real sibling directories.
+- Added a regression test for mojibake workdir repair.
+- Rebuilt and reinstalled `~/Applications/VoiceClaudeAgent.app`.
+
+### Verification
+- Verified the real mojibake path resolves back to `/Users/orange/Documents/Claude/Projects/语音助理`.
+- `./init.sh lint` passed.
+- Full test suite passed: 340/340.
+- `python setup.py py2app` passed.
+
 ### Risks / Notes
 - Full test suite may have intermittent hangs with some real-hardware tests (mic, sounddevice). Focused tests all pass cleanly.

@@ -3874,6 +3874,17 @@ class TestConfigFile:
 
         assert get_config_value("WHISPER_CPP_LANGUAGE", "zh") == "auto"
 
+    def test_claude_workdir_repairs_latin1_mojibake_final_component(self, tmp_path, monkeypatch):
+        """A mojibake final directory name should resolve to the real sibling path."""
+        import voice_claude_agent.config as config_mod
+
+        project = tmp_path / "语音助理"
+        project.mkdir()
+        mojibake = project.name.encode("utf-8").decode("latin1")
+
+        monkeypatch.setenv("VOICE_CLAUDE_WORKDIR", str(tmp_path / mojibake))
+        assert config_mod.get_claude_workdir() == project
+
     def test_whisper_model_resolves_from_config_json(self, tmp_path, monkeypatch):
         """WHISPER_CPP_MODEL should resolve from config.json when env is absent."""
         import json
