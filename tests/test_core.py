@@ -4337,10 +4337,14 @@ class TestVoiceConfirmation:
         )
 
         # First recording: a high-risk prompt
-        mock_rec = __import__("unittest").mock.MagicMock()
+        prompt_rec = __import__("unittest").mock.MagicMock(name="prompt_recorder")
+        confirm_rec = __import__("unittest").mock.MagicMock(name="confirm_recorder")
+        safe_recorder = __import__("unittest").mock.MagicMock(
+            side_effect=[prompt_rec, confirm_rec]
+        )
         monkeypatch.setattr(
             "voice_claude_agent.cli._safe_real_recorder",
-            __import__("unittest").mock.MagicMock(return_value=mock_rec),
+            safe_recorder,
         )
         record_mock = __import__("unittest").mock.MagicMock(
             side_effect=[(b"audio1", "ok"), (b"audio2", "ok")]
@@ -4375,6 +4379,9 @@ class TestVoiceConfirmation:
 
         # After execution, risk confirmation should have been accepted
         assert app.trigger_item.title in ("Trigger Recording", "Done ✓")
+        assert safe_recorder.call_count == 2
+        assert record_mock.call_args_list[0].args[0] is prompt_rec
+        assert record_mock.call_args_list[1].args[0] is confirm_rec
         pipeline_mock.assert_called_once_with(
             "git push origin main --force",
             input_mode="voice",
@@ -4383,6 +4390,66 @@ class TestVoiceConfirmation:
             stt_backend_used="text-input",
             on_tts_start=mock.ANY,
         )
+        speaker_mock.speak.assert_called_once()
+
+    def test_standalone_permission_reply_does_not_call_claude(self, tmp_path, monkeypatch):
+        """A bare '同意' after a previous permission request should show guidance."""
+        import json
+        import voice_claude_agent.app as app_mod
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, ""))
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "DEFAULT_RECORD_SECONDS", 0)
+        monkeypatch.setattr(app_mod.VoiceClaudeApp, "RECORD_WORKER_GRACE_SECONDS", 0)
+
+        state_dir = tmp_path / "state"
+        state_dir.mkdir()
+        last_result = state_dir / "last_result.json"
+        last_result.write_text(json.dumps({
+            "summary": "部分命令需要用户批准才能执行。请批准这些命令。",
+            "spoken_summary": "请批准这些命令。",
+        }, ensure_ascii=False), encoding="utf-8")
+        monkeypatch.setattr(
+            "voice_claude_agent.config.get_last_result_path",
+            lambda: last_result,
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.config.get_app_events_log_path",
+            lambda: state_dir / "app_events.jsonl",
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.cli._safe_real_recorder",
+            __import__("unittest").mock.MagicMock(return_value=__import__("unittest").mock.MagicMock()),
+        )
+
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        alerts = []
+        app = VoiceClaudeApp(
+            stt_backend="text-input",
+            _alert_patch=lambda **kw: alerts.append(kw),
+            _wake_target=lambda: None,
+        )
+        monkeypatch.setattr(app, "_record_with_timeout", lambda recorder: (b"audio", "ok"))
+        monkeypatch.setattr(
+            "voice_claude_agent.stt.RecordingTranscriber",
+            __import__("unittest").mock.MagicMock(
+                return_value=__import__("unittest").mock.MagicMock(
+                    transcribe=__import__("unittest").mock.MagicMock(return_value="同意")
+                )
+            ),
+        )
+        pipeline_mock = __import__("unittest").mock.MagicMock()
+        monkeypatch.setattr("voice_claude_agent.cli._run_pipeline", pipeline_mock)
+        speaker_mock = __import__("unittest").mock.MagicMock()
+        monkeypatch.setattr(
+            "voice_claude_agent.tts.create_speaker",
+            __import__("unittest").mock.MagicMock(return_value=speaker_mock),
+        )
+
+        app._record_and_execute()
+
+        pipeline_mock.assert_not_called()
+        assert alerts[-1]["title"] == "Manual Approval Required"
         speaker_mock.speak.assert_called_once()
 
     def test_low_risk_skips_confirmation(self, tmp_path, monkeypatch):

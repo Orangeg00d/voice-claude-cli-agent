@@ -1289,6 +1289,25 @@ class VoiceClaudeApp(rumps.App):
             from voice_claude_agent.risk import classify_risk, requires_confirmation as _req_conf
             from voice_claude_agent.confirmation import is_voice_confirm
 
+            if self._is_standalone_permission_reply(transcript):
+                self._append_runtime_event("standalone_permission_reply")
+                self._set_menu_title(self.mic_status_item, "Mic: Permission needs UI")
+                message = (
+                    "我听到了你的同意，但这不能直接批准 Claude CLI 的权限弹窗。\n\n"
+                    "请在 Claude/Codex 界面手动批准命令，或者重新语音描述一个不需要额外授权的任务。"
+                )
+                self._alert_on_main(
+                    title="Manual Approval Required",
+                    message=message,
+                )
+                try:
+                    from voice_claude_agent.tts import create_speaker
+                    create_speaker().speak("已听到同意，但 Claude CLI 权限需要在界面里手动批准。")
+                except Exception:
+                    pass
+                self._set_status("Idle")
+                return
+
             risk = classify_risk(transcript)
             if _req_conf(risk):
                 self._append_runtime_event("risk_high_confirm_start")
@@ -1300,7 +1319,14 @@ class VoiceClaudeApp(rumps.App):
 
                 # Record confirmation audio
                 self._set_menu_title(self.trigger_item, "Confirm? Say 同意 or 取消...")
-                conf_audio, conf_diag = self._record_with_timeout(recorder)
+                self._set_status("Confirming")
+                self._append_runtime_event("risk_high_confirm_record_start")
+                confirm_recorder = self._open_mic_or_alert()
+                if confirm_recorder is None:
+                    self._append_runtime_event("risk_high_confirm_record_open_failed")
+                    self._set_status("Error")
+                    return
+                conf_audio, conf_diag = self._record_with_timeout(confirm_recorder)
                 self._append_runtime_event(
                     "risk_high_confirm_recorded",
                     audio_bytes=len(conf_audio) if conf_audio else 0,
@@ -1311,6 +1337,7 @@ class VoiceClaudeApp(rumps.App):
                         title="Confirmation Failed",
                         message="No audio captured for confirmation. Action aborted.",
                     )
+                    self._set_status("Error")
                     return
 
                 conf_transcriber = RecordingTranscriber(backend=self.stt_backend)
@@ -1327,6 +1354,7 @@ class VoiceClaudeApp(rumps.App):
                     self._append_runtime_event("risk_high_confirm_rejected")
                     self._set_menu_title(self.mic_status_item, "Mic: Action rejected")
                     speaker.speak("高风险动作已被拒绝，未执行。")
+                    self._set_status("Idle")
                     return
                 else:
                     self._append_runtime_event("risk_high_confirm_unclear")
@@ -1338,6 +1366,7 @@ class VoiceClaudeApp(rumps.App):
                             "Could not determine yes/no. Action aborted for safety."
                         ),
                     )
+                    self._set_status("Error")
                     return
 
             # ── End F064 ────────────────────────────────────────
@@ -1495,6 +1524,31 @@ class VoiceClaudeApp(rumps.App):
             write_app_event(message, **fields)
         except Exception:
             pass
+
+    def _is_standalone_permission_reply(self, transcript: str) -> bool:
+        """Detect a bare approval reply to a previous Claude permission request."""
+        from voice_claude_agent.confirmation import is_voice_confirm
+
+        if is_voice_confirm(transcript) is not True:
+            return False
+
+        cleaned = transcript.strip().lower()
+        if len(cleaned) > 12:
+            return False
+
+        try:
+            from voice_claude_agent.config import get_last_result_path
+            import json as _json
+
+            data = _json.loads(get_last_result_path().read_text(encoding="utf-8"))
+        except Exception:
+            return False
+
+        previous = "\n".join(
+            str(data.get(key, ""))
+            for key in ("summary", "spoken_summary")
+        )
+        return any(marker in previous for marker in ("批准", "授权", "approve", "permission"))
 
     def _open_mic_or_alert(self):
         from voice_claude_agent.cli import _safe_real_recorder

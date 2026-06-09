@@ -2599,5 +2599,27 @@
 - Full test suite passed: 340/340.
 - `python setup.py py2app` passed.
 
+## 2026-06-09 14:45 — Codex Hotfix: Voice Approval Follow-up
+
+### Finding
+- User reported that after Claude verbally asked for authorization, recording a spoken approval caused the app to appear stuck.
+- There are two approval paths:
+  - App-owned high-risk voice confirmation before running destructive commands.
+  - Claude CLI/Claude Desktop permission requests inside a previous Claude response.
+- The app-owned path reused the first recording's recorder instance for confirmation audio. Real sounddevice streams are safer as one-shot objects; reusing a stopped recorder can leave the audio backend in a bad state.
+- A bare spoken approval such as `同意` after a previous Claude permission request cannot actually approve Claude's UI/CLI permission prompt, because it is a new voice command, not a click on the permission dialog.
+
+### Completed
+- High-risk voice confirmation now opens a fresh recorder for the confirmation utterance instead of reusing the prompt recorder.
+- Added `risk_high_confirm_record_start` and `risk_high_confirm_record_open_failed` app events for better diagnostics.
+- Added `Confirming` current status while recording confirmation audio.
+- Added a standalone permission-reply guard: if the user says a bare approval word after a previous result asked for approval/permission, the app explains that manual UI approval is required and skips Claude execution.
+- Added regression coverage for fresh confirmation recorder usage and standalone approval replies.
+
+### Verification
+- Focused voice confirmation tests passed: 10/10.
+- `./init.sh lint` passed.
+- Full test suite passed: 341/341.
+
 ### Risks / Notes
 - Full test suite may have intermittent hangs with some real-hardware tests (mic, sounddevice). Focused tests all pass cleanly.
