@@ -2446,3 +2446,41 @@
 
 ### Next Recommended Task
 - Manual test: choose 清润男声 or 爽快思思, run Preview TTS Voice, then Trigger Recording and View Logs. Confirm `tts_fallback_used: False` and no resource mismatch warning.
+
+## 2026-06-09 08:55 — Phase 22 (F076-F078): Voice UX Settings and Seed TTS 2.0 Voices
+
+### Finding
+- The worktree already contained partial F076/F077 changes for reply style and configurable TTS summary length, but focused tests failed because View Logs did not display `reply_style` / `spoken_summary` and logging schema support was incomplete.
+- User requested two known Seed TTS 2.0 voices: 东方浩然 (`zh_male_dongfanghaoran_uranus_bigtts`) and 阿虎 (`zh_male_wennuanahu_uranus_bigtts`).
+
+### Completed
+- Added `VOICE_REPLY_STYLE` and `VOICE_TTS_SUMMARY_MAX_CHARS` to config allowlist.
+- `_run_pipeline()` now uses reply style to adjust the Claude prompt preamble and persists `reply_style` in sessions/last_result, including timeout paths.
+- `summarize()` accepts a configurable max character limit for spoken TTS summaries while preserving full output in logs.
+- View Logs displays `reply_style` and `spoken_summary` when it differs from the full summary.
+- Added `TTS_2_VOICES` for 东方浩然 and 阿虎 in the menu app.
+- Selecting either TTS 2.0 voice writes `VOLCENGINE_TTS_RESOURCE_ID=seed-tts-2.0` and preserves existing API keys/settings.
+- Updated Volcengine TTS docs, feature list, README, release notes, and developer application status.
+- Stabilized `test_trigger_sets_cycle_guard` by mocking `_update_mic_status` so full tests do not touch real microphone state.
+
+### Verification
+- Focused TTS voice / Voice UX / session tests passed: 22/22.
+- `./init.sh lint` passed.
+- Full test suite passed: 310/310.
+
+### Files Changed
+- src/voice_claude_agent/app.py
+- src/voice_claude_agent/cli.py
+- src/voice_claude_agent/config.py
+- src/voice_claude_agent/logging_store.py
+- src/voice_claude_agent/summarizer.py
+- tests/test_core.py
+- docs/VOLCENGINE_TTS_SETUP.md
+- feature_list.json
+- README.md
+- RELEASE_NOTES.md
+- DEVELOPER_PROGRAM_APPLICATION.md
+- agent-progress.md
+
+### Next Recommended Task
+- Rebuild and reinstall the menu app, then manually select 东方浩然 or 阿虎 and run Preview TTS Voice. Confirm View Logs shows `tts_resource_id: seed-tts-2.0` and `tts_fallback_used: False`.

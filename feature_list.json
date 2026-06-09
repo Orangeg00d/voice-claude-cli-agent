@@ -1058,6 +1058,53 @@
       ],
       "passes": true,
       "evidence": "Moved BV701_streaming and BV120_streaming out of the default voice list into TTS_EXPERIMENTAL_VOICES with explicit Resource ID warnings. VolcengineDoubaoSpeaker now exposes fallback reason/detail, and _run_pipeline persists tts_fallback_reason and tts_fallback_detail to sessions.jsonl and last_result.json. View Logs reads those fields, prints a clear TTS resource mismatch hint, uses a 900x520 selectable rumps.Window, and shows Claude CLI running duration from _claude_invocation_start. Added tests for the experimental voice split, mismatch display, wide text window, running status, session schema parity, and pipeline fallback reason persistence."
+    },
+    {
+      "id": "F076",
+      "priority": 76,
+      "category": "ux",
+      "description": "Configurable Claude reply style for voice use",
+      "steps": [
+        "Add VOICE_REPLY_STYLE config key with normal default",
+        "concise style prepends a short-answer instruction to Claude prompts",
+        "detailed style prepends a detailed-answer instruction to Claude prompts",
+        "sessions.jsonl and last_result.json persist reply_style",
+        "View Logs displays reply_style for the last result",
+        "Tests cover default, concise, detailed, logging, and View Logs display"
+      ],
+      "passes": true,
+      "evidence": "_run_pipeline resolves VOICE_REPLY_STYLE and changes the Claude prompt preamble for concise/detailed modes. CONFIG_KEYS includes VOICE_REPLY_STYLE so Settings can save it. sessions.jsonl and last_result.json include reply_style, and View Logs shows it. Focused VoiceUX tests passed and full suite passed: 310/310."
+    },
+    {
+      "id": "F077",
+      "priority": 77,
+      "category": "ux",
+      "description": "Configurable TTS spoken summary length",
+      "steps": [
+        "Add VOICE_TTS_SUMMARY_MAX_CHARS config key",
+        "Pass the configured positive integer limit into summarize() for TTS readout",
+        "Keep the full Claude output in summary/session logs",
+        "View Logs shows spoken_summary separately when it differs from summary",
+        "Tests cover configured truncation and spoken/full summary display"
+      ],
+      "passes": true,
+      "evidence": "summarize() now accepts an optional max_chars. _run_pipeline reads VOICE_TTS_SUMMARY_MAX_CHARS, uses it for spoken_summary, and continues preserving the full summary in sessions/last_result. View Logs displays spoken_summary separately when it differs. Focused VoiceUX tests passed and full suite passed: 310/310."
+    },
+    {
+      "id": "F078",
+      "priority": 78,
+      "category": "voice",
+      "description": "Add Seed TTS 2.0 voices 东方浩然 and 阿虎 to TTS Voice menu",
+      "steps": [
+        "TTS Voice menu includes 东方浩然 mapped to zh_male_dongfanghaoran_uranus_bigtts",
+        "TTS Voice menu includes 阿虎 mapped to zh_male_wennuanahu_uranus_bigtts",
+        "Selecting either TTS 2.0 voice writes VOLCENGINE_TTS_RESOURCE_ID=seed-tts-2.0",
+        "Existing API keys and other settings are preserved",
+        "Docs list the new voices and resource pairing",
+        "Tests cover menu presence and seed-tts-2.0 config write"
+      ],
+      "passes": true,
+      "evidence": "Added TTS_2_VOICES and _on_select_tts_voice_v2() in the menu app. 东方浩然 and 阿虎 are shown in the TTS Voice submenu and save their voice type with VOLCENGINE_TTS_RESOURCE_ID=seed-tts-2.0 while preserving existing config. docs/VOLCENGINE_TTS_SETUP.md documents both voices. Focused TTS voice tests passed and full suite passed: 310/310."
     }
   ]
 }

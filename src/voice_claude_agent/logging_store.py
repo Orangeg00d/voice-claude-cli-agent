@@ -36,6 +36,7 @@ def write_session(entry: dict) -> Path:
         "summary": entry.get("summary", ""),
         "spoken_summary": entry.get("spoken_summary", entry.get("summary", "")),
         "spoken": entry.get("spoken", False),
+        "reply_style": entry.get("reply_style", "normal"),
         "stt_backend": entry.get("stt_backend", ""),
         "tts_backend": entry.get("tts_backend", ""),
         "tts_voice_type": entry.get("tts_voice_type", ""),

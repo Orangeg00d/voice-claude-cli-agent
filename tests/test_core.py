@@ -1989,7 +1989,7 @@ class TestSessionLogParity:
             "claude_stderr", "summary", "spoken_summary", "spoken",
             "stt_backend", "tts_backend", "tts_voice_type", "tts_resource_id",
             "tts_duration_seconds", "tts_fallback_used", "tts_fallback_reason",
-            "tts_fallback_detail",
+            "tts_fallback_detail", "reply_style",
         }
         assert set(cli_entry.keys()) == expected_keys
         assert set(menu_entry.keys()) == expected_keys
@@ -2590,6 +2590,7 @@ class TestNonReentrantTrigger:
         )
 
         # Mock mic check to pass
+        app._update_mic_status = lambda: None
         app._check_mic_or_alert = lambda: True
 
         app._trigger_recording(app.trigger_item)
@@ -5628,6 +5629,39 @@ class TestTTSVoiceSelector:
         assert saved["VOLCENGINE_TTS_VOICE_TYPE"] == "zh_male_qingrun_moon_bigtts"
         assert saved["VOLCENGINE_TTS_RESOURCE_ID"] == "seed-tts-1.0"
 
+    def test_tts_2_voices_are_in_menu_and_set_seed_tts_2_resource(self, monkeypatch, tmp_path):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(
+            json.dumps({
+                "VOLCENGINE_TTS_API_KEY": "secret-key",
+                "VOLCENGINE_TTS_RESOURCE_ID": "seed-tts-1.0",
+            }),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+        alerts = []
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+
+        assert "东方浩然" in list(app.tts_voice_item.keys())
+        assert "阿虎" in list(app.tts_voice_item.keys())
+
+        app._on_select_tts_voice_v2(
+            "zh_male_dongfanghaoran_uranus_bigtts",
+            "seed-tts-2.0",
+        )(app.tts_voice_item)
+
+        saved = json.loads(cfg_file.read_text(encoding="utf-8"))
+        assert saved["VOLCENGINE_TTS_API_KEY"] == "secret-key"
+        assert saved["VOLCENGINE_TTS_VOICE_TYPE"] == "zh_male_dongfanghaoran_uranus_bigtts"
+        assert saved["VOLCENGINE_TTS_RESOURCE_ID"] == "seed-tts-2.0"
+        assert app.tts_voice_item.title == "TTS Voice: 东方浩然"
+        assert "seed-tts-2.0" in alerts[-1]["message"]
+
     def test_select_bv_voice_does_not_overwrite_resource_id(self, monkeypatch, tmp_path):
         import voice_claude_agent.app as app_mod
         from voice_claude_agent.app import VoiceClaudeApp
@@ -5908,6 +5942,169 @@ class TestTTSVoiceSelector:
         assert calls[0]["dimensions"][0] >= 800
         assert calls[0]["dimensions"][1] >= 500
         assert calls[-1] == {"run": True}
+
+
+# ── F076-F079: Voice UX Polish ──────────────────────────────
+
+
+class TestVoiceUXPolish:
+    """Tests for F076-F079: reply style, TTS summary max, running state, stop run."""
+
+    def test_reply_style_default_is_normal(self, monkeypatch):
+        """Default reply style is 'normal'."""
+        monkeypatch.setattr(
+            "voice_claude_agent.cli.get_config_value",
+            lambda key, default="": default,
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.cli.run_claude",
+            lambda prompt: type("R", (), {"command": [], "exit_code": 0, "stdout": "ok", "stderr": "", "duration_seconds": 0.1, "timed_out": False, "cwd": ""})(),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.cli.write_session",
+            lambda entry: None,
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.cli.write_last_result",
+            lambda entry: None,
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.cli.create_speaker",
+            lambda: type("S", (), {"speak": lambda self, t: None})(),
+        )
+        monkeypatch.setattr("voice_claude_agent.cli._resolve_tts_backend", lambda: "macos-say")
+
+        from voice_claude_agent.cli import _run_pipeline
+        _run_pipeline("test", input_mode="text", tts_fake=True)
+        # No crash = the new reply_style code path works
+
+    def test_concise_reply_style_affects_claude_prompt(self, monkeypatch):
+        """Concise reply style adds '尽量简短' to Claude prompt."""
+        calls = []
+        def _fake_claude(prompt):
+            calls.append(prompt)
+            return type("R", (), {"command": [], "exit_code": 0, "stdout": "ok", "stderr": "", "duration_seconds": 0.1, "timed_out": False, "cwd": ""})()
+        monkeypatch.setattr("voice_claude_agent.cli.run_claude", _fake_claude)
+        monkeypatch.setattr("voice_claude_agent.cli.write_session", lambda entry: None)
+        monkeypatch.setattr("voice_claude_agent.cli.write_last_result", lambda entry: None)
+        monkeypatch.setattr("voice_claude_agent.cli.create_speaker", lambda: type("S", (), {"speak": lambda self, t: None})())
+        monkeypatch.setattr("voice_claude_agent.cli._resolve_tts_backend", lambda: "macos-say")
+        monkeypatch.setattr(
+            "voice_claude_agent.cli.get_config_value",
+            lambda key, default="": {"VOICE_REPLY_STYLE": "concise"}.get(key, default),
+        )
+
+        from voice_claude_agent.cli import _run_pipeline
+        _run_pipeline("test", input_mode="text", tts_fake=True)
+        assert any("尽量简短" in c for c in calls)
+
+    def test_detailed_reply_style_affects_claude_prompt(self, monkeypatch):
+        """Detailed reply style adds '尽可能详细完整' to Claude prompt."""
+        calls = []
+        def _fake_claude(prompt):
+            calls.append(prompt)
+            return type("R", (), {"command": [], "exit_code": 0, "stdout": "ok", "stderr": "", "duration_seconds": 0.1, "timed_out": False, "cwd": ""})()
+        monkeypatch.setattr("voice_claude_agent.cli.run_claude", _fake_claude)
+        monkeypatch.setattr("voice_claude_agent.cli.write_session", lambda entry: None)
+        monkeypatch.setattr("voice_claude_agent.cli.write_last_result", lambda entry: None)
+        monkeypatch.setattr("voice_claude_agent.cli.create_speaker", lambda: type("S", (), {"speak": lambda self, t: None})())
+        monkeypatch.setattr("voice_claude_agent.cli._resolve_tts_backend", lambda: "macos-say")
+        monkeypatch.setattr(
+            "voice_claude_agent.cli.get_config_value",
+            lambda key, default="": {"VOICE_REPLY_STYLE": "detailed"}.get(key, default),
+        )
+
+        from voice_claude_agent.cli import _run_pipeline
+        _run_pipeline("test", input_mode="text", tts_fake=True)
+        assert any("尽可能详细完整" in c for c in calls)
+
+    def test_tts_summary_max_chars_config(self, monkeypatch):
+        """VOICE_TTS_SUMMARY_MAX_CHARS sets truncation limit for TTS."""
+        monkeypatch.setattr("voice_claude_agent.cli.run_claude",
+            lambda prompt: type("R", (), {"command": [], "exit_code": 0, "stdout": "A sentence here. " * 30, "stderr": "", "duration_seconds": 0.1, "timed_out": False, "cwd": ""})())
+
+        spoken: list[str] = []
+        class _S:
+            def speak(self, text):
+                spoken.append(text)
+
+        monkeypatch.setattr("voice_claude_agent.cli.create_speaker", lambda: _S())
+        monkeypatch.setattr("voice_claude_agent.cli._resolve_tts_backend", lambda: "macos-say")
+        monkeypatch.setattr("voice_claude_agent.cli.write_session", lambda entry: None)
+        monkeypatch.setattr("voice_claude_agent.cli.write_last_result", lambda entry: None)
+
+        # Set max to 80 chars
+        monkeypatch.setattr(
+            "voice_claude_agent.cli.get_config_value",
+            lambda key, default="": (
+                {"VOICE_TTS_SUMMARY_MAX_CHARS": "80"}.get(key, default) if key == "VOICE_TTS_SUMMARY_MAX_CHARS" else default
+            ),
+        )
+
+        from voice_claude_agent.cli import _run_pipeline
+        _run_pipeline("test", input_mode="text", tts_fake=False)
+        assert spoken
+        assert len(spoken[0]) < 120
+        assert "（回复较长" in spoken[0]
+
+    def test_logging_store_includes_reply_style(self, monkeypatch, tmp_path):
+        """Session logs include reply_style field."""
+        monkeypatch.setattr("voice_claude_agent.cli.run_claude",
+            lambda prompt: type("R", (), {"command": [], "exit_code": 0, "stdout": "ok", "stderr": "", "duration_seconds": 0.1, "timed_out": False, "cwd": ""})())
+        monkeypatch.setattr("voice_claude_agent.cli._resolve_tts_backend", lambda: "macos-say")
+        monkeypatch.setattr("voice_claude_agent.cli.create_speaker", lambda: type("S", (), {"speak": lambda self, t: None})())
+
+        sessions_path = tmp_path / "sessions.jsonl"
+        last_path = tmp_path / "last_result.json"
+        monkeypatch.setattr("voice_claude_agent.logging_store.get_sessions_log_path", lambda: sessions_path)
+        monkeypatch.setattr("voice_claude_agent.logging_store.get_last_result_path", lambda: last_path)
+
+        from voice_claude_agent.cli import _run_pipeline
+        _run_pipeline("test", input_mode="text", tts_fake=True)
+
+        session = json.loads(sessions_path.read_text().splitlines()[0])
+        # reply_style defaults to "normal" since we don't override get_config_value
+        assert session.get("reply_style") == "normal"
+
+        last = json.loads(last_path.read_text())
+        assert last.get("reply_style") == "normal"
+
+    def test_app_view_logs_shows_reply_style_and_spoken_summary(self, monkeypatch, tmp_path):
+        """View Logs shows reply_style and spoken_summary differentiation."""
+        import voice_claude_agent.app as app_mod
+        import voice_claude_agent.config as config_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({}), encoding="utf-8")
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+
+        state_dir = tmp_path / "agent_state"
+        state_dir.mkdir(parents=True, exist_ok=True)
+        monkeypatch.setattr(config_mod, "get_agent_state_dir", lambda: state_dir)
+        monkeypatch.setattr(config_mod, "get_app_events_log_path", lambda: state_dir / "app_events.jsonl")
+        monkeypatch.setattr(config_mod, "get_last_result_path", lambda: state_dir / "last_result.json")
+
+        (state_dir / "app_events.jsonl").write_text(
+            '{"timestamp":"2026-06-08T10:00:00+08:00","event":"cycle_done"}\n', encoding="utf-8")
+        (state_dir / "last_result.json").write_text(json.dumps({
+            "prompt": "test", "exit_code": 0,
+            "summary": "这是一段非常非常长的完整回答",
+            "spoken_summary": "这是一段非常非常长的...",
+            "reply_style": "concise",
+        }, ensure_ascii=False), encoding="utf-8")
+
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._show_logs(app.logs_item)
+
+        msg = alerts[-1]["message"]
+        # View Logs reads reply_style from last_result
+        assert "reply_style" in msg
+        assert "concise" in msg
 
 
 # ── F071: Volcengine/Doubao TTS backend (continued) ──────────

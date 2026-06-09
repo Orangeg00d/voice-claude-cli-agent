@@ -158,6 +158,11 @@ class VoiceClaudeApp(rumps.App):
         ("VV 女声（方言）", "zh_female_vv_uranus_bigtts", True),
     ]
 
+    TTS_2_VOICES = [
+        ("东方浩然", "zh_male_dongfanghaoran_uranus_bigtts", "seed-tts-2.0"),
+        ("阿虎", "zh_male_wennuanahu_uranus_bigtts", "seed-tts-2.0"),
+    ]
+
     TTS_EXPERIMENTAL_VOICES = [
         ("标准女声", "BV701_streaming", False),
         ("标准男声", "BV120_streaming", False),
@@ -166,6 +171,9 @@ class VoiceClaudeApp(rumps.App):
     @staticmethod
     def _voice_label(voice_type: str) -> str:
         for label, vt, _moon in VoiceClaudeApp.TTS_VOICES:
+            if vt == voice_type:
+                return label
+        for label, vt, _resource_id in VoiceClaudeApp.TTS_2_VOICES:
             if vt == voice_type:
                 return label
         for label, vt, _moon in VoiceClaudeApp.TTS_EXPERIMENTAL_VOICES:
@@ -182,12 +190,19 @@ class VoiceClaudeApp(rumps.App):
         label = self._voice_label(self._current_tts_voice_type())
         return f"TTS Voice: {label}"
 
-    def _save_voice_type(self, voice_type: str, is_moon_bigtts: bool) -> None:
+    def _save_voice_type(
+        self,
+        voice_type: str,
+        is_moon_bigtts: bool,
+        resource_id: str | None = None,
+    ) -> None:
         import json
 
         cfg = load_config()
         cfg["VOLCENGINE_TTS_VOICE_TYPE"] = voice_type
-        if is_moon_bigtts:
+        if resource_id:
+            cfg["VOLCENGINE_TTS_RESOURCE_ID"] = resource_id
+        elif is_moon_bigtts:
             cfg["VOLCENGINE_TTS_RESOURCE_ID"] = "seed-tts-1.0"
         cfg_path = get_config_path()
         cfg_path.parent.mkdir(parents=True, exist_ok=True)
@@ -224,12 +239,32 @@ class VoiceClaudeApp(rumps.App):
             display = f"✓ {label}" if vt == current else label
             mi = rumps.MenuItem(display, callback=self._on_select_tts_voice(vt, is_moon))
             self.tts_voice_item[label] = mi
+        # Seed TTS 2.0 voices — known Resource ID pairing
+        self.tts_voice_item["__sep_seed2__"] = rumps.separator
+        for label, vt, resource_id in self.TTS_2_VOICES:
+            display = f"✓ {label}" if vt == current else label
+            mi = rumps.MenuItem(display, callback=self._on_select_tts_voice_v2(vt, resource_id))
+            self.tts_voice_item[label] = mi
         # Experimental voices — separated group
         self.tts_voice_item["__sep_exp__"] = rumps.separator
         for label, vt, is_moon in self.TTS_EXPERIMENTAL_VOICES:
             display = f"✓ {label}" if vt == current else label
             mi = rumps.MenuItem(display, callback=self._on_select_tts_voice_exp(vt))
             self.tts_voice_item[f"exp_{label}"] = mi
+
+    def _on_select_tts_voice_v2(self, voice_type: str, resource_id: str) -> callable:
+        def _cb(sender: rumps.MenuItem) -> None:
+            self._save_voice_type(voice_type, False, resource_id=resource_id)
+            self._update_tts_voice_menu_title()
+            self._refresh_tts_voice_submenu()
+            self._alert_on_main(
+                title="TTS Voice Changed",
+                message=(
+                    f"Voice set to: {self._voice_label(voice_type)}\n\n"
+                    f"VOLCENGINE_TTS_RESOURCE_ID set to {resource_id}."
+                ),
+            )
+        return _cb
 
     def _on_select_tts_voice_exp(self, voice_type: str) -> callable:
         def _cb(sender: rumps.MenuItem) -> None:
@@ -622,6 +657,8 @@ class VoiceClaudeApp(rumps.App):
                 lines.append(f"  prompt: {data.get('prompt', '?')}")
                 if data.get("claude_cwd"):
                     lines.append(f"  claude_cwd: {data.get('claude_cwd')}")
+                if data.get("reply_style"):
+                    lines.append(f"  reply_style: {data.get('reply_style')}")
                 if data.get("tts_backend"):
                     lines.append(f"  tts_backend: {data.get('tts_backend')}")
                 if data.get("stt_backend"):
@@ -648,6 +685,9 @@ class VoiceClaudeApp(rumps.App):
                     )
                 lines.append(f"  exit_code: {data.get('exit_code', '?')}")
                 summary = data.get("summary", data.get("spoken_summary", "?"))
+                spoken_summary = data.get("spoken_summary", "")
+                if spoken_summary and spoken_summary != summary:
+                    lines.append(f"  spoken_summary: {spoken_summary[:200]}")
                 lines.append(f"  summary: {summary[:200]}")
             except json.JSONDecodeError:
                 lines.append("(last_result.json is corrupted — not valid JSON)")

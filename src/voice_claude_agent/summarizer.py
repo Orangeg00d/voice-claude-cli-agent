@@ -35,7 +35,9 @@ def _truncate_at_sentence(text: str, max_chars: int) -> str:
     return chunk.rstrip()
 
 
-def summarize(result_text: str, exit_code: int, duration_seconds: float) -> str:
+def summarize(result_text: str, exit_code: int, duration_seconds: float, max_chars: int | None = None) -> str:
+    if max_chars is None:
+        max_chars = MAX_RESULT_CHARS_FOR_READOUT
     if exit_code == -2:
         return "Claude CLI 未找到，请确认已安装 Claude。"
 
@@ -55,10 +57,10 @@ def summarize(result_text: str, exit_code: int, duration_seconds: float) -> str:
     # Strip code blocks for TTS readability
     clean = _strip_code_blocks(result_text)
 
-    if len(clean) <= MAX_RESULT_CHARS_FOR_READOUT:
+    if len(clean) <= max_chars:
         return clean.strip()
 
-    truncated = _truncate_at_sentence(clean, MAX_RESULT_CHARS_FOR_READOUT)
+    truncated = _truncate_at_sentence(clean, max_chars)
     return f"{truncated}。{_TTS_TRUNCATION_NOTE}"
 
 

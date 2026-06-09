@@ -285,7 +285,15 @@ def _run_pipeline(
 
     # 3. Execute Claude CLI
     # F062: prepend zh-CN constraint
-    wrapped = f"请始终使用简体中文回答。{prompt}"
+    # F076: reply style
+    reply_style = get_config_value("VOICE_REPLY_STYLE", "normal")
+    if reply_style == "concise":
+        preamble = "请始终使用简体中文回答，而且尽量简短，不超过两句话。"
+    elif reply_style == "detailed":
+        preamble = "请始终使用简体中文回答，尽可能详细完整。"
+    else:
+        preamble = "请始终使用简体中文回答。"
+    wrapped = f"{preamble}{prompt}"
     click.echo(
         f"Running: claude -p \"{wrapped[:80]}{'...' if len(wrapped) > 80 else ''}\""
     )
@@ -321,6 +329,7 @@ def _run_pipeline(
             "summary": "Timed out",
             "spoken_summary": "Claude CLI 执行超时，请检查任务或重试。",
             "spoken": True,
+            "reply_style": reply_style,
             "stt_backend": stt_backend_used,
             "tts_backend": tts_backend_used,
             "tts_voice_type": tts_voice_type,
@@ -337,6 +346,7 @@ def _run_pipeline(
             "summary": "Timed out",
             "spoken_summary": "Claude CLI 执行超时，请检查任务或重试。",
             "risk_level": risk_level.value,
+            "reply_style": reply_style,
             "stt_backend": stt_backend_used,
             "tts_backend": tts_backend_used,
             "tts_voice_type": tts_voice_type,
@@ -353,8 +363,21 @@ def _run_pipeline(
     if result.stderr and result.exit_code != 0:
         combined = result.stderr + "\n" + result.stdout
     combined = _t2s_convert(combined)
+
+    # F077: configurable TTS summary max chars
+    from voice_claude_agent.summarizer import MAX_RESULT_CHARS_FOR_READOUT as _DEFAULT_SUMMARY_MAX
+    summary_max = _DEFAULT_SUMMARY_MAX
+    raw_max = get_config_value("VOICE_TTS_SUMMARY_MAX_CHARS")
+    if raw_max:
+        try:
+            parsed = int(raw_max)
+            if parsed > 0:
+                summary_max = parsed
+        except ValueError:
+            pass
+
     summary = summarize_for_record(combined, result.exit_code, result.duration_seconds)
-    spoken_summary = summarize(combined, result.exit_code, result.duration_seconds)
+    spoken_summary = summarize(combined, result.exit_code, result.duration_seconds, summary_max)
     click.echo(f"Summary: {spoken_summary}")
 
     # 5. TTS speak
@@ -383,6 +406,7 @@ def _run_pipeline(
         "summary": summary,
         "spoken_summary": spoken_summary,
         "spoken": True,
+        "reply_style": reply_style,
         "stt_backend": stt_backend_used,
         "tts_backend": tts_backend_used,
         "tts_voice_type": tts_voice_type,
@@ -400,6 +424,7 @@ def _run_pipeline(
         "summary": summary,
         "spoken_summary": spoken_summary,
         "risk_level": risk_level.value,
+        "reply_style": reply_style,
         "stt_backend": stt_backend_used,
         "tts_backend": tts_backend_used,
         "tts_voice_type": tts_voice_type,
