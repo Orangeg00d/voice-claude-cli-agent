@@ -31,6 +31,8 @@ from voice_claude_agent.tts import (
     FakeSpeaker,
     VolcengineDoubaoSpeaker,
     create_speaker,
+    is_tts_cancelled,
+    reset_tts_cancelled,
     _resolve_tts_backend,
 )
 from voice_claude_agent.wake import ManualWakeTrigger
@@ -254,6 +256,7 @@ def _run_pipeline(
     tts_fake: bool,
     confirmation_override: bool | None = None,
     stt_backend_used: str = "",
+    on_tts_start: callable | None = None,
 ) -> None:
     if tts_fake:
         speaker = FakeSpeaker()
@@ -285,6 +288,7 @@ def _run_pipeline(
 
     # 3. Execute Claude CLI
     reset_cancel_event()
+    reset_tts_cancelled()
     # F062: prepend zh-CN constraint
     # F076: reply style
     reply_style = get_config_value("VOICE_REPLY_STYLE", "normal")
@@ -316,8 +320,11 @@ def _run_pipeline(
             spoken_label = "任务已被取消。"
             click.echo(click.style("Claude CLI cancelled.", fg="red"))
 
+        if on_tts_start:
+            on_tts_start()
         tts_start = time.monotonic()
         speaker.speak(spoken_label)
+        tts_cancelled = is_tts_cancelled()
         tts_duration_seconds = round(time.monotonic() - tts_start, 3)
         tts_fallback_used = isinstance(speaker, VolcengineDoubaoSpeaker) and getattr(speaker, "_fallback_called", False)
         tts_fallback_reason = getattr(speaker, "_fallback_reason", "") if tts_fallback_used else ""
@@ -349,6 +356,7 @@ def _run_pipeline(
             "tts_fallback_reason": tts_fallback_reason,
             "tts_fallback_detail": tts_fallback_detail,
             "cancelled": result_cancelled,
+            "tts_cancelled": tts_cancelled,
         })
         write_last_result({
             "prompt": prompt,
@@ -367,6 +375,7 @@ def _run_pipeline(
             "tts_fallback_reason": tts_fallback_reason,
             "tts_fallback_detail": tts_fallback_detail,
             "cancelled": result_cancelled,
+            "tts_cancelled": tts_cancelled,
         })
         return
 
@@ -393,8 +402,11 @@ def _run_pipeline(
     click.echo(f"Summary: {spoken_summary}")
 
     # 5. TTS speak
+    if on_tts_start:
+        on_tts_start()
     tts_start = time.monotonic()
     speaker.speak(spoken_summary)
+    tts_cancelled = is_tts_cancelled()
     tts_duration_seconds = round(time.monotonic() - tts_start, 3)
     tts_fallback_used = isinstance(speaker, VolcengineDoubaoSpeaker) and getattr(speaker, "_fallback_called", False)
     tts_fallback_reason = getattr(speaker, "_fallback_reason", "") if tts_fallback_used else ""
@@ -428,6 +440,7 @@ def _run_pipeline(
         "tts_fallback_reason": tts_fallback_reason,
         "tts_fallback_detail": tts_fallback_detail,
         "cancelled": result_cancelled,
+        "tts_cancelled": tts_cancelled,
     })
 
     write_last_result({
@@ -447,6 +460,7 @@ def _run_pipeline(
         "tts_fallback_reason": tts_fallback_reason,
         "tts_fallback_detail": tts_fallback_detail,
         "cancelled": result_cancelled,
+        "tts_cancelled": tts_cancelled,
     })
 
 

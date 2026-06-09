@@ -663,6 +663,8 @@ class VoiceClaudeApp(rumps.App):
                     lines.append(f"  claude_cwd: {data.get('claude_cwd')}")
                 if data.get("cancelled") is not None:
                     lines.append(f"  cancelled: {data.get('cancelled')}")
+                if data.get("tts_cancelled") is not None:
+                    lines.append(f"  tts_cancelled: {data.get('tts_cancelled')}")
                 if data.get("reply_style"):
                     lines.append(f"  reply_style: {data.get('reply_style')}")
                 if data.get("tts_backend"):
@@ -1077,32 +1079,47 @@ class VoiceClaudeApp(rumps.App):
     # ── F079: Stop Current Run ─────────────────────────────────
 
     def _stop_current_run(self, sender: rumps.MenuItem) -> None:
-        """Cancel the currently running Claude CLI subprocess.
+        """Cancel the currently running Claude CLI subprocess or TTS playback.
 
         Signals the global cancel event so run_claude() returns early.
+        Also kills active TTS processes (say / afplay).
         Safe no-op when nothing is running.
         """
         from voice_claude_agent.claude_runner import request_cancel, is_cancelled
+        from voice_claude_agent.tts import cancel_all_tts, is_tts_speaking
 
-        if not self._cycle_in_progress and not self._claude_invocation_start:
+        tts_speaking = is_tts_speaking()
+
+        if not self._cycle_in_progress and not self._claude_invocation_start and not tts_speaking:
             self._alert_on_main(
                 title="Stop Current Run",
                 message="No active run is currently executing.",
             )
             return
 
-        if is_cancelled():
+        if is_cancelled() and not tts_speaking:
             return  # already cancelled
 
-        request_cancel()
-        self._append_runtime_event("cycle_cancelled")
-        self.mic_status_item.title = "Mic: Run cancelled"
-        if hasattr(self, "trigger_item"):
-            self.trigger_item.title = "Cancelling..."
+        if tts_speaking:
+            cancel_all_tts()
+            self._append_runtime_event("tts_cancelled")
+            self.mic_status_item.title = "Mic: TTS cancelled"
+            if hasattr(self, "trigger_item"):
+                self.trigger_item.title = "Trigger Recording"
+
+        if not tts_speaking:
+            request_cancel()
+            self._append_runtime_event("cycle_cancelled")
+            self.mic_status_item.title = "Mic: Run cancelled"
+            if hasattr(self, "trigger_item"):
+                self.trigger_item.title = "Cancelling..."
 
         self._alert_on_main(
             title="Stop Current Run",
-            message="Cancellation requested for the current Claude CLI run.",
+            message=(
+                "TTS playback stopped." if tts_speaking
+                else "Cancellation requested for the current Claude CLI run."
+            ),
         )
 
     # ── Wake loop (background thread) ────────────────────────
@@ -1265,6 +1282,7 @@ class VoiceClaudeApp(rumps.App):
                     tts_fake=False,
                     confirmation_override=True if _req_conf(risk) else None,
                     stt_backend_used=self.stt_backend,
+                    on_tts_start=lambda: setattr(self.trigger_item, "title", "Speaking..."),
                 )
             finally:
                 self._claude_invocation_start = 0

@@ -392,9 +392,10 @@ class TestDemoTextPipeline:
         # Mock claude subprocess
         fake_proc = mock.MagicMock()
         fake_proc.returncode = 0
-        fake_proc.stdout = "OK, I have completed the task."
-        fake_proc.stderr = ""
-        with mock.patch("subprocess.run", return_value=fake_proc):
+        fake_proc.poll.return_value = 0
+        fake_proc.communicate.return_value = ("OK, I have completed the task.", "")
+        with mock.patch("subprocess.Popen", return_value=fake_proc), \
+             mock.patch("subprocess.PIPE", "pipe"):
             from voice_claude_agent.claude_runner import run_claude
             from voice_claude_agent.risk import classify_risk, requires_confirmation
             from voice_claude_agent.summarizer import summarize
@@ -538,9 +539,10 @@ class TestVoicePipeline:
         # Mock Claude
         fake_proc = mock.MagicMock()
         fake_proc.returncode = 0
-        fake_proc.stdout = "OK"
-        fake_proc.stderr = ""
-        with mock.patch("subprocess.run", return_value=fake_proc):
+        fake_proc.poll.return_value = 0
+        fake_proc.communicate.return_value = ("OK", "")
+        with mock.patch("subprocess.Popen", return_value=fake_proc), \
+             mock.patch("subprocess.PIPE", "pipe"):
             result = run_claude(transcript)
             summary = summarize(result.stdout, result.exit_code, result.duration_seconds)
 
@@ -592,8 +594,8 @@ class TestDemoVoiceCLI:
 
         fake_proc = mock.MagicMock()
         fake_proc.returncode = 0
-        fake_proc.stdout = "OK"
-        fake_proc.stderr = ""
+        fake_proc.poll.return_value = 0
+        fake_proc.communicate.return_value = ("OK", "")
 
         with mock.patch("subprocess.Popen", return_value=fake_proc) as mock_popen, \
              mock.patch("subprocess.PIPE", "pipe"):
@@ -632,8 +634,8 @@ class TestDemoVoiceCLI:
 
         fake_proc = mock.MagicMock()
         fake_proc.returncode = 0
-        fake_proc.stdout = "done"
-        fake_proc.stderr = ""
+        fake_proc.poll.return_value = 0
+        fake_proc.communicate.return_value = ("done", "")
 
         with mock.patch("subprocess.Popen", return_value=fake_proc) as mock_popen, \
              mock.patch("subprocess.PIPE", "pipe"):
@@ -669,10 +671,11 @@ class TestWakeLoop:
 
         fake_proc = mock.MagicMock()
         fake_proc.returncode = 0
-        fake_proc.stdout = "OK"
-        fake_proc.stderr = ""
+        fake_proc.poll.return_value = 0
+        fake_proc.communicate.return_value = ("OK", "")
 
-        with mock.patch("subprocess.run", return_value=fake_proc):
+        with mock.patch("subprocess.Popen", return_value=fake_proc), \
+             mock.patch("subprocess.PIPE", "pipe"):
             runner = CliRunner()
             result = runner.invoke(main, ["wake", "--fake", "--once"])
 
@@ -700,8 +703,8 @@ class TestWakeLoop:
 
         fake_proc = mock.MagicMock()
         fake_proc.returncode = 0
-        fake_proc.stdout = "OK"
-        fake_proc.stderr = ""
+        fake_proc.poll.return_value = 0
+        fake_proc.communicate.return_value = ("OK", "")
 
         call_count = 0
 
@@ -712,7 +715,8 @@ class TestWakeLoop:
                 raise KeyboardInterrupt()
             return fake_proc
 
-        with mock.patch("subprocess.run", side_effect=_side_effect):
+        with mock.patch("subprocess.Popen", side_effect=_side_effect), \
+             mock.patch("subprocess.PIPE", "pipe"):
             runner = CliRunner()
             result = runner.invoke(main, ["wake", "--fake"])
 
@@ -2048,7 +2052,7 @@ class TestSessionLogParity:
             "claude_stderr", "summary", "spoken_summary", "spoken",
             "stt_backend", "tts_backend", "tts_voice_type", "tts_resource_id",
             "tts_duration_seconds", "tts_fallback_used", "tts_fallback_reason",
-            "tts_fallback_detail", "reply_style",
+            "tts_fallback_detail", "tts_cancelled", "reply_style",
         }
         assert set(cli_entry.keys()) == expected_keys
         assert set(menu_entry.keys()) == expected_keys
@@ -2990,7 +2994,7 @@ class TestLastTranscriptSummary:
             lambda: last_result,
         )
 
-        def fake_pipeline(prompt, input_mode, tts_fake, confirmation_override=None, stt_backend_used=""):
+        def fake_pipeline(prompt, input_mode, tts_fake, confirmation_override=None, stt_backend_used="", on_tts_start=None):
             last_result.write_text(json.dumps(
                 {"prompt": prompt, "exit_code": 0, "summary": "Claude says hi"}
             ), encoding="utf-8")
@@ -3023,7 +3027,7 @@ class TestLastTranscriptSummary:
             lambda: last_result,
         )
 
-        def fake_pipeline(prompt, input_mode, tts_fake, confirmation_override=None, stt_backend_used=""):
+        def fake_pipeline(prompt, input_mode, tts_fake, confirmation_override=None, stt_backend_used="", on_tts_start=None):
             last_result.write_text(json.dumps(
                 {"prompt": prompt, "exit_code": 0, "summary": "Fresh summary"}
             ), encoding="utf-8")
@@ -4321,6 +4325,7 @@ class TestVoiceConfirmation:
             tts_fake=False,
             confirmation_override=True,
             stt_backend_used="text-input",
+            on_tts_start=mock.ANY,
         )
         speaker_mock.speak.assert_called_once()
 
@@ -4376,6 +4381,7 @@ class TestVoiceConfirmation:
             tts_fake=False,
             confirmation_override=None,
             stt_backend_used="text-input",
+            on_tts_start=mock.ANY,
         )
 
     def test_high_risk_reject_skips_pipeline(self, tmp_path, monkeypatch):
@@ -6344,15 +6350,25 @@ class TestVolcengineDoubaoTTS:
         monkeypatch.setattr("urllib.request.urlopen", lambda req, timeout=None: _FakeResp())
         monkeypatch.setattr("urllib.request.Request", lambda *a, **kw: mock.MagicMock())
 
-        subprocess_calls = []
-        monkeypatch.setattr("subprocess.run", lambda *a, **kw: subprocess_calls.append(a))
+        popen_calls = []
+
+        class _FakeProc:
+            pid = 12345
+
+            def wait(self, timeout=None):
+                return 0
+
+            def poll(self):
+                return 0
+
+        monkeypatch.setattr("subprocess.Popen", lambda *a, **kw: popen_calls.append(a) or _FakeProc())
 
         from voice_claude_agent.tts import VolcengineDoubaoSpeaker
         speaker = VolcengineDoubaoSpeaker()
         speaker.speak("测试文本")
 
-        assert len(subprocess_calls) >= 1
-        cmd = subprocess_calls[0][0] if isinstance(subprocess_calls[0], tuple) else []
+        assert len(popen_calls) >= 1
+        cmd = popen_calls[0][0] if isinstance(popen_calls[0], tuple) else []
         assert "afplay" in str(cmd)
         assert speaker._fallback_called is False
 
@@ -6694,3 +6710,209 @@ class TestVolcengineDoubaoTTS:
         assert "mismatched" in session["tts_fallback_detail"]
         assert last_result["tts_fallback_reason"] == "api_error"
         assert "mismatched" in last_result["tts_fallback_detail"]
+
+
+# ── F080: Stop Current Run — TTS Cancellation ──────────────────
+
+
+class TestTTSCancellation:
+    """F080: Stop Current Run cancels TTS playback (say + afplay)."""
+
+    # ── helpers ──
+
+    @staticmethod
+    def _mock_app(monkeypatch, tmp_path, alerts):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({}), encoding="utf-8")
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+
+        state_dir = tmp_path / "agent_state"
+        state_dir.mkdir(parents=True, exist_ok=True)
+        monkeypatch.setattr("voice_claude_agent.config.get_agent_state_dir", lambda: state_dir)
+        monkeypatch.setattr("voice_claude_agent.config.get_app_events_log_path", lambda: state_dir / "app_events.jsonl")
+
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        return app
+
+    # ── macOS say cancellation ──
+
+    def test_say_playback_pid_tracked_and_cleared(self):
+        """_register + _unregister track say process PID lifecycle."""
+        from voice_claude_agent.tts import _register_tts_pid, _unregister_tts_pid, _tts_pids
+
+        _tts_pids.clear()
+        _register_tts_pid(12345)
+        _register_tts_pid(12346)
+        assert 12345 in _tts_pids
+        assert 12346 in _tts_pids
+
+        _unregister_tts_pid(12345)
+        assert 12345 not in _tts_pids
+        assert 12346 in _tts_pids
+
+        _unregister_tts_pid(99999)  # no-op for unknown pid
+        _tts_pids.clear()
+
+    def test_tts_cancelled_flag_roundtrip(self):
+        """is_tts_cancelled / reset_tts_cancelled / mark_tts_cancelled round-trip."""
+        from voice_claude_agent.tts import (
+            is_tts_cancelled, reset_tts_cancelled, mark_tts_cancelled,
+            _tts_pids,
+        )
+
+        _tts_pids.clear()
+        reset_tts_cancelled()
+        assert is_tts_cancelled() is False
+
+        mark_tts_cancelled()
+        assert is_tts_cancelled() is True
+
+        reset_tts_cancelled()
+        assert is_tts_cancelled() is False
+
+    def test_cancel_all_tts_marks_cancelled(self, monkeypatch):
+        """cancel_all_tts calls mark_tts_cancelled when a PID is tracked."""
+        from voice_claude_agent.tts import cancel_all_tts, _register_tts_pid, _tts_pids
+
+        mark_calls = []
+        monkeypatch.setattr("voice_claude_agent.tts.mark_tts_cancelled", lambda: mark_calls.append(1))
+        # Also bypass os.kill so we don't touch real processes
+        monkeypatch.setattr("voice_claude_agent.tts.os.kill", lambda pid, sig: None)
+
+        _tts_pids.clear()
+        _register_tts_pid(12345)
+
+        cancel_all_tts()
+        assert len(mark_calls) == 1
+        assert len(_tts_pids) == 0
+
+    # ── afplay cancellation (Volcengine path) ──
+
+    def test_afplay_drains_pids(self, monkeypatch):
+        """cancel_all_tts drains _tts_pids, covering the Volcengine afplay path."""
+        from voice_claude_agent.tts import cancel_all_tts, _register_tts_pid, _tts_pids
+
+        killed = []
+        monkeypatch.setattr("voice_claude_agent.tts.os.kill", lambda pid, sig: killed.append((pid, sig)))
+        _tts_pids.clear()
+        _register_tts_pid(99999)
+        assert len(_tts_pids) == 1
+
+        cancel_all_tts()
+        assert len(_tts_pids) == 0
+        assert killed == [(99999, 15)]
+
+    # ── Stop Current Run during TTS writes tts_cancelled ──
+
+    def test_stop_during_speaking_writes_tts_cancelled(self, monkeypatch, tmp_path):
+        """Stop Current Run while TTS is playing writes tts_cancelled event."""
+        alerts = []
+        app = self._mock_app(monkeypatch, tmp_path, alerts)
+
+        monkeypatch.setattr(
+            "voice_claude_agent.tts.is_tts_speaking", lambda: True,
+        )
+        kill_calls = []
+        monkeypatch.setattr(
+            "voice_claude_agent.tts.cancel_all_tts",
+            lambda: kill_calls.append(1) or 1,
+        )
+
+        app._stop_current_run(app.stop_current_item)
+        assert kill_calls
+
+        events_path = tmp_path / "agent_state" / "app_events.jsonl"
+        assert events_path.exists()
+        events = events_path.read_text().strip()
+        assert "tts_cancelled" in events
+        assert "TTS playback stopped" in alerts[-1]["message"]
+
+    # ── View Logs shows tts_cancelled ──
+
+    def test_view_logs_shows_tts_cancelled(self, monkeypatch, tmp_path):
+        """View Logs displays tts_cancelled from last_result."""
+        import voice_claude_agent.app as app_mod
+        import voice_claude_agent.config as config_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text(json.dumps({}), encoding="utf-8")
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+
+        state_dir = tmp_path / "agent_state"
+        state_dir.mkdir(parents=True, exist_ok=True)
+        monkeypatch.setattr(config_mod, "get_agent_state_dir", lambda: state_dir)
+        monkeypatch.setattr(config_mod, "get_app_events_log_path", lambda: state_dir / "app_events.jsonl")
+        monkeypatch.setattr(config_mod, "get_last_result_path", lambda: state_dir / "last_result.json")
+
+        (state_dir / "app_events.jsonl").write_text(
+            '{"timestamp":"2026-06-09T10:00:00+08:00","event":"tts_cancelled"}\n',
+            encoding="utf-8",
+        )
+        (state_dir / "last_result.json").write_text(json.dumps({
+            "prompt": "test", "exit_code": 0,
+            "summary": "Some result",
+            "tts_cancelled": True,
+        }, ensure_ascii=False), encoding="utf-8")
+
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._show_logs(app.logs_item)
+
+        msg = alerts[-1]["message"]
+        assert "tts_cancelled" in msg
+
+    # ── Idle Stop Current Run still no-op ──
+
+    def test_idle_stop_no_tts_event(self, monkeypatch, tmp_path):
+        """Idle Stop Current Run does not write tts_cancelled."""
+        alerts = []
+        app = self._mock_app(monkeypatch, tmp_path, alerts)
+
+        monkeypatch.setattr("voice_claude_agent.tts.is_tts_speaking", lambda: False)
+        monkeypatch.setattr("voice_claude_agent.claude_runner.request_cancel", lambda: None)
+        monkeypatch.setattr("voice_claude_agent.claude_runner.is_cancelled", lambda: False)
+
+        app._cycle_in_progress = False
+        app._claude_invocation_start = 0
+        app._stop_current_run(app.stop_current_item)
+
+        events_path = tmp_path / "agent_state" / "app_events.jsonl"
+        assert not events_path.exists()
+        assert "No active run" in alerts[-1]["message"]
+
+    # ── Pipeline tts_cancelled persistence ──
+
+    def test_pipeline_persists_tts_cancelled(self, monkeypatch, tmp_path):
+        """_run_pipeline persists tts_cancelled in session and last_result."""
+        monkeypatch.setattr("voice_claude_agent.cli.run_claude",
+            lambda prompt, timeout=300, extra_args=None, workdir=None, cancel_event=None: type("R", (), {"command": [], "exit_code": 0, "stdout": "ok", "stderr": "", "duration_seconds": 0.1, "timed_out": False, "cancelled": False, "cwd": ""})())
+        monkeypatch.setattr("voice_claude_agent.cli._resolve_tts_backend", lambda: "macos-say")
+        monkeypatch.setattr("voice_claude_agent.cli.create_speaker", lambda: type("S", (), {"speak": lambda self, t: None})())
+
+        # Simulate TTS being cancelled during speak
+        monkeypatch.setattr("voice_claude_agent.cli.is_tts_cancelled", lambda: True)
+        monkeypatch.setattr("voice_claude_agent.cli.reset_tts_cancelled", lambda: None)
+
+        sessions_path = tmp_path / "sessions.jsonl"
+        last_path = tmp_path / "last_result.json"
+        monkeypatch.setattr("voice_claude_agent.logging_store.get_sessions_log_path", lambda: sessions_path)
+        monkeypatch.setattr("voice_claude_agent.logging_store.get_last_result_path", lambda: last_path)
+
+        from voice_claude_agent.cli import _run_pipeline
+        _run_pipeline("test", input_mode="text", tts_fake=False)
+
+        session = json.loads(sessions_path.read_text().splitlines()[0])
+        assert session.get("tts_cancelled") is True
+
+        last = json.loads(last_path.read_text())
+        assert last.get("tts_cancelled") is True

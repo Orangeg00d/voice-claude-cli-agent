@@ -7,6 +7,8 @@ Backends:
 """
 
 import json
+import os
+import threading
 import tempfile
 import urllib.request
 import uuid
@@ -14,6 +16,63 @@ from pathlib import Path
 from typing import Protocol
 
 from voice_claude_agent.config import get_config_value
+
+# ── Global TTS process tracking for cancellation ───────────
+_tts_pids: list[int] = []
+_tts_lock = threading.Lock()
+
+
+def _register_tts_pid(pid: int) -> None:
+    with _tts_lock:
+        _tts_pids.append(pid)
+
+
+def _unregister_tts_pid(pid: int) -> None:
+    with _tts_lock:
+        try:
+            _tts_pids.remove(pid)
+        except ValueError:
+            pass
+
+
+def cancel_all_tts() -> int:
+    """Kill all running TTS processes. Returns number of processes killed."""
+    with _tts_lock:
+        pids = list(_tts_pids)
+        _tts_pids.clear()
+    if pids:
+        mark_tts_cancelled()
+    killed = 0
+    for pid in pids:
+        try:
+            os.kill(pid, 15)  # SIGTERM
+            killed += 1
+        except Exception:
+            pass
+    return killed
+
+
+def is_tts_speaking() -> bool:
+    with _tts_lock:
+        return len(_tts_pids) > 0
+
+
+# ── TTS cancellation state (F080) ──────────────────────────
+_tts_cancelled = False
+
+
+def mark_tts_cancelled() -> None:
+    global _tts_cancelled
+    _tts_cancelled = True
+
+
+def is_tts_cancelled() -> bool:
+    return _tts_cancelled
+
+
+def reset_tts_cancelled() -> None:
+    global _tts_cancelled
+    _tts_cancelled = False
 
 
 class Speaker(Protocol):
@@ -36,18 +95,29 @@ class MacOSSaySpeaker:
     """TTS using macOS `say` command."""
 
     def speak(self, text: str) -> None:
-        import subprocess
+        import subprocess as _subprocess
 
         safe_text = text.replace('"', '\\"')
         try:
-            subprocess.run(
+            proc = _subprocess.Popen(
                 ["say", safe_text],
-                capture_output=True,
-                timeout=30,
+                stdout=_subprocess.DEVNULL,
+                stderr=_subprocess.DEVNULL,
             )
+            _register_tts_pid(proc.pid)
+            try:
+                proc.wait(timeout=30)
+            except _subprocess.TimeoutExpired:
+                pass
+            finally:
+                _unregister_tts_pid(proc.pid)
+                if proc.poll() is None:
+                    try:
+                        proc.kill()
+                        proc.wait(timeout=2)
+                    except Exception:
+                        pass
         except FileNotFoundError:
-            pass
-        except subprocess.TimeoutExpired:
             pass
 
 
@@ -176,12 +246,25 @@ class VolcengineDoubaoSpeaker:
                 f.write(audio_bytes)
                 tmp_path = Path(f.name)
 
-            import subprocess
-            subprocess.run(
+            import subprocess as _subprocess
+            proc = _subprocess.Popen(
                 ["afplay", str(tmp_path)],
-                capture_output=True,
-                timeout=60,
+                stdout=_subprocess.DEVNULL,
+                stderr=_subprocess.DEVNULL,
             )
+            _register_tts_pid(proc.pid)
+            try:
+                proc.wait(timeout=60)
+            except _subprocess.TimeoutExpired:
+                pass
+            finally:
+                _unregister_tts_pid(proc.pid)
+                if proc.poll() is None:
+                    try:
+                        proc.kill()
+                        proc.wait(timeout=2)
+                    except Exception:
+                        pass
         except Exception as e:
             self._speak_fallback(text, "playback_error", str(e))
         finally:

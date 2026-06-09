@@ -2509,3 +2509,24 @@
 
 ### Scope Note
 - F079 currently cancels the active Claude CLI subprocess. It does not yet interrupt an already-started TTS playback subprocess; that should be a separate future feature if needed.
+
+## 2026-06-09 10:35 — Codex Review: F080 Stop Current Run Cancels TTS
+
+### Finding
+- Claude implemented the expected F080 direction: `Stop Current Run` can now stop active TTS playback in addition to cancelling Claude CLI execution.
+- macOS `say` and Volcengine/Doubao `afplay` now run through tracked `subprocess.Popen` processes.
+- Initial review found a few audit issues around schema parity and test isolation rather than the core product path.
+
+### Completed
+- `cancel_all_tts()` drains tracked playback PIDs, sends SIGTERM, and marks the shared `tts_cancelled` flag when playback was active.
+- `Stop Current Run` detects active TTS playback, writes `tts_cancelled`, updates menu state, and leaves idle clicks as a no-op.
+- `_run_pipeline()` persists `tts_cancelled` into `sessions.jsonl` and `last_result.json`.
+- View Logs displays `tts_cancelled`.
+- Codex fixed session schema parity for `tts_cancelled`.
+- Codex fixed legacy tests that still mocked `subprocess.run`; after F079/F080 switched to `Popen`, those tests could accidentally call real `claude -p` or real `say`.
+- Codex isolated PID cancellation tests by mocking `os.kill`.
+- Updated `feature_list.json`, README, RELEASE_NOTES, DEVELOPER_PROGRAM_APPLICATION, and this progress log to F001-F080.
+
+### Verification
+- `./init.sh lint` passed.
+- Full test suite passed: 324/324.

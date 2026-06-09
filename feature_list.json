@@ -1124,6 +1124,24 @@
       ],
       "passes": true,
       "evidence": "run_claude now uses subprocess.Popen with periodic cancel_event polling. request_cancel()/reset_cancel_event()/is_cancelled() manage the shared menu-app cancellation signal. _run_pipeline resets the signal before invoking Claude and handles cancelled results alongside timeouts. Stop Current Run now only acts during an active cycle, logs cycle_cancelled, sets menu title to Cancelling..., and leaves idle clicks as no-op. Session logs, last_result, and View Logs expose cancelled status. Focused F079 tests passed."
+    },
+    {
+      "id": "F080",
+      "priority": 80,
+      "category": "voice",
+      "description": "Stop Current Run cancels active TTS playback",
+      "steps": [
+        "macOS say playback is launched as a tracked subprocess instead of an opaque blocking call",
+        "Volcengine/Doubao afplay playback is launched as a tracked subprocess",
+        "Stop Current Run detects active TTS playback and terminates tracked say/afplay processes",
+        "TTS cancellation sets a shared tts_cancelled flag",
+        "sessions and last_result persist tts_cancelled status",
+        "View Logs displays tts_cancelled for the last result",
+        "Idle Stop Current Run remains a no-op and does not write tts_cancelled events",
+        "Tests cover PID tracking, say/afplay cancellation, app event logging, View Logs display, and pipeline persistence"
+      ],
+      "passes": true,
+      "evidence": "MacOSSaySpeaker and VolcengineDoubaoSpeaker now use subprocess.Popen, register playback PIDs, and unregister them after completion. cancel_all_tts() drains tracked PIDs, terminates them with SIGTERM, and marks TTS as cancelled. Stop Current Run now handles active TTS separately from Claude CLI cancellation, writes tts_cancelled app_events, and updates the menu status. _run_pipeline persists tts_cancelled into sessions.jsonl and last_result.json, and View Logs displays it. Codex fixed schema parity, old subprocess mocks that could accidentally call real Claude/say during tests, cancellation flag marking, and PID test isolation. 324/324 tests passed, lint clean."
     }
   ]
 }
