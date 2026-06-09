@@ -1988,7 +1988,8 @@ class TestSessionLogParity:
             "claude_command", "claude_cwd", "exit_code", "claude_stdout",
             "claude_stderr", "summary", "spoken_summary", "spoken",
             "stt_backend", "tts_backend", "tts_voice_type", "tts_resource_id",
-            "tts_duration_seconds", "tts_fallback_used",
+            "tts_duration_seconds", "tts_fallback_used", "tts_fallback_reason",
+            "tts_fallback_detail",
         }
         assert set(cli_entry.keys()) == expected_keys
         assert set(menu_entry.keys()) == expected_keys
@@ -5798,6 +5799,116 @@ class TestTTSVoiceSelector:
         assert "tts_voice_type: zh_male_qingrun_moon_bigtts" in msg
         assert "tts_resource_id: seed-tts-1.0" in msg
 
+    def test_bv_voices_are_experimental_not_default(self, monkeypatch):
+        """BV701_streaming / BV120_streaming must be in TTS_EXPERIMENTAL_VOICES, not TTS_VOICES."""
+        from voice_claude_agent.app import VoiceClaudeApp
+        default_vts = {vt for _, vt, _ in VoiceClaudeApp.TTS_VOICES}
+        exp_vts = {vt for _, vt, _ in VoiceClaudeApp.TTS_EXPERIMENTAL_VOICES}
+        assert "BV701_streaming" not in default_vts
+        assert "BV120_streaming" not in default_vts
+        assert "BV701_streaming" in exp_vts
+        assert "BV120_streaming" in exp_vts
+
+    def test_resource_mismatch_fallback_shown_in_view_logs(self, monkeypatch, tmp_path):
+        """View Logs shows diagnostic when fallback_reason mentions resource mismatch."""
+        import json as _json
+
+        from voice_claude_agent.app import VoiceClaudeApp
+        import voice_claude_agent.app as app_mod
+        import voice_claude_agent.config as config_mod
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text("{}", encoding="utf-8")
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+
+        # Isolate from real agent_state dir
+        state_dir = tmp_path / "agent_state"
+        state_dir.mkdir(parents=True, exist_ok=True)
+        monkeypatch.setattr(config_mod, "get_agent_state_dir", lambda: state_dir)
+        monkeypatch.setattr(config_mod, "get_app_events_log_path", lambda: state_dir / "app_events.jsonl")
+        monkeypatch.setattr(config_mod, "get_last_result_path", lambda: state_dir / "last_result.json")
+
+        # Write only a minimal app_events
+        (state_dir / "app_events.jsonl").write_text(
+            '{"timestamp":"2026-06-08T10:00:00+08:00","event":"tts_preview_done"}\n',
+            encoding="utf-8",
+        )
+        # Write last_result with resource mismatch fallback
+        (state_dir / "last_result.json").write_text(_json.dumps({
+            "prompt": "test", "exit_code": 0, "summary": "ok",
+            "tts_backend": "macos-say", "tts_fallback_used": True,
+            "tts_fallback_reason": "api_error",
+            "tts_fallback_detail": "resource ID is mismatched with speaker related resource",
+        }), encoding="utf-8")
+
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._show_logs(app.logs_item)
+
+        msg = alerts[-1]["message"]
+        assert "resource mismatch" in msg
+        assert "moon_bigtts" in msg
+
+    def test_view_logs_shows_claude_running_when_stuck(self, monkeypatch, tmp_path):
+        """View Logs shows 'Claude CLI: running' when _claude_invocation_start is set."""
+        import json as _json
+        import time as _time
+
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+        cfg_file = tmp_path / "config.json"
+        cfg_file.write_text("{}", encoding="utf-8")
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg_file)
+
+        events_path = tmp_path / "app_events.jsonl"
+        events_path.write_text("", encoding="utf-8")
+        last_path = tmp_path / "last_result.json"
+        last_path.write_text(_json.dumps({"prompt": "test", "exit_code": 0, "summary": "done"}), encoding="utf-8")
+        import voice_claude_agent.config as config_mod
+        monkeypatch.setattr(config_mod, "get_agent_state_dir", lambda: tmp_path)
+        monkeypatch.setattr(config_mod, "get_app_events_log_path", lambda: events_path)
+        monkeypatch.setattr(config_mod, "get_last_result_path", lambda: last_path)
+
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        # Simulate Claude running for 30 seconds
+        app._claude_invocation_start = _time.monotonic() - 30
+        app._show_logs(app.logs_item)
+
+        msg = alerts[-1]["message"]
+        assert "Claude CLI: running" in msg
+        assert "30s" in msg or "29s" in msg
+
+    def test_view_logs_uses_wide_text_window(self, monkeypatch):
+        """Real View Logs uses a wider selectable text window instead of a narrow alert."""
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+
+        calls = []
+
+        class _FakeWindow:
+            def __init__(self, **kwargs):
+                calls.append(kwargs)
+                self._textfield = mock.MagicMock()
+
+            def run(self):
+                calls.append({"run": True})
+
+        monkeypatch.setattr(app_mod.rumps, "Window", _FakeWindow)
+        app = VoiceClaudeApp()
+        app._show_text_window("View Logs", "hello")
+
+        assert calls[0]["title"] == "View Logs"
+        assert calls[0]["default_text"] == "hello"
+        assert calls[0]["dimensions"][0] >= 800
+        assert calls[0]["dimensions"][1] >= 500
+        assert calls[-1] == {"run": True}
+
 
 # ── F071: Volcengine/Doubao TTS backend (continued) ──────────
 
@@ -6162,3 +6273,59 @@ class TestVolcengineDoubaoTTS:
         assert last_result["tts_voice_type"] == "zh_male_qingrun_moon_bigtts"
         assert last_result["tts_resource_id"] == "seed-tts-1.0"
         assert isinstance(last_result["tts_duration_seconds"], float)
+
+    def test_pipeline_records_tts_fallback_reason(self, tmp_path, monkeypatch):
+        """Pipeline persists Volcengine fallback reason/detail for later View Logs diagnostics."""
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_sessions_log_path",
+            lambda: tmp_path / "sessions.jsonl",
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.logging_store.get_last_result_path",
+            lambda: tmp_path / "last_result.json",
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.cli.run_claude",
+            mock.MagicMock(return_value=ClaudeRunResult(
+                command=["claude", "-p", "test"],
+                exit_code=0,
+                stdout="完成",
+                stderr="",
+                duration_seconds=0.1,
+                timed_out=False,
+            )),
+        )
+        monkeypatch.setattr(
+            "voice_claude_agent.config.get_config_path",
+            lambda: tmp_path / "config.json",
+        )
+        (tmp_path / "config.json").write_text(
+            json.dumps({
+                "VOICE_TTS_BACKEND": "volcengine-doubao",
+                "VOLCENGINE_TTS_VOICE_TYPE": "BV701_streaming",
+                "VOLCENGINE_TTS_RESOURCE_ID": "seed-tts-1.0",
+            }),
+            encoding="utf-8",
+        )
+
+        from voice_claude_agent.tts import VolcengineDoubaoSpeaker
+
+        class _FallbackSpeaker(VolcengineDoubaoSpeaker):
+            def speak(self, text: str) -> None:
+                self._fallback_called = True
+                self._fallback_reason = "api_error"
+                self._fallback_detail = "resource ID is mismatched with speaker related resource"
+
+        monkeypatch.setattr("voice_claude_agent.cli.create_speaker", lambda: _FallbackSpeaker())
+        monkeypatch.setattr("voice_claude_agent.cli._resolve_tts_backend", lambda: "volcengine-doubao")
+
+        from voice_claude_agent.cli import _run_pipeline
+        _run_pipeline("test", input_mode="text", tts_fake=False, stt_backend_used="volcengine-doubao")
+
+        session = json.loads((tmp_path / "sessions.jsonl").read_text().splitlines()[0])
+        last_result = json.loads((tmp_path / "last_result.json").read_text())
+        assert session["tts_fallback_used"] is True
+        assert session["tts_fallback_reason"] == "api_error"
+        assert "mismatched" in session["tts_fallback_detail"]
+        assert last_result["tts_fallback_reason"] == "api_error"
+        assert "mismatched" in last_result["tts_fallback_detail"]

@@ -1040,6 +1040,24 @@
       ],
       "passes": true,
       "evidence": "Enhanced _run_pipeline with stt_backend_used and persisted stt_backend, tts_voice_type, and tts_resource_id to sessions.jsonl and last_result.json. Menu bar _record_and_execute passes self.stt_backend and writes tts_done app_events with STT/TTS backend, voice, resource, duration, and fallback status. View Logs now shows current config plus per-run last_result metadata, and recent app_events inline tts/fallback details. Added/updated tests for View Logs display, session schema parity, and pipeline metadata persistence. 298/298 tests, lint clean, check clean."
+    },
+    {
+      "id": "F075",
+      "priority": 75,
+      "category": "ux",
+      "description": "Harden TTS voice selection and View Logs diagnostics",
+      "steps": [
+        "Default TTS Voice menu shows only known seed-tts-1.0 moon_bigtts voices",
+        "BV701_streaming and BV120_streaming are separated into an experimental group with Resource ID warning",
+        "Volcengine TTS fallback persists tts_fallback_reason and tts_fallback_detail to sessions and last_result",
+        "View Logs displays resource mismatch diagnostics when fallback detail mentions resource mismatch or code 55000000",
+        "View Logs opens in a wider selectable text window for long logs",
+        "View Logs shows Claude CLI running duration while a request is still executing",
+        "Claude running state is cleared in a finally block after pipeline completion or failure",
+        "Tests cover experimental voices, fallback reason persistence, mismatch diagnostics, wide View Logs window, and running Claude status"
+      ],
+      "passes": true,
+      "evidence": "Moved BV701_streaming and BV120_streaming out of the default voice list into TTS_EXPERIMENTAL_VOICES with explicit Resource ID warnings. VolcengineDoubaoSpeaker now exposes fallback reason/detail, and _run_pipeline persists tts_fallback_reason and tts_fallback_detail to sessions.jsonl and last_result.json. View Logs reads those fields, prints a clear TTS resource mismatch hint, uses a 900x520 selectable rumps.Window, and shows Claude CLI running duration from _claude_invocation_start. Added tests for the experimental voice split, mismatch display, wide text window, running status, session schema parity, and pipeline fallback reason persistence."
     }
   ]
 }

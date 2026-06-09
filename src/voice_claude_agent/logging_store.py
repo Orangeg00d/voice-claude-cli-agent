@@ -42,6 +42,8 @@ def write_session(entry: dict) -> Path:
         "tts_resource_id": entry.get("tts_resource_id", ""),
         "tts_duration_seconds": entry.get("tts_duration_seconds"),
         "tts_fallback_used": entry.get("tts_fallback_used", False),
+        "tts_fallback_reason": entry.get("tts_fallback_reason", ""),
+        "tts_fallback_detail": entry.get("tts_fallback_detail", ""),
     }
 
     with open(log_path, "a", encoding="utf-8") as f:

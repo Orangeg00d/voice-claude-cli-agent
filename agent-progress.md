@@ -2408,3 +2408,41 @@
 
 ### Next Recommended Task
 - Manual test: run Trigger Recording, then View Logs. Confirm Last result shows `stt_backend`, `tts_voice_type`, `tts_resource_id`, and `tts_fallback_used` for that actual run.
+
+## 2026-06-09 10:20 — Phase 21 (F075): TTS Voice and View Logs Hardening
+
+### Finding
+- Real manual testing selected `BV701_streaming` with `seed-tts-1.0`, and Volcengine returned `code=55000000` / `resource ID is mismatched with speaker related resource`.
+- Claude's initial F075 pass separated BV voices and added tests, but did not persist real fallback reason/detail from the TTS speaker into `last_result.json` or `sessions.jsonl`.
+- View Logs still used the narrow alert path, so long logs could hide the OK button.
+- Documentation and acceptance metadata were still at F001-F074 / 298 tests.
+
+### Completed
+- Moved `BV701_streaming` and `BV120_streaming` into `TTS_EXPERIMENTAL_VOICES`; default TTS Voice menu now only includes known `seed-tts-1.0` moon_bigtts voices.
+- Experimental voice selection warns that a matching `VOLCENGINE_TTS_RESOURCE_ID` is required.
+- `VolcengineDoubaoSpeaker` now tracks `_fallback_reason` and `_fallback_detail` whenever fallback is used.
+- `_run_pipeline()` persists `tts_fallback_reason` and `tts_fallback_detail` into sessions and last_result for both timeout and success branches.
+- View Logs displays fallback reason/detail and prints a clear resource mismatch hint when the detail includes mismatch/code 55000000.
+- View Logs now opens through a wider selectable `rumps.Window` (900x520) instead of a narrow alert in the real app; tests still use `_alert_patch`.
+- `_claude_invocation_start` is cleared in a `finally` block, and View Logs shows Claude CLI running duration while a request is active.
+- Updated `feature_list.json`, README, RELEASE_NOTES, DEVELOPER_PROGRAM_APPLICATION, and `docs/VOLCENGINE_TTS_SETUP.md`.
+
+### Verification
+- Focused F075/View Logs/session tests passed: 20/20.
+- Full verification pending in this review turn.
+
+### Files Changed
+- src/voice_claude_agent/app.py
+- src/voice_claude_agent/cli.py
+- src/voice_claude_agent/tts.py
+- src/voice_claude_agent/logging_store.py
+- tests/test_core.py
+- feature_list.json
+- README.md
+- RELEASE_NOTES.md
+- DEVELOPER_PROGRAM_APPLICATION.md
+- docs/VOLCENGINE_TTS_SETUP.md
+- agent-progress.md
+
+### Next Recommended Task
+- Manual test: choose 清润男声 or 爽快思思, run Preview TTS Voice, then Trigger Recording and View Logs. Confirm `tts_fallback_used: False` and no resource mismatch warning.

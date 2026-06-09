@@ -106,14 +106,12 @@ JSON
 
 ### 6.3 选择音色 (TTS Voice)
 
-菜单栏 App 提供 **TTS Voice** 子菜单，可以直接切换常用音色，不需要手动编辑 `config.json`：
+菜单栏 App 提供 **TTS Voice** 子菜单，可以直接切换常用音色，不需要手动编辑 `config.json`。默认列表只放入已知匹配 `seed-tts-1.0` 的 `moon_bigtts` 音色：
 
 | 菜单显示 | 写入的 `VOLCENGINE_TTS_VOICE_TYPE` |
 |---|---|
 | 爽快思思（女声） | `zh_female_shuangkuaisisi_moon_bigtts` |
 | 清润男声 | `zh_male_qingrun_moon_bigtts` |
-| 标准女声 | `BV701_streaming` |
-| 标准男声 | `BV120_streaming` |
 | VV 女声（方言） | `zh_female_vv_uranus_bigtts` |
 
 选择 `moon_bigtts` 系列音色时，App 会自动设置：
@@ -122,7 +120,7 @@ JSON
 VOLCENGINE_TTS_RESOURCE_ID=seed-tts-1.0
 ```
 
-选择 `BV701_streaming` / `BV120_streaming` 时，App 不会覆盖已有 Resource ID。如果预览时发生 fallback，请到火山控制台确认该音色需要的 Resource ID。
+`BV701_streaming` / `BV120_streaming` 被放入 Experimental 分组。它们可能需要不同的 `VOLCENGINE_TTS_RESOURCE_ID`；如果 Resource ID 不匹配，火山接口会返回 `resource ID is mismatched with speaker related resource`，App 会 fallback 到 macOS say，并在 View Logs 中显示诊断。除非你已经在火山控制台确认对应 Resource ID，否则建议优先使用上面的 `moon_bigtts` 音色。
 
 切换后可立即使用 **Preview TTS Voice** 验证效果，不需要重启 App。
 
@@ -151,7 +149,7 @@ voice-claude-agent check
 | speaker 参数 | 描述 |
 |---|---|
 | `zh_female_shuangkuaisisi_moon_bigtts` | 爽快思思（女声，默认，使用 `seed-tts-1.0`） |
-| `zh_male_qingrun_moon_bigtts` | 清润男声 |
-| `BV701_streaming` | 标准女声 |
-| `BV120_streaming` | 标准男声 |
-| `zh_female_vv_uranus_bigtts` | VV 女声（支持方言） |
+| `zh_male_qingrun_moon_bigtts` | 清润男声（使用 `seed-tts-1.0`） |
+| `zh_female_vv_uranus_bigtts` | VV 女声（支持方言，使用 `seed-tts-1.0`） |
+| `BV701_streaming` | 标准女声（Experimental，需确认 Resource ID） |
+| `BV120_streaming` | 标准男声（Experimental，需确认 Resource ID） |

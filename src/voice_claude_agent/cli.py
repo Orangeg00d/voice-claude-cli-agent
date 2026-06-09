@@ -302,6 +302,8 @@ def _run_pipeline(
         speaker.speak("Claude CLI 执行超时，请检查任务或重试。")
         tts_duration_seconds = round(time.monotonic() - tts_start, 3)
         tts_fallback_used = isinstance(speaker, VolcengineDoubaoSpeaker) and getattr(speaker, "_fallback_called", False)
+        tts_fallback_reason = getattr(speaker, "_fallback_reason", "") if tts_fallback_used else ""
+        tts_fallback_detail = getattr(speaker, "_fallback_detail", "") if tts_fallback_used else ""
         if tts_fake:
             assert isinstance(speaker, FakeSpeaker)
             click.echo(f"TTS (fake): {speaker.spoken[-1]}")
@@ -325,6 +327,8 @@ def _run_pipeline(
             "tts_resource_id": tts_resource_id,
             "tts_duration_seconds": tts_duration_seconds,
             "tts_fallback_used": tts_fallback_used,
+            "tts_fallback_reason": tts_fallback_reason,
+            "tts_fallback_detail": tts_fallback_detail,
         })
         write_last_result({
             "prompt": prompt,
@@ -339,6 +343,8 @@ def _run_pipeline(
             "tts_resource_id": tts_resource_id,
             "tts_duration_seconds": tts_duration_seconds,
             "tts_fallback_used": tts_fallback_used,
+            "tts_fallback_reason": tts_fallback_reason,
+            "tts_fallback_detail": tts_fallback_detail,
         })
         return
 
@@ -356,6 +362,8 @@ def _run_pipeline(
     speaker.speak(spoken_summary)
     tts_duration_seconds = round(time.monotonic() - tts_start, 3)
     tts_fallback_used = isinstance(speaker, VolcengineDoubaoSpeaker) and getattr(speaker, "_fallback_called", False)
+    tts_fallback_reason = getattr(speaker, "_fallback_reason", "") if tts_fallback_used else ""
+    tts_fallback_detail = getattr(speaker, "_fallback_detail", "") if tts_fallback_used else ""
     if tts_fake:
         assert isinstance(speaker, FakeSpeaker)
         click.echo(f"TTS (fake): {speaker.spoken[-1]}")
@@ -381,6 +389,8 @@ def _run_pipeline(
         "tts_resource_id": tts_resource_id,
         "tts_duration_seconds": tts_duration_seconds,
         "tts_fallback_used": tts_fallback_used,
+        "tts_fallback_reason": tts_fallback_reason,
+        "tts_fallback_detail": tts_fallback_detail,
     })
 
     write_last_result({
@@ -396,6 +406,8 @@ def _run_pipeline(
         "tts_resource_id": tts_resource_id,
         "tts_duration_seconds": tts_duration_seconds,
         "tts_fallback_used": tts_fallback_used,
+        "tts_fallback_reason": tts_fallback_reason,
+        "tts_fallback_detail": tts_fallback_detail,
     })
 
 

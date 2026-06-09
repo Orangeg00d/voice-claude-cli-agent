@@ -89,11 +89,15 @@ class VolcengineDoubaoSpeaker:
     def __init__(self) -> None:
         self._fallback = MacOSSaySpeaker()
         self._fallback_called = False
+        self._fallback_reason = ""
+        self._fallback_detail = ""
 
     # ── public API ─────────────────────────────────────────
 
     def speak(self, text: str) -> None:
         self._fallback_called = False
+        self._fallback_reason = ""
+        self._fallback_detail = ""
         creds, err = _check_volcengine_tts_credentials()
         if err:
             self._speak_fallback(text, "missing_credentials", err)
@@ -186,6 +190,8 @@ class VolcengineDoubaoSpeaker:
 
     def _speak_fallback(self, text: str, reason: str, detail: str = "") -> None:
         self._fallback_called = True
+        self._fallback_reason = reason
+        self._fallback_detail = detail
         _log_tts_fallback(reason, detail)
         self._fallback.speak(text)
 

@@ -13,9 +13,9 @@ Voice Claude Agent 是一个 macOS local-first 语音 Agent。用户通过菜单
 
 ## 当前 main 状态
 
-- **验收项**: 74/74 passed (F001-F074)
-- **测试数量**: 298
-- **最新阶段**: Phase 20 — runtime backend logs
+- **验收项**: 75/75 passed (F001-F075)
+- **测试数量**: 303
+- **最新阶段**: Phase 21 — TTS voice/log UX hardening
 
 ## v0.1.0 功能清单 (67 项验收全部通过)
 
@@ -148,9 +148,9 @@ Voice Claude Agent 是一个 macOS local-first 语音 Agent。用户通过菜单
 
 ### Unreleased: TTS Voice Selector (F073)
 - 菜单栏新增 `TTS Voice` 子菜单
-- 支持爽快思思、清润男声、标准女声、标准男声、VV 女声（方言）
+- 默认支持爽快思思、清润男声、VV 女声（方言）
 - 选择 `moon_bigtts` 系列时自动设置 `VOLCENGINE_TTS_RESOURCE_ID=seed-tts-1.0`
-- 选择 BV 系列时保留已有 Resource ID，并提示用户确认匹配关系
+- BV 标准女声/男声移入 Experimental，避免 Resource ID 不匹配时误回退到 macOS say
 - Health Check / Mic Diagnostic 显示当前 TTS voice type
 
 ### Unreleased: Runtime Backend Logs (F074)
@@ -159,10 +159,17 @@ Voice Claude Agent 是一个 macOS local-first 语音 Agent。用户通过菜单
 - app_events 的 `tts_done` 显示 STT/TTS backend、音色和 fallback 状态
 - sessions / last_result 记录 STT backend、TTS voice type、TTS resource ID
 
+### Unreleased: TTS Voice and View Logs Hardening (F075)
+- BV701_streaming / BV120_streaming 从默认音色列表移入 Experimental 分组
+- Volcengine TTS fallback 持久化 `tts_fallback_reason` 和 `tts_fallback_detail`
+- View Logs 遇到 Resource ID mismatch 时显示可理解诊断
+- View Logs 改用更宽的 selectable text window，长日志不再挤压 OK 按钮
+- View Logs 可显示 Claude CLI 当前 running 时长
+
 ## 测试
 
 - **测试框架**: pytest
-- **当前测试数量**: 298
+- **当前测试数量**: 303
 - **v0.1.0 发布测试数量**: 223
 - **测试覆盖**: CLI 管道、录音、STT、风险分类、菜单栏生命周期、并发安全、日志格式
 

@@ -58,6 +58,7 @@ class VoiceClaudeApp(rumps.App):
 
         self.stt_backend = stt_backend or get_config_value("VOICE_STT_BACKEND", "text-input")
         self._wake_target = _wake_target or self._run_wake_loop
+        self._alert_is_patch = _alert_patch is not None
         self._alert = _alert_patch or self._rumps_alert
 
         # F053 + F059: record_seconds = env > config.json > default
@@ -78,6 +79,7 @@ class VoiceClaudeApp(rumps.App):
         self._single_trigger_mode = False
         self._cycle_in_progress = False  # F043: non-reentrant guard
         self._cycle_lock = threading.Lock()
+        self._claude_invocation_start: float = 0  # F075: Claude running timer
 
         # F046: last transcript/summary for menu bar inspection
         self._last_transcript: str = ""
@@ -153,9 +155,12 @@ class VoiceClaudeApp(rumps.App):
     TTS_VOICES = [
         ("爽快思思（女声）", "zh_female_shuangkuaisisi_moon_bigtts", True),
         ("清润男声", "zh_male_qingrun_moon_bigtts", True),
+        ("VV 女声（方言）", "zh_female_vv_uranus_bigtts", True),
+    ]
+
+    TTS_EXPERIMENTAL_VOICES = [
         ("标准女声", "BV701_streaming", False),
         ("标准男声", "BV120_streaming", False),
-        ("VV 女声（方言）", "zh_female_vv_uranus_bigtts", True),
     ]
 
     @staticmethod
@@ -163,6 +168,9 @@ class VoiceClaudeApp(rumps.App):
         for label, vt, _moon in VoiceClaudeApp.TTS_VOICES:
             if vt == voice_type:
                 return label
+        for label, vt, _moon in VoiceClaudeApp.TTS_EXPERIMENTAL_VOICES:
+            if vt == voice_type:
+                return f"[Exp] {label}"
         return voice_type
 
     def _current_tts_voice_type(self) -> str:
@@ -216,6 +224,29 @@ class VoiceClaudeApp(rumps.App):
             display = f"✓ {label}" if vt == current else label
             mi = rumps.MenuItem(display, callback=self._on_select_tts_voice(vt, is_moon))
             self.tts_voice_item[label] = mi
+        # Experimental voices — separated group
+        self.tts_voice_item["__sep_exp__"] = rumps.separator
+        for label, vt, is_moon in self.TTS_EXPERIMENTAL_VOICES:
+            display = f"✓ {label}" if vt == current else label
+            mi = rumps.MenuItem(display, callback=self._on_select_tts_voice_exp(vt))
+            self.tts_voice_item[f"exp_{label}"] = mi
+
+    def _on_select_tts_voice_exp(self, voice_type: str) -> callable:
+        def _cb(sender: rumps.MenuItem) -> None:
+            self._save_voice_type(voice_type, False)
+            self._update_tts_voice_menu_title()
+            self._refresh_tts_voice_submenu()
+            self._alert_on_main(
+                title="TTS Voice Changed (Experimental)",
+                message=(
+                    f"Voice set to: {self._voice_label(voice_type)}\n\n"
+                    "This voice requires a matching VOLCENGINE_TTS_RESOURCE_ID.\n"
+                    "If Preview TTS Voice falls back to macOS say, check the\n"
+                    "Volcengine console for the correct Resource ID and set it in Settings.\n\n"
+                    "Or switch back to a moon_bigtts voice (爽快思思 / 清润男声 / VV)."
+                ),
+            )
+        return _cb
 
     # ── F068: Settings UI ───────────────────────────────────
 
@@ -464,6 +495,38 @@ class VoiceClaudeApp(rumps.App):
 
             AppHelper.callAfter(self._alert, title=title, message=message)
 
+    def _show_text_window(self, title: str, message: str, dimensions: tuple[int, int] = (900, 520)) -> None:
+        """Show long read-only text in a wider selectable window.
+
+        Tests inject _alert_patch and still receive the plain title/message pair.
+        """
+        if self._alert_is_patch:
+            self._alert(title=title, message=message)
+            return
+
+        def _show() -> None:
+            win = rumps.Window(
+                message="",
+                title=title,
+                default_text=message,
+                ok="OK",
+                cancel=False,
+                dimensions=dimensions,
+            )
+            try:
+                win._textfield.setEditable_(False)
+            except Exception:
+                pass
+            win.run()
+
+        import threading as _threading
+        if _threading.current_thread() is _threading.main_thread():
+            _show()
+        else:
+            from PyObjCTools import AppHelper
+
+            AppHelper.callAfter(_show)
+
     def _check_mic_or_alert(self) -> bool:
         has_mic, detail = check_mic_permission()
         if not has_mic:
@@ -496,21 +559,25 @@ class VoiceClaudeApp(rumps.App):
         """Show recent app_events and last_result in an alert dialog."""
         import json
 
-        from voice_claude_agent.config import get_agent_state_dir
+        from voice_claude_agent.config import get_app_events_log_path, get_last_result_path
+        from voice_claude_agent.tts import _resolve_tts_backend
 
         lines = ["=== View Logs ===", ""]
-        state_dir = get_agent_state_dir()
 
         # ── Current config summary ──
-        from voice_claude_agent.tts import _resolve_tts_backend
         lines.append("Current STT/TTS Configuration:")
         lines.append(f"  STT backend: {self.stt_backend}")
         lines.append(f"  TTS backend: {_resolve_tts_backend()}")
         lines.append(f"  TTS voice type: {self._current_tts_voice_type()}")
+
+        # F075: show Claude running duration if still executing
+        if self._claude_invocation_start:
+            elapsed = time.monotonic() - self._claude_invocation_start
+            lines.append(f"  Claude CLI: running ({elapsed:.0f}s)")
         lines.append("")
 
         # ── app_events ──
-        events_path = state_dir / "app_events.jsonl"
+        events_path = get_app_events_log_path()
         if events_path.exists():
             try:
                 raw = events_path.read_text(encoding="utf-8")
@@ -547,7 +614,7 @@ class VoiceClaudeApp(rumps.App):
         lines.append("")
 
         # ── last_result ──
-        result_path = state_dir / "last_result.json"
+        result_path = get_last_result_path()
         if result_path.exists():
             try:
                 data = json.loads(result_path.read_text(encoding="utf-8"))
@@ -567,6 +634,18 @@ class VoiceClaudeApp(rumps.App):
                     lines.append(f"  tts_duration_seconds: {data.get('tts_duration_seconds')}")
                 if data.get("tts_fallback_used") is not None:
                     lines.append(f"  tts_fallback_used: {data.get('tts_fallback_used')}")
+                fallback_reason = data.get("tts_fallback_reason") or data.get("fallback_reason") or ""
+                fallback_detail = data.get("tts_fallback_detail") or ""
+                if fallback_reason:
+                    lines.append(f"  tts_fallback_reason: {fallback_reason}")
+                if fallback_detail:
+                    lines.append(f"  tts_fallback_detail: {fallback_detail[:160]}")
+                # F075: resource mismatch diagnostic
+                fbreason = f"{fallback_reason}\n{fallback_detail}".lower()
+                if "mismatched" in fbreason or "55000000" in fbreason or "resource id" in fbreason:
+                    lines.append(
+                        "  TTS resource mismatch: switch to a moon_bigtts voice or set the correct Resource ID."
+                    )
                 lines.append(f"  exit_code: {data.get('exit_code', '?')}")
                 summary = data.get("summary", data.get("spoken_summary", "?"))
                 lines.append(f"  summary: {summary[:200]}")
@@ -577,7 +656,7 @@ class VoiceClaudeApp(rumps.App):
         else:
             lines.append("(no last_result.json yet)")
 
-        self._alert_on_main(title="View Logs", message="\n".join(lines))
+        self._show_text_window(title="View Logs", message="\n".join(lines))
 
     # ── Mic Diagnostic ───────────────────────────────────────
 
@@ -1098,13 +1177,20 @@ class VoiceClaudeApp(rumps.App):
             self.trigger_item.title = "Running Claude..."
             claude_start = _time.monotonic()
             self._append_runtime_event("claude_start", elapsed=f"{claude_start - cycle_start:.3f}s")
-            _run_pipeline(
-                transcript,
-                input_mode="voice",
-                tts_fake=False,
-                confirmation_override=True if _req_conf(risk) else None,
-                stt_backend_used=self.stt_backend,
-            )
+
+            # F075: note the start time so View Logs can show running duration
+            self._claude_invocation_start = claude_start
+
+            try:
+                _run_pipeline(
+                    transcript,
+                    input_mode="voice",
+                    tts_fake=False,
+                    confirmation_override=True if _req_conf(risk) else None,
+                    stt_backend_used=self.stt_backend,
+                )
+            finally:
+                self._claude_invocation_start = 0
 
             # Capture summary from last_result.json written by _run_pipeline
             import json as _json
@@ -1134,6 +1220,7 @@ class VoiceClaudeApp(rumps.App):
                 tts_resource_id=last_data.get("tts_resource_id", ""),
                 tts_duration_seconds=last_data.get("tts_duration_seconds"),
                 tts_fallback_used=last_data.get("tts_fallback_used", False),
+                tts_fallback_reason=last_data.get("tts_fallback_reason", ""),
             )
 
             self.trigger_item.title = "Done ✓"
