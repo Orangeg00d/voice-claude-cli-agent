@@ -7408,6 +7408,7 @@ class TestConversationClaudeRunner:
             "VOICE_CLAUDE_SESSION_ID": test_uuid,
         }))
         monkeypatch.setattr(config_mod, "get_config_path", lambda: cfg)
+        monkeypatch.setattr(runner_mod, "_claude_session_exists", lambda _sid: False)
         with mock.patch.object(runner_mod.subprocess, "Popen", autospec=True) as mock_popen:
             mock_proc = mock.MagicMock()
             mock_proc.poll.return_value = 0
@@ -7429,6 +7430,7 @@ class TestConversationClaudeRunner:
             "VOICE_CLAUDE_SESSION_ID": test_uuid,
         }))
         monkeypatch.setattr(config_mod, "get_config_path", lambda: cfg)
+        monkeypatch.setattr(runner_mod, "_claude_session_exists", lambda _sid: False)
         with mock.patch.object(runner_mod.subprocess, "Popen", autospec=True) as mock_popen:
             mock_proc = mock.MagicMock()
             mock_proc.poll.return_value = 0
@@ -7446,6 +7448,27 @@ class TestConversationClaudeRunner:
                 "-p",
                 "hello",
             ]
+
+    def test_run_claude_resumes_existing_session_id(self, tmp_path, monkeypatch):
+        import voice_claude_agent.config as config_mod
+        import voice_claude_agent.claude_runner as runner_mod
+        cfg = tmp_path / "conv_cfg.json"
+        test_uuid = "550e8400-e29b-41d4-a716-446655440000"
+        cfg.write_text(json.dumps({
+            "VOICE_CONVERSATION_MODE": "true",
+            "VOICE_CLAUDE_SESSION_ID": test_uuid,
+        }))
+        monkeypatch.setattr(config_mod, "get_config_path", lambda: cfg)
+        monkeypatch.setattr(runner_mod, "_claude_session_exists", lambda sid: sid == test_uuid)
+        with mock.patch.object(runner_mod.subprocess, "Popen", autospec=True) as mock_popen:
+            mock_proc = mock.MagicMock()
+            mock_proc.poll.return_value = 0
+            mock_proc.returncode = 0
+            mock_proc.communicate.return_value = ("ok", "")
+            mock_popen.return_value = mock_proc
+            runner_mod.run_claude("follow up", timeout=5)
+            call_args = mock_popen.call_args[0][0]
+            assert call_args == ["claude", "--resume", test_uuid, "-p", "follow up"]
 
     def test_reload_from_config_refreshes_conversation_menu(self, tmp_path, monkeypatch):
         import voice_claude_agent.app as app_mod

@@ -35,13 +35,13 @@ and the results are read aloud via macOS Text-to-Speech.
 | TTS | macOS `say` + optional Volcengine/Doubao TTS | Native fallback plus higher-quality cloud voice |
 | Menu bar UI | rumps + PyObjC | Lightweight macOS system tray |
 | Packaging | py2app | Native .app bundle |
-| Testing | pytest (372 tests) | Full pipeline + UI + concurrency + cloud STT/TTS + workdir/session coverage |
+| Testing | pytest (373 tests) | Full pipeline + UI + concurrency + cloud STT/TTS + workdir/session coverage |
 
 ## Project Status
 
 - **Version**: v0.1.0
 - **Features**: 91 acceptance items (F001-F091), all passing on current `main`
-- **Tests**: 372 (pytest), passing with `./init.sh test`
+- **Tests**: 373 (pytest), passing with `./init.sh test`
 - **Lint**: ruff clean
 - **Code**: ~6000 lines (src + tests), 20+ source modules
 

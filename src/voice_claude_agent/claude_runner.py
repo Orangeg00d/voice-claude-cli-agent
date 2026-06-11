@@ -49,6 +49,33 @@ def is_cancelled() -> bool:
     return _cancel_event.is_set()
 
 
+def _claude_session_exists(session_id: str) -> bool:
+    """Return True when Claude Code already has a persisted session file."""
+    if not session_id:
+        return False
+    sessions_root = Path.home() / ".claude" / "projects"
+    if not sessions_root.exists():
+        return False
+    return any(sessions_root.rglob(f"{session_id}.jsonl"))
+
+
+def _build_claude_command(
+    prompt: str,
+    session_id: str,
+    extra_args: list[str] | None = None,
+) -> list[str]:
+    if session_id:
+        if _claude_session_exists(session_id):
+            command = ["claude", "--resume", session_id, "-p", prompt]
+        else:
+            command = ["claude", "--session-id", session_id, "-p", prompt]
+    else:
+        command = ["claude", "-p", prompt]
+    if extra_args:
+        command = [command[0], *extra_args, *command[1:]]
+    return command
+
+
 def run_claude(
     prompt: str,
     timeout: int = DEFAULT_TIMEOUT_SECONDS,
@@ -58,12 +85,7 @@ def run_claude(
 ) -> ClaudeRunResult:
     # Phase 25: session-id for conversation continuity
     session_id = get_claude_session_id()
-    if session_id:
-        command = ["claude", "--session-id", session_id, "-p", prompt]
-    else:
-        command = ["claude", "-p", prompt]
-    if extra_args:
-        command = [command[0], *extra_args, *command[1:]]
+    command = _build_claude_command(prompt, session_id, extra_args)
 
     cwd_path = Path(workdir).expanduser() if workdir is not None else get_claude_workdir()
     cwd = str(cwd_path)

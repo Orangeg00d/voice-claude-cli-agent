@@ -2674,3 +2674,23 @@
 ### Verification
 - `./init.sh lint` passed.
 - Full test suite passed: 372/372.
+
+## 2026-06-11 17:00 — Codex Hotfix: Conversation Resume Semantics
+
+### Finding
+- User manual test showed the first conversation turn worked, but the second turn failed with `exit_code=-1` and `Error: Session ID ... is already in use.`
+- Root cause: Claude CLI `--session-id` creates/claims a session ID; it should not be reused for every follow-up turn after the session already exists.
+- Correct behavior is first use `--session-id <uuid>`, then continue with `--resume <uuid>`.
+
+### Completed
+- Added detection for existing Claude Code session files under `~/.claude/projects/**/<session_id>.jsonl`.
+- `run_claude()` now uses:
+  - `claude --session-id <uuid> -p <prompt>` when the session file does not yet exist.
+  - `claude --resume <uuid> -p <prompt>` when the session file already exists.
+- Preserved extra Claude CLI args with both session creation and resume commands.
+- Added regression coverage for resume command construction.
+- Updated README, RELEASE_NOTES, feature evidence, and developer application test count.
+
+### Verification
+- `./init.sh lint` passed.
+- Full test suite passed: 373/373.

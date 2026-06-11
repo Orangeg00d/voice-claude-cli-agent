@@ -14,7 +14,7 @@ Voice Claude Agent 是一个 macOS local-first 语音 Agent。用户通过菜单
 ## 当前 main 状态
 
 - **验收项**: 91/91 passed (F001-F091)
-- **测试数量**: 372
+- **测试数量**: 373
 - **最新阶段**: Phase 24 — long-running Claude task UX
 
 ## v0.1.0 功能清单 (67 项验收全部通过)
@@ -230,7 +230,9 @@ Voice Claude Agent 是一个 macOS local-first 语音 Agent。用户通过菜单
 **F088 — 默认连续对话模式**
 - 新增 `VOICE_CONVERSATION_MODE`，默认开启
 - 新增 `VOICE_CLAUDE_SESSION_ID`
-- 启用时 Claude CLI 使用 `claude --session-id <uuid> -p <prompt>`
+- 首次启用时 Claude CLI 使用 `claude --session-id <uuid> -p <prompt>` 创建会话
+- 后续轮次检测到本地 session 文件后使用 `claude --resume <uuid> -p <prompt>` 继续会话
+- 修复重复使用 `--session-id` 导致第二轮报 `Session ID ... is already in use` 的问题
 - 关闭时保留原有独立 `claude -p <prompt>` 行为
 
 **F089 — 菜单栏会话控制**
@@ -253,7 +255,7 @@ Voice Claude Agent 是一个 macOS local-first 语音 Agent。用户通过菜单
 ## 测试
 
 - **测试框架**: pytest
-- **当前测试数量**: 372
+- **当前测试数量**: 373
 - **v0.1.0 发布测试数量**: 223
 - **测试覆盖**: CLI 管道、录音、STT、风险分类、菜单栏生命周期、并发安全、日志格式
 

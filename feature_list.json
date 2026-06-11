@@ -1256,11 +1256,11 @@
       "steps": [
         "Add VOICE_CONVERSATION_MODE with default true",
         "Add VOICE_CLAUDE_SESSION_ID with UUID generation",
-        "Run Claude with --session-id when conversation mode is enabled",
+        "Run Claude with --session-id for first use and --resume for existing sessions",
         "Keep one-shot claude -p behavior when conversation mode is disabled"
       ],
       "passes": true,
-      "evidence": "Added conversation config helpers and run_claude command construction using claude --session-id <uuid> -p <prompt>. Session IDs are generated when Claude actually runs, while read-only UI/checks do not mutate config. Tests cover default enabled mode, disabled mode, UUID generation, and command construction."
+      "evidence": "Added conversation config helpers and run_claude command construction using claude --session-id <uuid> -p <prompt> when the session file does not exist, then claude --resume <uuid> -p <prompt> for existing sessions. Session IDs are generated when Claude actually runs, while read-only UI/checks do not mutate config. Tests cover default enabled mode, disabled mode, UUID generation, session-id command construction, resume command construction, and extra args preservation."
     },
     {
       "id": "F089",
