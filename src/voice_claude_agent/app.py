@@ -16,6 +16,9 @@ from voice_claude_agent.config import (
     get_config_path,
     get_config_value,
     get_claude_workdir,
+    get_conversation_mode,
+    get_claude_session_id,
+    new_conversation_session,
     load_config,
     mask_credential,
 )
@@ -134,6 +137,21 @@ class VoiceClaudeApp(rumps.App):
         self._current_status = "Idle"
         self.status_item = rumps.MenuItem(f"Current Status: {self._current_status}")
 
+        # Phase 25: Conversation mode
+        conv_mode = get_conversation_mode()
+        self._conv_session_id = get_claude_session_id(create_if_missing=False)
+        conv_label = "Conversation: On" if conv_mode else "Conversation: Off"
+        self.conversation_status_item = rumps.MenuItem(conv_label)
+        self.toggle_conv_item = rumps.MenuItem(
+            "Toggle Conversation Mode", callback=self._toggle_conversation_mode
+        )
+        self.new_conv_item = rumps.MenuItem(
+            "New Conversation", callback=self._new_conversation
+        )
+        self.show_conv_id_item = rumps.MenuItem(
+            "Show Conversation ID", callback=self._show_conversation_id
+        )
+
         self.menu = [
             self.start_item,
             self.stop_item,
@@ -141,6 +159,11 @@ class VoiceClaudeApp(rumps.App):
             self.trigger_item,
             self.preview_tts_item,
             self.tts_voice_item,
+            None,
+            self.conversation_status_item,
+            self.toggle_conv_item,
+            self.new_conv_item,
+            self.show_conv_id_item,
             None,
             self.status_item,
             self.mic_status_item,
@@ -336,6 +359,8 @@ class VoiceClaudeApp(rumps.App):
             "VOICE_STT_BACKEND",
             "VOICE_TTS_BACKEND",
             "VOICE_CLAUDE_WORKDIR",
+            "VOICE_CONVERSATION_MODE",
+            "VOICE_CLAUDE_SESSION_ID",
             "WHISPER_CPP_MODEL",
             "WHISPER_CPP_LANGUAGE",
             "VOLCENGINE_ASR_API_KEY",
@@ -402,6 +427,7 @@ class VoiceClaudeApp(rumps.App):
                            "VOICE_STT_BACKEND",
                            "VOICE_TTS_BACKEND",
                            "VOICE_CLAUDE_WORKDIR",
+                           "VOICE_CONVERSATION_MODE", "VOICE_CLAUDE_SESSION_ID",
                            "WHISPER_CPP_MODEL", "WHISPER_CPP_LANGUAGE",
                            "VOLCENGINE_ASR_API_KEY", "VOLCENGINE_ASR_APP_ID",
                            "VOLCENGINE_ASR_ACCESS_TOKEN",
@@ -453,6 +479,19 @@ class VoiceClaudeApp(rumps.App):
                 errors.append(
                     f"STT backend must be one of: {', '.join(sorted(self._VALID_BACKENDS))}"
                 )
+
+        # Phase 25: validate conversation settings
+        if "VOICE_CONVERSATION_MODE" in new_cfg:
+            val = new_cfg["VOICE_CONVERSATION_MODE"].lower()
+            if val not in ("true", "false"):
+                errors.append("Conversation mode must be 'true' or 'false'.")
+
+        if "VOICE_CLAUDE_SESSION_ID" in new_cfg:
+            sid = new_cfg["VOICE_CLAUDE_SESSION_ID"]
+            if sid:
+                from voice_claude_agent.config import is_valid_uuid
+                if not is_valid_uuid(sid):
+                    errors.append("Claude session ID must be a valid UUID (e.g. 550e8400-e29b-41d4-a716-446655440000).")
 
         if errors:
             self._alert_on_main(
@@ -512,6 +551,7 @@ class VoiceClaudeApp(rumps.App):
             self.stt_backend = cfg["VOICE_STT_BACKEND"]
         self._update_tts_voice_menu_title()
         self._refresh_tts_voice_submenu()
+        self._refresh_conv_menu()
         self._validate_stt_backend()
 
     # ── F083: Reload Config ──────────────────────────────────
@@ -688,6 +728,11 @@ class VoiceClaudeApp(rumps.App):
         if self._claude_invocation_start:
             elapsed = time.monotonic() - self._claude_invocation_start
             lines.append(f"  Claude CLI: running ({elapsed:.0f}s)")
+        # Phase 25: conversation info
+        lines.append(f"  Conversation mode: {'on' if get_conversation_mode() else 'off'}")
+        conv_sid = get_claude_session_id(create_if_missing=False)
+        conv_detail = conv_sid if conv_sid else ("not created yet" if get_conversation_mode() else "disabled")
+        lines.append(f"  Claude session id: {conv_detail}")
         lines.append("")
 
         # ── app_events ──
@@ -762,6 +807,11 @@ class VoiceClaudeApp(rumps.App):
                     lines.append(f"  tts_fallback_reason: {fallback_reason}")
                 if fallback_detail:
                     lines.append(f"  tts_fallback_detail: {fallback_detail[:160]}")
+                # Phase 25: conversation info
+                if data.get("conversation_mode") is not None:
+                    lines.append(f"  conversation_mode: {data.get('conversation_mode')}")
+                if data.get("claude_session_id"):
+                    lines.append(f"  claude_session_id: {data.get('claude_session_id')}")
                 # F075: resource mismatch diagnostic
                 fbreason = f"{fallback_reason}\n{fallback_detail}".lower()
                 if "mismatched" in fbreason or "55000000" in fbreason or "resource id" in fbreason:
@@ -782,6 +832,62 @@ class VoiceClaudeApp(rumps.App):
             lines.append("(no last_result.json yet)")
 
         self._show_text_window(title="View Logs", message="\n".join(lines))
+
+    # ── Phase 25: Conversation mode ──────────────────────────
+
+    def _refresh_conv_menu(self) -> None:
+        """Refresh conversation mode menu items from current config."""
+        conv_mode = get_conversation_mode()
+        self._conv_session_id = get_claude_session_id(create_if_missing=False)
+        self._set_menu_title(
+            self.conversation_status_item,
+            "Conversation: On" if conv_mode else "Conversation: Off",
+        )
+
+    def _toggle_conversation_mode(self, sender: rumps.MenuItem) -> None:
+        """Toggle VOICE_CONVERSATION_MODE between true/false."""
+        import json as _json
+
+        conv_mode = get_conversation_mode()
+        new_mode = not conv_mode
+        cfg_path = get_config_path()
+        cfg = load_config()
+        cfg["VOICE_CONVERSATION_MODE"] = "true" if new_mode else "false"
+        cfg_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = cfg_path.with_name(f"{cfg_path.name}.tmp")
+        tmp_path.write_text(_json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        tmp_path.replace(cfg_path)
+        self._refresh_conv_menu()
+        label = "On" if new_mode else "Off"
+        self._alert_on_main(
+            title="Conversation Mode",
+            message=f"Conversation mode is now {label}.",
+        )
+
+    def _new_conversation(self, sender: rumps.MenuItem) -> None:
+        """Generate a new session UUID and persist it."""
+        sid = new_conversation_session()
+        self._conv_session_id = sid
+        self._refresh_conv_menu()
+        self._alert_on_main(
+            title="New Conversation",
+            message=f"Started new conversation.\nSession ID: {sid}",
+        )
+
+    def _show_conversation_id(self, sender: rumps.MenuItem) -> None:
+        """Show the current Claude session ID."""
+        sid = get_claude_session_id()
+        conv_mode = get_conversation_mode()
+        if not conv_mode:
+            self._alert_on_main(
+                title="Conversation ID",
+                message="Conversation mode is OFF. Enable it to get a session ID.",
+            )
+            return
+        self._alert_on_main(
+            title="Conversation ID",
+            message=f"Claude Session ID:\n{sid}",
+        )
 
     # ── Mic Diagnostic ───────────────────────────────────────
 
@@ -979,6 +1085,13 @@ class VoiceClaudeApp(rumps.App):
         tts_env_override = os.environ.get("VOICE_TTS_BACKEND", "").strip()
         if tts_env_override:
             lines.append(f"  env override: VOICE_TTS_BACKEND={tts_env_override}")
+        lines.append("")
+
+        # Phase 25: conversation info
+        lines.append(self._check_item("Conversation mode", True, "on" if get_conversation_mode() else "off", ""))
+        conv_sid = get_claude_session_id(create_if_missing=False)
+        conv_detail = conv_sid if conv_sid else ("not created yet" if get_conversation_mode() else "disabled")
+        lines.append(self._check_item("Claude session id", True, conv_detail, ""))
         lines.append("")
 
         claude_workdir = get_claude_workdir()

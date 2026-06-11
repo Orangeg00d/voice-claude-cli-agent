@@ -2651,3 +2651,26 @@
 - Full test suite passed: 344/344.
 - `.venv/bin/python setup.py py2app` passed.
 - Rebuilt, ad-hoc signed, and reinstalled `~/Applications/VoiceClaudeAgent.app`.
+
+## 2026-06-11 16:05 — Codex Review: Phase 25 Conversation Session (F088-F091)
+
+### Finding
+- Claude implemented the core `--session-id` path, but the first handoff was not yet shippable:
+  - lint failed due to unused imports.
+  - `feature_list.json`, README, RELEASE_NOTES, MANUAL_TEST_CURRENT, DEVELOPER_PROGRAM_APPLICATION, and this progress log were not updated.
+  - `run_claude(extra_args=...)` dropped `--session-id` when conversation mode was enabled.
+  - read-only UI paths such as app initialization, Health Check, Settings validation tests, Reset Settings, and Reload Config could create or overwrite `config.json` just by reading the current session id.
+  - Settings / Reload Config did not refresh the Conversation menu status.
+
+### Completed
+- Added side-effect-free session ID reads with `get_claude_session_id(create_if_missing=False)` for menu/status/log/check paths.
+- Kept auto-generation for actual Claude execution and explicit user actions such as Show Conversation ID / New Conversation.
+- Fixed `run_claude()` command construction so extra args and `--session-id` are both preserved.
+- Settings / Reload Config now refresh the Conversation menu.
+- Added regression tests for command construction with extra args and reload menu refresh.
+- Added F088-F091 to `feature_list.json`.
+- Updated README, RELEASE_NOTES, MANUAL_TEST_CURRENT, and DEVELOPER_PROGRAM_APPLICATION to Phase 25 / F001-F091 / 372 tests.
+
+### Verification
+- `./init.sh lint` passed.
+- Full test suite passed: 372/372.

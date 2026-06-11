@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![macOS](https://img.shields.io/badge/platform-macOS-lightgrey)](https://www.apple.com/macos/)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-green)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-344%20passing-brightgreen)](tests/)
+[![Tests](https://img.shields.io/badge/tests-372%20passing-brightgreen)](tests/)
 
 一个面向 macOS 的 local-first 语音 Agent 项目。目标是让用户通过语音唤醒发出开发指令，由本地 Claude CLI 执行任务，并在完成后用语音播报结果；STT/TTS 默认可本地运行，也可按需切换到 Volcengine/Doubao 云端后端。
 
@@ -41,6 +41,8 @@ cat > ~/.voice-claude-agent/config.json <<'JSON'
 {
   "VOICE_RECORD_SECONDS": "10",
   "VOICE_CLAUDE_TIMEOUT_SECONDS": "600",
+  "VOICE_CONVERSATION_MODE": "true",
+  "VOICE_CLAUDE_SESSION_ID": "",
   "VOICE_STT_BACKEND": "whisper-cli",
   "WHISPER_CPP_MODEL": "/path/to/ggml-base.bin",
   "WHISPER_CPP_LANGUAGE": "zh"
@@ -55,7 +57,7 @@ JSON
 
 ## Current Status
 
-Phases 1-24 已完成，共 87 项验收 (F001-F087) 全部通过，344 个测试，lint clean。Phase 22 增加回复风格、播报摘要长度配置、东方浩然/阿虎 Seed TTS 2.0 音色，以及 Stop Current Run 取消当前 Claude CLI 任务和当前 TTS 播报。Phase 23 增加 402 余额不足中文提示、Current Status 菜单状态显示、Reload Config 热重载配置，以及 MANUAL_TEST_CURRENT.md 人工验收文档。Phase 24 增加可配置 Claude CLI 超时时间、timeout 日志可观测性和更友好的超时语音提示。
+Phases 1-25 已完成，共 91 项验收 (F001-F091) 全部通过，372 个测试，lint clean。Phase 22 增加回复风格、播报摘要长度配置、东方浩然/阿虎 Seed TTS 2.0 音色，以及 Stop Current Run 取消当前 Claude CLI 任务和当前 TTS 播报。Phase 23 增加 402 余额不足中文提示、Current Status 菜单状态显示、Reload Config 热重载配置，以及 MANUAL_TEST_CURRENT.md 人工验收文档。Phase 24 增加可配置 Claude CLI 超时时间、timeout 日志可观测性和更友好的超时语音提示。Phase 25 增加默认开启的连续对话模式，通过 Claude CLI `--session-id` 复用上下文。
 
 核心能力：
 - CLI 文本/语音命令执行，高风险动作二次确认；菜单栏语音流程支持说“同意/取消”确认高风险动作
@@ -210,7 +212,7 @@ MIT License — 详见 [LICENSE](LICENSE)。欢迎通过 [CONTRIBUTING.md](CONTR
 
 ## 开发状态
 
-Current main — F001-F087 (Phase 1-24) 全部通过。344 个测试。详情见 `feature_list.json`、`RELEASE_NOTES.md`。
+Current main — F001-F091 (Phase 1-25) 全部通过。372 个测试。详情见 `feature_list.json`、`RELEASE_NOTES.md`。
 
 v0.1.0 Release — F001-F067 (Phase 1-13)，223 个测试，已发布到 GitHub Releases。
 

@@ -48,6 +48,8 @@ def write_session(entry: dict) -> Path:
         "tts_fallback_used": entry.get("tts_fallback_used", False),
         "tts_fallback_reason": entry.get("tts_fallback_reason", ""),
         "tts_fallback_detail": entry.get("tts_fallback_detail", ""),
+        "conversation_mode": entry.get("conversation_mode", False),
+        "claude_session_id": entry.get("claude_session_id", ""),
     }
 
     with open(log_path, "a", encoding="utf-8") as f:

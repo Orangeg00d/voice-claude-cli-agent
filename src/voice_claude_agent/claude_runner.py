@@ -6,7 +6,11 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from voice_claude_agent.config import DEFAULT_TIMEOUT_SECONDS, get_claude_workdir
+from voice_claude_agent.config import (
+    DEFAULT_TIMEOUT_SECONDS,
+    get_claude_workdir,
+    get_claude_session_id,
+)
 
 
 @dataclass
@@ -52,7 +56,12 @@ def run_claude(
     workdir: str | Path | None = None,
     cancel_event: threading.Event | None = None,
 ) -> ClaudeRunResult:
-    command = ["claude", "-p", prompt]
+    # Phase 25: session-id for conversation continuity
+    session_id = get_claude_session_id()
+    if session_id:
+        command = ["claude", "--session-id", session_id, "-p", prompt]
+    else:
+        command = ["claude", "-p", prompt]
     if extra_args:
         command = [command[0], *extra_args, *command[1:]]
 

@@ -13,8 +13,8 @@ Voice Claude Agent 是一个 macOS local-first 语音 Agent。用户通过菜单
 
 ## 当前 main 状态
 
-- **验收项**: 87/87 passed (F001-F087)
-- **测试数量**: 344
+- **验收项**: 91/91 passed (F001-F091)
+- **测试数量**: 372
 - **最新阶段**: Phase 24 — long-running Claude task UX
 
 ## v0.1.0 功能清单 (67 项验收全部通过)
@@ -225,10 +225,35 @@ Voice Claude Agent 是一个 macOS local-first 语音 Agent。用户通过菜单
 - 建议提高 timeout 或拆分任务
 - 日志 summary 仍保留 `Timed out`，便于检索
 
+### Phase 25: Conversation Session (F088-F091)
+
+**F088 — 默认连续对话模式**
+- 新增 `VOICE_CONVERSATION_MODE`，默认开启
+- 新增 `VOICE_CLAUDE_SESSION_ID`
+- 启用时 Claude CLI 使用 `claude --session-id <uuid> -p <prompt>`
+- 关闭时保留原有独立 `claude -p <prompt>` 行为
+
+**F089 — 菜单栏会话控制**
+- 菜单栏显示 `Conversation: On/Off`
+- 新增 `Toggle Conversation Mode`
+- 新增 `New Conversation`
+- 新增 `Show Conversation ID`
+- Settings / Reload Config 后会刷新菜单状态
+
+**F090 — 会话状态可观测**
+- `sessions.jsonl` / `last_result.json` 持久化 `conversation_mode` 和 `claude_session_id`
+- View Logs 显示 conversation 信息
+- Health Check 和 CLI check 显示 conversation mode 与 session id 状态
+
+**F091 — 连续对话文档**
+- README 配置示例包含 conversation 配置
+- MANUAL_TEST_CURRENT.md 增加连续对话验收步骤
+- agent-progress.md 记录 Codex 审核发现和修复
+
 ## 测试
 
 - **测试框架**: pytest
-- **当前测试数量**: 344
+- **当前测试数量**: 372
 - **v0.1.0 发布测试数量**: 223
 - **测试覆盖**: CLI 管道、录音、STT、风险分类、菜单栏生命周期、并发安全、日志格式
 

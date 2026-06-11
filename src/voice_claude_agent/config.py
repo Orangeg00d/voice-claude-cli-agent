@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import unicodedata
+import uuid
 from pathlib import Path
 
 
@@ -98,6 +99,8 @@ CONFIG_KEYS = {
     "VOICE_TTS_SUMMARY_MAX_CHARS",
     "VOICE_CLAUDE_WORKDIR",
     "VOICE_CLAUDE_TIMEOUT_SECONDS",
+    "VOICE_CONVERSATION_MODE",
+    "VOICE_CLAUDE_SESSION_ID",
     "WHISPER_CPP_MODEL",
     "WHISPER_CPP_LANGUAGE",
     "VOLCENGINE_ASR_API_KEY",
@@ -229,3 +232,70 @@ def get_claude_timeout() -> int:
         except ValueError:
             pass
     return DEFAULT_TIMEOUT_SECONDS
+
+
+# ── Phase 25: Conversation mode ─────────────────────────
+
+
+def get_conversation_mode() -> bool:
+    """Resolve VOICE_CONVERSATION_MODE with env > config.json > default (true)."""
+    raw = get_config_value("VOICE_CONVERSATION_MODE", "true")
+    return raw.lower() in ("true", "1", "yes", "on")
+
+
+def get_claude_session_id(create_if_missing: bool = True) -> str:
+    """Return the Claude conversation session UUID.
+
+    Priority: env var > config.json > auto-generate and persist.
+    When VOICE_CONVERSATION_MODE is false, returns empty string.
+    """
+    if not get_conversation_mode():
+        return ""
+
+    sid = get_config_value("VOICE_CLAUDE_SESSION_ID", "")
+    if sid:
+        return sid
+    if not create_if_missing:
+        return ""
+    return _generate_and_persist_session_id()
+
+
+def _generate_and_persist_session_id() -> str:
+    """Generate a new UUID, persist it to config.json, and return it."""
+    import json as _json
+
+    sid = str(uuid.uuid4())
+    cfg_path = get_config_path()
+    cfg = load_config()
+    cfg["VOICE_CLAUDE_SESSION_ID"] = sid
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = cfg_path.with_name(f"{cfg_path.name}.tmp")
+    tmp_path.write_text(_json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    tmp_path.replace(cfg_path)
+    return sid
+
+
+def new_conversation_session() -> str:
+    """Generate a new session UUID, persist, and return it. Replaces any existing ID."""
+    import json as _json
+
+    sid = str(uuid.uuid4())
+    cfg_path = get_config_path()
+    cfg = load_config()
+    cfg["VOICE_CLAUDE_SESSION_ID"] = sid
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = cfg_path.with_name(f"{cfg_path.name}.tmp")
+    tmp_path.write_text(_json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    tmp_path.replace(cfg_path)
+    return sid
+
+
+def is_valid_uuid(s: str) -> bool:
+    """Return True if s is a valid UUID string."""
+    if not s:
+        return False
+    try:
+        uuid.UUID(s)
+        return True
+    except (ValueError, AttributeError):
+        return False

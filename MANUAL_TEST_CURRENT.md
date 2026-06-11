@@ -151,7 +151,24 @@
 - [ ] View Logs / last_result 显示 `timed_out: True`
 - [ ] app_events 中可看到 `claude_timeout`
 
-## 10. 多轮稳定性
+## 10. Conversation Mode
+
+点击菜单栏 `Health Check`，再点击 `View Logs`。
+
+### 预期结果
+- [ ] Health Check 显示 `Conversation mode — on`
+- [ ] 首次运行前 `Claude session id` 可显示 `not created yet`
+- [ ] 第一次 Trigger Recording 后，View Logs 显示 `conversation_mode: True`
+- [ ] View Logs 显示稳定的 `claude_session_id`
+- [ ] 连续问两个相关问题时，第二个问题可以引用第一个问题的上下文
+- [ ] 点击 `New Conversation` 后 session id 变化，后续问题从新上下文开始
+- [ ] 点击 `Toggle Conversation Mode` 后菜单显示 `Conversation: Off`，后续调用恢复独立 `claude -p` 行为
+
+### 常见问题
+- 如果连续问题仍然不连贯，先检查 View Logs 中两轮 `claude_session_id` 是否一致。
+- 如果 session id 一直为空，检查 `VOICE_CONVERSATION_MODE` 是否被设置为 `false`。
+
+## 11. 多轮稳定性
 
 重复执行 Trigger Recording 3-5 次。
 
@@ -162,7 +179,7 @@
 - [ ] app_events 日志无重复/交叉的 cycle 事件
 - [ ] sessions.jsonl 每轮一条记录
 
-## 11. App 退出
+## 12. App 退出
 
 点击 `Quit`。
 

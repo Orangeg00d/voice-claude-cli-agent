@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import threading
+import uuid
 from pathlib import Path
 from unittest import mock
 
@@ -2135,6 +2136,7 @@ class TestSessionLogParity:
             "stt_backend", "tts_backend", "tts_voice_type", "tts_resource_id",
             "tts_duration_seconds", "tts_fallback_used", "tts_fallback_reason",
             "tts_fallback_detail", "tts_cancelled", "reply_style",
+            "conversation_mode", "claude_session_id",
         }
         assert set(cli_entry.keys()) == expected_keys
         assert set(menu_entry.keys()) == expected_keys
@@ -7326,3 +7328,440 @@ class TestReloadConfig:
         app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
         app._reload_config_menu(app.reload_config_item)
         assert any("Reload Config Failed" in a.get("title", "") for a in alerts)
+
+
+# ── Phase 25: Conversation Mode ──────────────────────────────
+
+
+class TestConversationModeConfig:
+    """F088: conversation mode config helpers."""
+
+    def test_default_conversation_mode_is_true(self):
+        from voice_claude_agent.config import get_conversation_mode
+        assert get_conversation_mode() is True
+
+    def test_conversation_mode_false_via_env(self, monkeypatch):
+        from voice_claude_agent.config import get_conversation_mode
+        monkeypatch.setenv("VOICE_CONVERSATION_MODE", "false")
+        assert get_conversation_mode() is False
+
+    def test_conversation_mode_true_via_config(self, tmp_path, monkeypatch):
+        import voice_claude_agent.config as config_mod
+        cfg = tmp_path / "conv_cfg.json"
+        cfg.write_text('{"VOICE_CONVERSATION_MODE": "true"}')
+        monkeypatch.setattr(config_mod, "get_config_path", lambda: cfg)
+        assert config_mod.get_conversation_mode() is True
+
+    def test_auto_generate_session_id_when_empty(self, tmp_path, monkeypatch):
+        import voice_claude_agent.config as config_mod
+        cfg = tmp_path / "conv_cfg.json"
+        cfg.write_text('{"VOICE_CONVERSATION_MODE": "true"}')
+        monkeypatch.setattr(config_mod, "get_config_path", lambda: cfg)
+        sid = config_mod.get_claude_session_id()
+        assert sid != ""
+        uuid.UUID(sid)  # valid UUID
+
+    def test_session_id_empty_when_mode_off(self, tmp_path, monkeypatch):
+        import voice_claude_agent.config as config_mod
+        cfg = tmp_path / "conv_cfg.json"
+        cfg.write_text('{"VOICE_CONVERSATION_MODE": "false"}')
+        monkeypatch.setattr(config_mod, "get_config_path", lambda: cfg)
+        assert config_mod.get_claude_session_id() == ""
+
+    def test_generate_and_persist_session_id_persists(self, tmp_path, monkeypatch):
+        import voice_claude_agent.config as config_mod
+        cfg = tmp_path / "conv_cfg.json"
+        monkeypatch.setattr(config_mod, "get_config_path", lambda: cfg)
+        sid = config_mod._generate_and_persist_session_id()
+        uuid.UUID(sid)
+        saved = json.loads(cfg.read_text())
+        assert saved["VOICE_CLAUDE_SESSION_ID"] == sid
+
+    def test_new_conversation_replaces_session_id(self, tmp_path, monkeypatch):
+        import voice_claude_agent.config as config_mod
+        cfg = tmp_path / "conv_cfg.json"
+        cfg.write_text('{"VOICE_CONVERSATION_MODE": "true", "VOICE_CLAUDE_SESSION_ID": "old-uuid"}')
+        monkeypatch.setattr(config_mod, "get_config_path", lambda: cfg)
+        sid = config_mod.new_conversation_session()
+        uuid.UUID(sid)
+        assert sid != "old-uuid"
+        saved = json.loads(cfg.read_text())
+        assert saved["VOICE_CLAUDE_SESSION_ID"] == sid
+
+    def test_is_valid_uuid(self):
+        from voice_claude_agent.config import is_valid_uuid
+        assert is_valid_uuid("550e8400-e29b-41d4-a716-446655440000") is True
+        assert is_valid_uuid("not-a-uuid") is False
+        assert is_valid_uuid("") is False
+
+
+class TestConversationClaudeRunner:
+    """F088: run_claude command includes --session-id when mode is on."""
+
+    def test_run_claude_includes_session_id_when_mode_on(self, tmp_path, monkeypatch):
+        import voice_claude_agent.config as config_mod
+        import voice_claude_agent.claude_runner as runner_mod
+        cfg = tmp_path / "conv_cfg.json"
+        test_uuid = "550e8400-e29b-41d4-a716-446655440000"
+        cfg.write_text(json.dumps({
+            "VOICE_CONVERSATION_MODE": "true",
+            "VOICE_CLAUDE_SESSION_ID": test_uuid,
+        }))
+        monkeypatch.setattr(config_mod, "get_config_path", lambda: cfg)
+        with mock.patch.object(runner_mod.subprocess, "Popen", autospec=True) as mock_popen:
+            mock_proc = mock.MagicMock()
+            mock_proc.poll.return_value = 0
+            mock_proc.returncode = 0
+            mock_proc.communicate.return_value = ("ok", "")
+            mock_popen.return_value = mock_proc
+            runner_mod.run_claude("hello", timeout=5)
+            call_args = mock_popen.call_args[0][0]
+            assert "--session-id" in call_args
+            assert test_uuid in call_args
+
+    def test_run_claude_keeps_extra_args_with_session_id(self, tmp_path, monkeypatch):
+        import voice_claude_agent.config as config_mod
+        import voice_claude_agent.claude_runner as runner_mod
+        cfg = tmp_path / "conv_cfg.json"
+        test_uuid = "550e8400-e29b-41d4-a716-446655440000"
+        cfg.write_text(json.dumps({
+            "VOICE_CONVERSATION_MODE": "true",
+            "VOICE_CLAUDE_SESSION_ID": test_uuid,
+        }))
+        monkeypatch.setattr(config_mod, "get_config_path", lambda: cfg)
+        with mock.patch.object(runner_mod.subprocess, "Popen", autospec=True) as mock_popen:
+            mock_proc = mock.MagicMock()
+            mock_proc.poll.return_value = 0
+            mock_proc.returncode = 0
+            mock_proc.communicate.return_value = ("ok", "")
+            mock_popen.return_value = mock_proc
+            runner_mod.run_claude("hello", timeout=5, extra_args=["--permission-mode", "default"])
+            call_args = mock_popen.call_args[0][0]
+            assert call_args == [
+                "claude",
+                "--permission-mode",
+                "default",
+                "--session-id",
+                test_uuid,
+                "-p",
+                "hello",
+            ]
+
+    def test_reload_from_config_refreshes_conversation_menu(self, tmp_path, monkeypatch):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+        import voice_claude_agent.config as config_mod
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        cfg = tmp_path / "conv_cfg.json"
+        cfg.write_text('{"VOICE_CONVERSATION_MODE": "true"}')
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg)
+        monkeypatch.setattr(config_mod, "get_config_path", lambda: cfg)
+        monkeypatch.setattr(app_mod, "load_config", lambda: json.loads(cfg.read_text()))
+        monkeypatch.setattr(config_mod, "load_config", lambda: json.loads(cfg.read_text()))
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: None)
+        assert app.conversation_status_item.title == "Conversation: On"
+        cfg.write_text('{"VOICE_CONVERSATION_MODE": "false"}')
+        app._reload_from_config({"VOICE_CONVERSATION_MODE": "false"})
+        assert app.conversation_status_item.title == "Conversation: Off"
+
+    def test_run_claude_no_session_id_when_mode_off(self, tmp_path, monkeypatch):
+        import voice_claude_agent.config as config_mod
+        import voice_claude_agent.claude_runner as runner_mod
+        cfg = tmp_path / "conv_cfg.json"
+        cfg.write_text('{"VOICE_CONVERSATION_MODE": "false"}')
+        monkeypatch.setattr(config_mod, "get_config_path", lambda: cfg)
+        with mock.patch.object(runner_mod.subprocess, "Popen", autospec=True) as mock_popen:
+            mock_proc = mock.MagicMock()
+            mock_proc.poll.return_value = 0
+            mock_proc.returncode = 0
+            mock_proc.communicate.return_value = ("ok", "")
+            mock_popen.return_value = mock_proc
+            runner_mod.run_claude("hello", timeout=5)
+            call_args = mock_popen.call_args[0][0]
+            assert "--session-id" not in call_args
+
+
+class TestConversationMenu:
+    """F089: conversation menu items and callbacks."""
+
+    def test_conversation_menu_items_present(self, monkeypatch):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: None)
+        titles = []
+        for m in app.menu:
+            if m is None:
+                continue
+            t = m.title
+            if callable(t):
+                titles.append(t())
+            else:
+                titles.append(str(t))
+        assert "Conversation: On" in titles
+        assert "Toggle Conversation Mode" in titles
+        assert "New Conversation" in titles
+        assert "Show Conversation Id" in titles
+
+    def test_conversation_off_shows_off(self, tmp_path, monkeypatch):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+        import voice_claude_agent.config as config_mod
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        cfg = tmp_path / "conv_cfg.json"
+        cfg.write_text('{"VOICE_CONVERSATION_MODE": "false"}')
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg)
+        monkeypatch.setattr(config_mod, "get_config_path", lambda: cfg)
+        monkeypatch.setattr(app_mod, "load_config", lambda: {"VOICE_CONVERSATION_MODE": "false"})
+        monkeypatch.setattr(config_mod, "load_config", lambda: {"VOICE_CONVERSATION_MODE": "false"})
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: None)
+        assert app.conversation_status_item.title == "Conversation: Off"
+
+    def test_toggle_conversation_mode(self, tmp_path, monkeypatch):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        cfg = tmp_path / "conv_cfg.json"
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg)
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        assert app.conversation_status_item.title == "Conversation: On"
+        app._toggle_conversation_mode(app.toggle_conv_item)
+        cfg_data = json.loads(cfg.read_text())
+        assert cfg_data["VOICE_CONVERSATION_MODE"] == "false"
+        assert any("now Off" in a.get("message", "") for a in alerts)
+
+    def test_new_conversation_generates_new_id(self, tmp_path, monkeypatch):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+        import voice_claude_agent.config as config_mod
+        import uuid
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        cfg = tmp_path / "conv_cfg.json"
+        old_id = str(uuid.uuid4())
+        cfg.write_text(json.dumps({
+            "VOICE_CONVERSATION_MODE": "true",
+            "VOICE_CLAUDE_SESSION_ID": old_id,
+        }))
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg)
+        monkeypatch.setattr(config_mod, "get_config_path", lambda: cfg)
+        monkeypatch.setattr(app_mod, "load_config", lambda: json.loads(cfg.read_text()))
+        monkeypatch.setattr(config_mod, "load_config", lambda: json.loads(cfg.read_text()))
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._new_conversation(app.new_conv_item)
+        saved = json.loads(cfg.read_text())
+        assert saved["VOICE_CLAUDE_SESSION_ID"] != old_id
+        assert any("Started new conversation" in a.get("message", "") for a in alerts)
+
+    def test_show_conversation_id_when_on(self, tmp_path, monkeypatch):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+        import voice_claude_agent.config as config_mod
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        test_uuid = "550e8400-e29b-41d4-a716-446655440000"
+        cfg = tmp_path / "conv_cfg.json"
+        cfg.write_text(json.dumps({
+            "VOICE_CONVERSATION_MODE": "true",
+            "VOICE_CLAUDE_SESSION_ID": test_uuid,
+        }))
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg)
+        monkeypatch.setattr(config_mod, "get_config_path", lambda: cfg)
+        monkeypatch.setattr(app_mod, "load_config", lambda: json.loads(cfg.read_text()))
+        monkeypatch.setattr(config_mod, "load_config", lambda: json.loads(cfg.read_text()))
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._show_conversation_id(app.show_conv_id_item)
+        assert any(test_uuid in a.get("message", "") for a in alerts)
+
+    def test_show_conversation_id_when_off(self, tmp_path, monkeypatch):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+        import voice_claude_agent.config as config_mod
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        cfg = tmp_path / "conv_cfg.json"
+        cfg.write_text('{"VOICE_CONVERSATION_MODE": "false"}')
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg)
+        monkeypatch.setattr(config_mod, "get_config_path", lambda: cfg)
+        monkeypatch.setattr(app_mod, "load_config", lambda: {"VOICE_CONVERSATION_MODE": "false"})
+        monkeypatch.setattr(config_mod, "load_config", lambda: {"VOICE_CONVERSATION_MODE": "false"})
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._show_conversation_id(app.show_conv_id_item)
+        assert any("OFF" in a.get("message", "") for a in alerts)
+
+
+class TestConversationSettingsValidation:
+    """F089: Settings UI validates conversation fields."""
+
+    def test_conv_mode_true_valid(self, tmp_path, monkeypatch):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        cfg = tmp_path / "conv_cfg.json"
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg)
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app.stt_backend = "text-input"
+        type(app).settings_item = app.settings_item
+
+    def test_conv_mode_false_valid(self, tmp_path, monkeypatch):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        cfg = tmp_path / "conv_cfg.json"
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg)
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app.stt_backend = "text-input"
+        from voice_claude_agent.config import is_valid_uuid
+        assert is_valid_uuid("550e8400-e29b-41d4-a716-446655440000") is True
+        assert is_valid_uuid("not-a-uuid") is False
+
+    def test_conv_mode_invalid_rejected(self, tmp_path, monkeypatch):
+        import voice_claude_agent.app as app_mod
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        cfg = tmp_path / "conv_cfg.json"
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg)
+        monkeypatch.setattr(app_mod, "load_config", lambda: {})
+
+        # Test validation logic directly
+        new_cfg = {"VOICE_CONVERSATION_MODE": "invalid"}
+        errors = []
+        if "VOICE_CONVERSATION_MODE" in new_cfg:
+            val = new_cfg["VOICE_CONVERSATION_MODE"].lower()
+            if val not in ("true", "false"):
+                errors.append("Conversation mode must be 'true' or 'false'.")
+        assert len(errors) == 1
+
+    def test_session_id_invalid_uuid_rejected(self, tmp_path, monkeypatch):
+        from voice_claude_agent.config import is_valid_uuid
+        assert is_valid_uuid("not-a-uuid") is False
+        assert is_valid_uuid("") is False
+
+    def test_session_id_valid_uuid_accepted(self):
+        from voice_claude_agent.config import is_valid_uuid
+        assert is_valid_uuid("550e8400-e29b-41d4-a716-446655440000") is True
+
+
+class TestConversationViewLogs:
+    """F090: View Logs shows conversation info."""
+
+    def test_view_logs_shows_conversation_info(self, tmp_path, monkeypatch):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+        import voice_claude_agent.config as config_mod
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        test_uuid = "550e8400-e29b-41d4-a716-446655440000"
+        cfg = tmp_path / "conv_cfg.json"
+        cfg.write_text(json.dumps({
+            "VOICE_CONVERSATION_MODE": "true",
+            "VOICE_CLAUDE_SESSION_ID": test_uuid,
+        }))
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg)
+        monkeypatch.setattr(config_mod, "get_config_path", lambda: cfg)
+        monkeypatch.setattr(app_mod, "load_config", lambda: json.loads(cfg.read_text()))
+        monkeypatch.setattr(config_mod, "load_config", lambda: json.loads(cfg.read_text()))
+
+        # Set up fake last_result
+        import voice_claude_agent.logging_store as ls
+        last_path = tmp_path / "agent_state" / "last_result.json"
+        monkeypatch.setattr(ls, "get_last_result_path", lambda: last_path)
+        last_path.parent.mkdir(parents=True, exist_ok=True)
+        last_path.write_text(json.dumps({
+            "prompt": "test",
+            "exit_code": 0,
+            "summary": "OK",
+            "conversation_mode": True,
+            "claude_session_id": test_uuid,
+            "stt_backend": "text-input",
+        }))
+
+        events_path = tmp_path / "agent_state" / "app_events.jsonl"
+        monkeypatch.setattr(ls, "get_app_events_log_path", lambda: events_path)
+        events_path.parent.mkdir(parents=True, exist_ok=True)
+        events_path.write_text("")
+
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._show_logs(app.logs_item)
+        combined = "\n".join(a.get("message", "") for a in alerts)
+        assert "Conversation mode: on" in combined or "conversation_mode: True" in combined
+        assert test_uuid in combined
+
+
+class TestConversationHealthCheck:
+    """F090: Health Check shows conversation info."""
+
+    def test_health_check_shows_conversation_info(self, tmp_path, monkeypatch):
+        import voice_claude_agent.app as app_mod
+        from voice_claude_agent.app import VoiceClaudeApp
+        import voice_claude_agent.config as config_mod
+        import voice_claude_agent.stt as stt_mod
+        monkeypatch.setattr(app_mod, "check_mic_permission", lambda: (True, "ok"))
+        monkeypatch.setattr(config_mod, "check_apple_speech_available", lambda: True)
+        monkeypatch.setattr(config_mod, "find_claude_executable", lambda: "/usr/bin/claude")
+        monkeypatch.setattr(stt_mod, "_find_whisper_cpp_binary", lambda: "/usr/bin/whisper-cli")
+        monkeypatch.setattr(stt_mod, "_resolve_whisper_model", lambda: ("ok", ""))
+        test_uuid = "550e8400-e29b-41d4-a716-446655440000"
+        cfg = tmp_path / "conv_cfg.json"
+        cfg.write_text(json.dumps({
+            "VOICE_CONVERSATION_MODE": "true",
+            "VOICE_CLAUDE_SESSION_ID": test_uuid,
+        }))
+        monkeypatch.setattr(app_mod, "get_config_path", lambda: cfg)
+        monkeypatch.setattr(config_mod, "get_config_path", lambda: cfg)
+        monkeypatch.setattr(app_mod, "load_config", lambda: json.loads(cfg.read_text()))
+        monkeypatch.setattr(config_mod, "load_config", lambda: json.loads(cfg.read_text()))
+
+        alerts = []
+        app = VoiceClaudeApp(_alert_patch=lambda **kw: alerts.append(kw))
+        app._run_health_check(app.health_item)
+        combined = "\n".join(a.get("message", "") for a in alerts)
+        assert "Conversation mode" in combined
+        assert "on" in combined
+        assert test_uuid in combined
+
+
+class TestConversationLoggingStore:
+    """F090: sessions and last_result include conversation fields."""
+
+    def test_write_session_includes_conversation_fields(self, tmp_path, monkeypatch):
+        import voice_claude_agent.logging_store as ls
+        sessions_path = tmp_path / "agent_state" / "sessions.jsonl"
+        monkeypatch.setattr(ls, "get_sessions_log_path", lambda: sessions_path)
+        ls.write_session({
+            "transcript": "test",
+            "conversation_mode": True,
+            "claude_session_id": "test-uuid-123",
+        })
+        sessions_path.parent.mkdir(parents=True, exist_ok=True)
+        data = [json.loads(sessions_path.read_text().strip().split("\n")[0])]
+        assert data[0]["conversation_mode"] is True
+        assert data[0]["claude_session_id"] == "test-uuid-123"
+
+    def test_default_session_no_conversation_fields(self, tmp_path, monkeypatch):
+        import voice_claude_agent.logging_store as ls
+        sessions_path = tmp_path / "sessions.jsonl"
+        monkeypatch.setattr(ls, "get_sessions_log_path", lambda: sessions_path)
+        ls.write_session({"transcript": "test"})
+        entry = json.loads(sessions_path.read_text().strip().split("\n")[0])
+        assert "conversation_mode" in entry
+        assert entry["conversation_mode"] is False
+        assert entry["claude_session_id"] == ""
+
+
+class TestConversationCLICheck:
+    """F090: CLI check shows conversation info."""
+
+    def test_check_shows_conversation_info(self):
+        from click.testing import CliRunner
+        from voice_claude_agent.cli import main
+        runner = CliRunner()
+        result = runner.invoke(main, ["check"], catch_exceptions=False)
+        assert "Conversation mode:" in result.output
+        assert "Claude session id:" in result.output

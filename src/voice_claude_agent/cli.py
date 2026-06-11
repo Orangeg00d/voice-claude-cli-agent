@@ -12,6 +12,8 @@ from voice_claude_agent.config import (
     get_claude_workdir,
     get_config_value,
     get_claude_timeout,
+    get_conversation_mode,
+    get_claude_session_id,
 )
 from voice_claude_agent.claude_runner import run_claude, reset_cancel_event
 from voice_claude_agent.logging_store import write_session, write_last_result
@@ -210,6 +212,12 @@ def check():
         f"  Claude workdir:   {'OK' if status['claude_workdir_ok'] else 'INVALID'}"
         f" ({status['claude_workdir']})"
     )
+    # Phase 25: conversation info
+    conv_mode = get_conversation_mode()
+    click.echo(f"  Conversation mode: {'on' if conv_mode else 'off'}")
+    session_id = get_claude_session_id(create_if_missing=False)
+    session_detail = session_id if session_id else ("not created yet" if conv_mode else "disabled")
+    click.echo(f"  Claude session id: {session_detail}")
 
     all_ok = (
         status["claude_available"]
@@ -263,6 +271,10 @@ def _run_pipeline(
         speaker = FakeSpeaker()
     else:
         speaker = create_speaker()
+
+    # Phase 25: conversation mode metadata
+    conv_mode = get_conversation_mode()
+    conv_session_id = get_claude_session_id()
 
     # 1. Risk classification
     risk_level = classify_risk(prompt)
@@ -359,6 +371,8 @@ def _run_pipeline(
             "tts_fallback_detail": tts_fallback_detail,
             "cancelled": result_cancelled,
             "tts_cancelled": tts_cancelled,
+            "conversation_mode": conv_mode,
+            "claude_session_id": conv_session_id,
         })
         write_last_result({
             "prompt": prompt,
@@ -379,6 +393,8 @@ def _run_pipeline(
             "tts_fallback_detail": tts_fallback_detail,
             "cancelled": result_cancelled,
             "tts_cancelled": tts_cancelled,
+            "conversation_mode": conv_mode,
+            "claude_session_id": conv_session_id,
         })
         return
 
@@ -445,6 +461,8 @@ def _run_pipeline(
         "tts_fallback_detail": tts_fallback_detail,
         "cancelled": result_cancelled,
         "tts_cancelled": tts_cancelled,
+        "conversation_mode": conv_mode,
+        "claude_session_id": conv_session_id,
     })
 
     write_last_result({
@@ -466,6 +484,8 @@ def _run_pipeline(
         "tts_fallback_detail": tts_fallback_detail,
         "cancelled": result_cancelled,
         "tts_cancelled": tts_cancelled,
+        "conversation_mode": conv_mode,
+        "claude_session_id": conv_session_id,
     })
 
 

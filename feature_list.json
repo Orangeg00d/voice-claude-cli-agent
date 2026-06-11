@@ -1247,6 +1247,63 @@
       ],
       "passes": true,
       "evidence": "Timeout branch now speaks '任务执行超时，可能任务较长。你可以提高超时时间，或把任务拆成几个小任务。' while preserving summary='Timed out'. Tests cover the spoken timeout message and persisted timeout state."
+    },
+    {
+      "id": "F088",
+      "priority": 88,
+      "category": "conversation",
+      "description": "Default conversation mode reuses a Claude CLI session",
+      "steps": [
+        "Add VOICE_CONVERSATION_MODE with default true",
+        "Add VOICE_CLAUDE_SESSION_ID with UUID generation",
+        "Run Claude with --session-id when conversation mode is enabled",
+        "Keep one-shot claude -p behavior when conversation mode is disabled"
+      ],
+      "passes": true,
+      "evidence": "Added conversation config helpers and run_claude command construction using claude --session-id <uuid> -p <prompt>. Session IDs are generated when Claude actually runs, while read-only UI/checks do not mutate config. Tests cover default enabled mode, disabled mode, UUID generation, and command construction."
+    },
+    {
+      "id": "F089",
+      "priority": 89,
+      "category": "app",
+      "description": "Menu controls manage conversation mode and new conversations",
+      "steps": [
+        "Show Conversation: On/Off in the menu",
+        "Add Toggle Conversation Mode",
+        "Add New Conversation",
+        "Add Show Conversation ID",
+        "Refresh conversation status after Settings and Reload Config"
+      ],
+      "passes": true,
+      "evidence": "Menu includes Conversation status, Toggle Conversation Mode, New Conversation, and Show Conversation ID. New Conversation persists a new UUID. Settings/Reload now refresh the menu status without creating a session as a side effect. Tests cover menu items, toggle, new conversation, show ID, and reload refresh."
+    },
+    {
+      "id": "F090",
+      "priority": 90,
+      "category": "observability",
+      "description": "Conversation metadata is visible in logs and health checks",
+      "steps": [
+        "Persist conversation_mode and claude_session_id in sessions.jsonl",
+        "Persist conversation_mode and claude_session_id in last_result.json",
+        "Show conversation metadata in View Logs",
+        "Show conversation mode and session ID state in Health Check and CLI check"
+      ],
+      "passes": true,
+      "evidence": "sessions.jsonl and last_result.json include conversation_mode and claude_session_id. View Logs, Health Check, and CLI check show conversation state, using 'not created yet' for enabled mode before the first Claude run. Tests cover logging, View Logs, Health Check, and CLI check."
+    },
+    {
+      "id": "F091",
+      "priority": 91,
+      "category": "docs",
+      "description": "Documentation covers conversation mode manual testing",
+      "steps": [
+        "Update README current status and config example",
+        "Update RELEASE_NOTES with Phase 25",
+        "Update MANUAL_TEST_CURRENT with conversation mode acceptance steps",
+        "Update agent-progress with Codex review findings"
+      ],
+      "passes": true,
+      "evidence": "README, RELEASE_NOTES, MANUAL_TEST_CURRENT, and agent-progress.md document Phase 25 conversation mode behavior, test count, and manual acceptance workflow."
     }
   ]
 }
